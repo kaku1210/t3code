@@ -32,6 +32,7 @@ import type {
   ResolvedKeybindingsConfig,
   RuntimeMode,
   RuntimeRequestId,
+  RunId,
   ScopedThreadRef,
   ServerProvider,
   ThreadId,
@@ -271,6 +272,7 @@ import { readEnvironmentScope, readPreparedConnection } from "../../state/sessio
 import type { ReviewCommentContext } from "../../reviewCommentContext";
 import { useComposerRestingTransition } from "./useComposerRestingTransition";
 import { ComposerCommandMenuLayer } from "./ComposerCommandMenuLayer";
+import { useNextPromptSuggestion } from "./useNextPromptSuggestion";
 import { useRestingComposerControlsLayout } from "./useRestingComposerControlsLayout";
 import { useProviderWorkspaceSnapshotRefresh } from "./useProviderWorkspaceSnapshotRefresh";
 import { useComposerProviderModel } from "./useComposerProviderModel";
@@ -370,6 +372,7 @@ export interface ChatComposerProps {
   activeThreadId: ThreadId | null;
   activeThread: Thread | undefined;
   activeThreadShell: ThreadShell | null;
+  promptSuggestionRunId?: RunId | null;
   promptHistoryEntries: ReadonlyArray<TimelineEntry>;
   forceExpandedOnMobile: boolean;
   projectSelectionRequired: boolean;
@@ -529,6 +532,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     onMultipleModelSelectionsChange: setMultipleModelSelections,
     activeThreadId,
     activeThread,
+    promptSuggestionRunId,
     promptHistoryEntries,
     forceExpandedOnMobile,
     projectSelectionRequired,
@@ -2309,6 +2313,34 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const expandMobileComposerStable = useStableCallback(expandMobileComposer);
 
+  const promptSuggestion = useNextPromptSuggestion(
+    routeThreadRef,
+    promptSuggestionRunId ?? null,
+    routeKind === "server" &&
+      activeThreadId === routeThreadRef.threadId &&
+      canOperateThread &&
+      phase !== "running" &&
+      !isSendBusy &&
+      !isRevertingCheckpoint &&
+      !isCompacting &&
+      !isPreparingWorktree &&
+      !isEditingQueuedMessage &&
+      !composerMenuOpen &&
+      !projectSelectionRequired &&
+      !showProviderUnavailable &&
+      !showPlanFollowUpPrompt &&
+      environmentUnavailable === null &&
+      pendingApprovals.length === 0 &&
+      incomingPendingUserInputs.length === 0 &&
+      speechInput.state.phase === "idle" &&
+      prompt.length === 0 &&
+      !composerDraftHasUserContent(composerDraft),
+  );
+  const acceptPromptSuggestion = () =>
+    promptSuggestion !== null &&
+    promptRef.current.length === 0 &&
+    applyPromptReplacement(0, 0, promptSuggestion);
+
   const onComposerCommandKey = (key: string, event: KeyboardEvent, isTaskItem?: boolean) =>
     composerCommandKeyHandler({
       keybindings,
@@ -2342,6 +2374,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       toggleInteractionMode,
       nudgeComposerMenuHighlight,
       onSelectComposerItem,
+      acceptPromptSuggestion,
       resolveActiveComposerTrigger,
       readComposerSnapshot,
       applyPromptReplacement,
@@ -3541,7 +3574,9 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               ? t("composer.chooseProjectAbove")
                               : showProviderUnavailable
                                 ? t("composer.enableProviderToSend")
-                                : t("composer.placeholder")
+                                : promptSuggestion === null
+                                  ? t("composer.placeholder")
+                                  : ""
                     }
                     disabled={
                       projectSelectionRequired ||
@@ -3551,6 +3586,21 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     }
                   />
                 </ComposerContextActionsContext>
+                {promptSuggestion !== null ? (
+                  <div className="pointer-events-none absolute inset-x-0 top-0 flex flex-wrap items-baseline gap-x-2 text-(length:--font-size-prompt,var(--text-sm)) text-muted-foreground">
+                    <button
+                      type="button"
+                      className="pointer-events-auto cursor-pointer text-left hover:text-foreground"
+                      data-composer-prompt-suggestion
+                      aria-description={t("composer.acceptSuggestion")}
+                      onClick={acceptPromptSuggestion}
+                    >
+                      {promptSuggestion}
+                    </button>
+                    <span>{t("composer.acceptSuggestion")}</span>
+                    <span>{t("composer.shortcutHints")}</span>
+                  </div>
+                ) : null}
                 {showMobilePendingAnswerActions ? (
                   <div
                     data-chat-composer-mobile-pending-actions="true"

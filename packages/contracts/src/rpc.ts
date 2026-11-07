@@ -37,7 +37,8 @@ import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import * as RpcMiddleware from "effect/rpc/RpcMiddleware";
-import { NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NonNegativeInt, RunId, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { TextGenerationError } from "./git.ts";
 import {
   ProviderAuthCancelInput,
   ProviderAuthCompleteInput,
@@ -424,6 +425,7 @@ export const WS_METHODS = {
   filesystemGetMetadata: "filesystem.getMetadata",
   agentSessionsScan: "agentSessions.scan",
   agentSessionsImport: "agentSessions.import",
+  threadPromptSuggestion: "thread.suggestNextPrompt",
   assetsCreateUrl: "assets.createUrl",
   assetsPersistChatAttachments: "assets.persistChatAttachments",
   attachmentsCreateUploadUrl: "attachments.createUploadUrl",
@@ -1394,6 +1396,21 @@ const WsAgentSessionsImportRpc = Rpc.make(WS_METHODS.agentSessionsImport, {
   ]),
 });
 
+export const ThreadPromptSuggestionInput = Schema.Struct({ threadId: ThreadId, runId: RunId });
+export type ThreadPromptSuggestionInput = typeof ThreadPromptSuggestionInput.Type;
+
+/** A null suggestion means the completed turn has no actionable next prompt. */
+export const ThreadPromptSuggestionResult = Schema.Struct({
+  suggestion: Schema.NullOr(Schema.String),
+});
+export type ThreadPromptSuggestionResult = typeof ThreadPromptSuggestionResult.Type;
+
+const WsThreadPromptSuggestionRpc = Rpc.make(WS_METHODS.threadPromptSuggestion, {
+  payload: ThreadPromptSuggestionInput,
+  success: ThreadPromptSuggestionResult,
+  error: Schema.Union([TextGenerationError, EnvironmentAuthorizationError]),
+});
+
 const WsAssetsCreateUrlRpc = Rpc.make(WS_METHODS.assetsCreateUrl, {
   payload: AssetCreateUrlInput,
   success: AssetCreateUrlResult,
@@ -2130,6 +2147,7 @@ export const WsRpcGroup = RpcGroup.make(
   WsFilesystemGetMetadataRpc,
   WsAgentSessionsScanRpc,
   WsAgentSessionsImportRpc,
+  WsThreadPromptSuggestionRpc,
   WsAssetsCreateUrlRpc,
   WsAssetsPersistChatAttachmentsRpc,
   WsAttachmentsCreateUploadUrlRpc,

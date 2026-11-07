@@ -1,7 +1,9 @@
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
-import { DEFAULT_COMPOSER_PLACEHOLDER } from "../composerPlaceholder";
+import { COMPOSER_SHORTCUT_HINTS, DEFAULT_COMPOSER_PLACEHOLDER } from "../composerPlaceholder";
 import { threadMessages } from "./threadMessages";
 import { settingsDetailMessages } from "./settingsDetailMessages";
+
+const chineseComposerShortcutHints = "@ 引用文件，$ 选择技能，/ 打开命令，↑ 上一句";
 
 const messages = {
   ...threadMessages,
@@ -230,8 +232,10 @@ const messages = {
   ],
   "composer.placeholder": [
     DEFAULT_COMPOSER_PLACEHOLDER,
-    "输入你的任务。@ 引用文件，$ 选择技能，/ 打开命令",
+    `输入你的任务。${chineseComposerShortcutHints}`,
   ],
+  "composer.shortcutHints": [COMPOSER_SHORTCUT_HINTS, chineseComposerShortcutHints],
+  "composer.acceptSuggestion": ["Tab or click to fill the draft", "按 Tab 或点击填入草稿"],
   "composer.attach": ["Attach files", "添加附件"],
   "composer.send": ["Submit message", "发送消息"],
   "composer.expand": ["Expand composer", "展开输入区"],

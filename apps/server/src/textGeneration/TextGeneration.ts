@@ -132,6 +132,29 @@ export const make = Effect.gen(function* () {
     );
   });
   return TextGeneration.of({
+    generatePromptSuggestion: Effect.fn("TextGeneration.generatePromptSuggestion")(
+      function* (input) {
+        const instance = yield* registry.getInstance(input.modelSelection.instanceId);
+        const snapshot = instance ? yield* instance.snapshot.getSnapshot : undefined;
+        if (
+          !instance ||
+          !snapshot?.enabled ||
+          !isProviderAvailable(snapshot) ||
+          !isProviderTextGenerationCapable(snapshot)
+        ) {
+          return yield* new TextGenerationError({
+            operation: "generatePromptSuggestion",
+            detail: "The selected prompt suggestion provider is unavailable.",
+          });
+        }
+        const now = DateTime.toEpochMillis(yield* DateTime.now);
+        if (exhaustedUsageWindow(snapshot, now, input.modelSelection.model)) {
+          return { suggestion: null };
+        }
+        // Conversation excerpts stay with the provider explicitly selected for suggestions.
+        return yield* instance.textGeneration.generatePromptSuggestion(input);
+      },
+    ),
     generateCommitMessage: Effect.fn("TextGeneration.generateCommitMessage")(function (input) {
       return generate("generateCommitMessage", input.modelSelection, (service, modelSelection) =>
         service.generateCommitMessage({ ...input, modelSelection }),

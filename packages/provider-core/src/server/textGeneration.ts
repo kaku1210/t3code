@@ -4,6 +4,7 @@ import type {
   ModelSelection,
   PullRequestReviewGuide,
   TextGenerationError,
+  ThreadPromptSuggestionResult,
 } from "@t3tools/contracts";
 import type * as Effect from "effect/Effect";
 
@@ -107,7 +108,18 @@ export interface TranscriptionPostProcessingResult {
   transcription: string;
 }
 
+/** A one-shot text prompt prepared from a bounded conversation excerpt. */
+export interface PromptSuggestionGenerationInput {
+  readonly cwd: string;
+  readonly prompt: string;
+  readonly modelSelection: ModelSelection;
+}
+
 export interface ProviderTextGeneration {
+  readonly generatePromptSuggestion: (
+    input: PromptSuggestionGenerationInput,
+  ) => Effect.Effect<ThreadPromptSuggestionResult, TextGenerationError>;
+
   readonly generateTranscriptionPostProcessing: (
     input: TranscriptionPostProcessingInput,
   ) => Effect.Effect<TranscriptionPostProcessingResult, TextGenerationError>;

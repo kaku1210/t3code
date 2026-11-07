@@ -71,6 +71,7 @@ export function composerCommandKeyHandler(input: {
   readonly toggleInteractionMode: () => void;
   readonly nudgeComposerMenuHighlight: (key: "ArrowDown" | "ArrowUp") => void;
   readonly onSelectComposerItem: (item: ComposerCommandItem) => void;
+  readonly acceptPromptSuggestion?: () => boolean;
   readonly resolveActiveComposerTrigger: () => { trigger: ComposerTrigger | null };
   readonly readComposerSnapshot: () => { value: string };
   readonly applyPromptReplacement: (
@@ -117,6 +118,7 @@ export function composerCommandKeyHandler(input: {
     toggleInteractionMode,
     nudgeComposerMenuHighlight,
     onSelectComposerItem,
+    acceptPromptSuggestion,
     resolveActiveComposerTrigger,
     readComposerSnapshot,
     applyPromptReplacement,
@@ -238,6 +240,20 @@ export function composerCommandKeyHandler(input: {
         onSelectComposerItem(selectedItem);
         return true;
       }
+    }
+    if (
+      key === "Tab" &&
+      !menuIsActive &&
+      submissionIntent === null &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      !event.isComposing &&
+      event.keyCode !== 229 &&
+      acceptPromptSuggestion?.()
+    ) {
+      return true;
     }
     if ((key === "ArrowUp" || key === "ArrowDown") && submissionIntent === null) {
       return navigatePromptHistory(key === "ArrowUp" ? "backward" : "forward", event);

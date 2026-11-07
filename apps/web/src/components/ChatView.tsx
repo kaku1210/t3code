@@ -3633,6 +3633,11 @@ export default function ChatView(props: ChatViewProps) {
                                 activeThreadId={activeThreadId}
                                 activeThread={activeThread}
                                 activeThreadShell={activeThreadShell}
+                                promptSuggestionRunId={
+                                  latestRunSettled && activeLatestRun?.status === "completed"
+                                    ? activeLatestRun.runId
+                                    : null
+                                }
                                 promptHistoryEntries={timelineEntries}
                                 forceExpandedOnMobile={
                                   forceExpandedMobileComposer && isDraftHeroState

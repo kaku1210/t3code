@@ -805,6 +805,20 @@ export const SETTINGS_SEARCH_ITEMS = [
     desktopOnly: true,
   },
   {
+    id: "next-prompt-suggestions-enabled",
+    title: "Automatically suggest a next prompt",
+    to: "/settings/threads",
+    scope: "environment",
+    searchTerms: ["composer next prompt suggestions follow-up Tab"],
+  },
+  {
+    id: "next-prompt-suggestions-model",
+    title: "Suggestion model",
+    to: "/settings/threads",
+    scope: "environment",
+    searchTerms: ["next prompt suggestions provider model reasoning effort"],
+  },
+  {
     id: "text-generation-model",
     title: "Text generation model",
     to: "/settings/threads",

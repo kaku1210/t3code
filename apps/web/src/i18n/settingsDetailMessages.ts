@@ -1,4 +1,21 @@
 export const settingsDetailMessages = {
+  "settings.promptSuggestion.title": ["Next prompt suggestions", "推荐下一条指令"],
+  "settings.promptSuggestion.enabled": [
+    "Automatically suggest a next prompt",
+    "自动推荐下一条指令",
+  ],
+  "settings.promptSuggestion.help": [
+    "When you open a conversation with a completed reply and an empty composer, request one suggestion for what to ask next.",
+    "打开已有完整回复的会话时，如果输入框为空，就生成一条接下来可以发送的建议。",
+  ],
+  "settings.promptSuggestion.model": ["Suggestion model", "推荐使用的模型"],
+  "settings.promptSuggestion.modelHelp": [
+    "Choose an available provider, model, and reasoning effort. Each generated suggestion uses one request on that provider.",
+    "选择可用的服务商、模型和推理强度。每生成一条建议，会额外使用该服务商的一次模型请求。",
+  ],
+  "settings.promptSuggestion.chooseModel": ["Choose model", "选择模型"],
+  "settings.promptSuggestion.mixed": ["Mixed", "不同环境使用不同模型"],
+  "settings.promptSuggestion.modelSaveError": ["Suggestion model not saved", "推荐模型未保存"],
   "settings.voice.input": ["Input", "输入"],
   "settings.voice.microphone": ["Microphone", "麦克风"],
   "settings.voice.microphoneHelp": [

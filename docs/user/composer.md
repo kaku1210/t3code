@@ -156,6 +156,15 @@ the text is an unedited recalled prompt, with the caret on the first visual line
 the last visual line for `ArrowDown`, counting wrapped lines. Editing a recalled prompt turns it
 into a normal draft.
 
+## Suggest the next prompt
+
+On web and desktop, open **Settings → Threads → Next prompt suggestions** to choose
+a provider, model, and reasoning effort, then enable automatic suggestions. Opening
+a conversation with a completed reply and an empty composer can make one model request
+using an excerpt of that turn. Suggestions stay in the client until it closes or a newer
+completed turn takes their place. Press **Tab** or click a suggestion to fill the draft,
+then review it and send it when ready.
+
 ## Edit an earlier prompt
 
 On web and desktop, choose **Edit from here** beneath a sent message to rewind

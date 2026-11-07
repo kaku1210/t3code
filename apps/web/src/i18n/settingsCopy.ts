@@ -67,6 +67,12 @@ const groupCopy: Readonly<Partial<Record<string, CopyPair>>> = {
 };
 
 const settingCopy: Readonly<Partial<Record<string, SettingCopy>>> = {
+  "next-prompt-suggestions-enabled": {
+    title: settingsDetailMessages["settings.promptSuggestion.enabled"],
+  },
+  "next-prompt-suggestions-model": {
+    title: settingsDetailMessages["settings.promptSuggestion.model"],
+  },
   "snap-shot-enabled": { title: ["SnapShots", "快照"] },
   "snap-shot-accessibility": { title: ["Include app text", "包含应用文本"] },
   "snap-shot-shortcut": { title: ["Capture shortcut", "捕获快捷键"] },

@@ -26,6 +26,7 @@ import {
   investigationUnsupported,
   TranscriptionPostProcessingOutput,
 } from "@t3tools/provider-core/server/textGenerationOperations";
+import { ThreadPromptSuggestionResult } from "@t3tools/contracts";
 import {
   buildBranchNamePrompt,
   buildCommitMessagePrompt,
@@ -361,6 +362,16 @@ export const makeMuseTextGeneration = Effect.fn("makeMuseTextGeneration")(functi
     });
   const generateReviewGuide: ProviderTextGeneration["generateReviewGuide"] = () =>
     Effect.fail(investigationUnsupported("generateReviewGuide", "Muse Code"));
+  const generatePromptSuggestion: ProviderTextGeneration["generatePromptSuggestion"] = Effect.fn(
+    "MuseTextGeneration.generatePromptSuggestion",
+  )(function (input) {
+    return runMuseJson({
+      operation: "generatePromptSuggestion",
+      prompt: input.prompt,
+      outputSchema: ThreadPromptSuggestionResult,
+      modelSelection: input.modelSelection,
+    });
+  });
   return {
     generateCommitMessage,
     generatePrContent,
@@ -368,5 +379,6 @@ export const makeMuseTextGeneration = Effect.fn("makeMuseTextGeneration")(functi
     generateThreadTitle,
     generateReviewGuide,
     generateTranscriptionPostProcessing,
+    generatePromptSuggestion,
   } satisfies ProviderTextGeneration;
 });
