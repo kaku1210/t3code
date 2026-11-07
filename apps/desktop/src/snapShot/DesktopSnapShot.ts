@@ -39,6 +39,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Electron from "electron";
 
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import { startGlobalShiftShortcutProcess } from "./GlobalShiftShortcutProcess.ts";
@@ -93,6 +94,7 @@ import {
 } from "./snapShot.ts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import { readImageDimensions } from "@t3tools/shared/imageDimensions";
+import { resolveUiLanguage } from "@t3tools/shared/uiLanguage";
 
 const isCaptureSetupRequiredError = Schema.is(CaptureSetupRequiredError);
 
@@ -758,6 +760,7 @@ function probeGlobalShortcut(accelerator: string): DesktopSnapShotShortcutAvaila
 
 export const make = Effect.gen(function* () {
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
+  const electronApp = yield* ElectronApp.ElectronApp;
   const permissions = yield* MacPermissions.MacPermissions;
   const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
   const desktopWindow = yield* DesktopWindow.DesktopWindow;
@@ -1102,7 +1105,14 @@ export const make = Effect.gen(function* () {
       };
     }
     const systemConflict = snapShotShortcutSystemConflict(shortcut);
-    if (systemConflict) return { available: false, message: systemConflict };
+    if (systemConflict) {
+      const { uiLanguage } = yield* Ref.get(settingsRef);
+      const language = resolveUiLanguage(
+        uiLanguage,
+        uiLanguage === "system" ? yield* electronApp.systemLocale : null,
+      );
+      return { available: false, message: systemConflict[language === "zh-CN" ? 1 : 0] };
+    }
     if (mode === "portal") {
       return yield* Effect.try({
         try: () => portalShortcutTrigger(shortcut),

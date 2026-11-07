@@ -1,5 +1,6 @@
 import * as MacPermissions from "../permissions/MacPermissions.ts";
 import { assert, it } from "@effect/vitest";
+import { parseKeybindingShortcut } from "@t3tools/shared/keybindings";
 import {
   DEFAULT_CLIENT_SETTINGS,
   DesktopPendingSnapShot,
@@ -426,6 +427,7 @@ import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as DesktopWindow from "../window/DesktopWindow.ts";
 import * as DesktopSnapShot from "./DesktopSnapShot.ts";
+import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as SnapShotAccessibility from "./SnapShotAccessibility.ts";
 import { CaptureSetupRequiredError } from "./linuxCaptureSession.ts";
 
@@ -489,6 +491,7 @@ const layerTest = (
   MacPermissions.layer.pipe(
     Layer.provideMerge(
       Layer.mergeAll(
+        Layer.mock(ElectronApp.ElectronApp)({ systemLocale: Effect.succeed("zh-CN") }),
         Layer.succeed(
           DesktopEnvironment.DesktopEnvironment,
           DesktopEnvironment.DesktopEnvironment.of({
@@ -1809,6 +1812,31 @@ it.effect("flags revoked macOS permissions on read and re-registers once they re
       assert.isTrue(recovered.shortcutRegistered);
     }),
   ).pipe(Effect.provide(layerTest("darwin")));
+});
+
+it.effect("explains why a global capture shortcut cannot take over Select All", () => {
+  registerShortcutMock.mockReset().mockReturnValue(true);
+  const selectAll = parseKeybindingShortcut("Mod+A")!;
+  const alternative = parseKeybindingShortcut("Mod+Alt+F9")!;
+
+  return Effect.scoped(
+    Effect.gen(function* () {
+      const service = yield* DesktopSnapShot.make;
+      yield* service.configure({ ...DEFAULT_CLIENT_SETTINGS, uiLanguage: "en" });
+      const english = yield* service.checkShortcut(selectAll);
+      assert.isFalse(english.available);
+      assert.include(english.message, "Select All");
+
+      yield* service.configure({ ...DEFAULT_CLIENT_SETTINGS, uiLanguage: "system" });
+      const chinese = yield* service.checkShortcut(selectAll);
+      assert.isFalse(chinese.available);
+      assert.include(chinese.message, "全选");
+      assert.include(chinese.message, "Shift 或 Alt");
+      assert.lengthOf(registerShortcutMock.mock.calls, 0);
+
+      assert.isTrue((yield* service.checkShortcut(alternative)).available);
+    }),
+  ).pipe(Effect.provide(layerTest("win32")));
 });
 
 it.effect("an unrelated client-setting change keeps the registered shortcut", () => {

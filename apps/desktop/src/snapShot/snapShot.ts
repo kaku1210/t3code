@@ -46,23 +46,26 @@ export function snapShotShortcutRegistrationFailureMessage(
     : "This shortcut is already used by the system or another app.";
 }
 
-const COMMON_MOD_ACTIONS: Readonly<Record<string, string>> = {
-  a: "Select All",
-  c: "Copy",
-  f: "Find",
-  n: "New",
-  o: "Open",
-  p: "Print",
-  q: "Quit",
-  s: "Save",
-  t: "New Tab",
-  v: "Paste",
-  w: "Close Window",
-  x: "Cut",
-  z: "Undo",
+type ShortcutCopy = readonly [english: string, simplifiedChinese: string];
+
+const COMMON_MOD_ACTIONS: Readonly<Partial<Record<string, ShortcutCopy>>> = {
+  a: ["Select All", "全选"],
+  c: ["Copy", "复制"],
+  f: ["Find", "查找"],
+  n: ["New", "新建"],
+  o: ["Open", "打开"],
+  p: ["Print", "打印"],
+  q: ["Quit", "退出"],
+  s: ["Save", "保存"],
+  t: ["New Tab", "新建标签页"],
+  v: ["Paste", "粘贴"],
+  w: ["Close Window", "关闭窗口"],
+  x: ["Cut", "剪切"],
+  z: ["Undo", "撤销"],
 };
 
-export function snapShotShortcutSystemConflict(shortcut: SnapShotKeyChord): string | null {
+/** Returns the reason and recovery text for a chord reserved by common app or system actions. */
+export function snapShotShortcutSystemConflict(shortcut: SnapShotKeyChord): ShortcutCopy | null {
   const modifierCount = [
     shortcut.modKey,
     shortcut.metaKey,
@@ -72,19 +75,38 @@ export function snapShotShortcutSystemConflict(shortcut: SnapShotKeyChord): stri
   ].filter(Boolean).length;
   if (modifierCount !== 1) return null;
   if (shortcut.shiftKey) {
-    return "Shift combinations are used for typing and text selection. Add another modifier.";
+    return [
+      "Shift combinations are used for typing and text selection. Add another modifier.",
+      "Shift 组合键用于输入和选择文本。请再加一个修饰键。",
+    ];
   }
   const key = shortcut.key.toLowerCase();
   if (shortcut.modKey) {
     const action = COMMON_MOD_ACTIONS[key];
-    return action ? `This shortcut is ${action} in most apps.` : null;
+    return action
+      ? [
+          `Most apps use this shortcut for ${action[0]}. Add Shift or Alt, or choose another shortcut.`,
+          `多数应用将此快捷键用于「${action[1]}」。请加上 Shift 或 Alt，或换一组快捷键。`,
+        ]
+      : null;
   }
   if (shortcut.ctrlKey && ["c", "d", "z"].includes(key)) {
-    return "This shortcut controls running commands in terminals.";
+    return [
+      "This shortcut controls running commands in terminals. Choose another shortcut.",
+      "此快捷键用于控制终端中运行的命令。请换一组快捷键。",
+    ];
   }
-  if (shortcut.altKey && key === "tab") return "The system uses Alt+Tab to switch apps.";
+  if (shortcut.altKey && key === "tab") {
+    return [
+      "The system uses Alt+Tab to switch apps. Choose another shortcut.",
+      "系统使用 Alt+Tab 切换应用。请换一组快捷键。",
+    ];
+  }
   if (shortcut.metaKey && ["l", " "].includes(key)) {
-    return "The system already uses this shortcut.";
+    return [
+      "The system already uses this shortcut. Choose another shortcut.",
+      "系统已占用此快捷键。请换一组快捷键。",
+    ];
   }
   return null;
 }
