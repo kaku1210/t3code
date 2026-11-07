@@ -4,6 +4,8 @@ import {
   WorkspaceBreadcrumbSeparator,
 } from "../WorkspaceBreadcrumb";
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
+import { settingsPageLabel } from "../../i18n/settingsCopy";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 
 const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
   ...SETTINGS_SECTION_LABELS,
@@ -11,24 +13,22 @@ const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {
   "/settings/open-source-licenses": "Open source licenses",
 };
 
-function settingsBreadcrumbLabel(pathname: string): string | null {
-  const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
-  return SETTINGS_BREADCRUMB_LABELS[normalizedPathname] ?? null;
-}
-
 export function SettingsBreadcrumb({ pathname }: { pathname: string }) {
-  const sectionLabel = settingsBreadcrumbLabel(pathname);
+  const { language, t } = useUiLanguage();
+  const normalizedPathname = pathname.replace(/\/+$/, "") || "/";
+  const sourceLabel = SETTINGS_BREADCRUMB_LABELS[normalizedPathname];
+  const sectionLabel = sourceLabel && settingsPageLabel(language, normalizedPathname, sourceLabel);
 
   return (
-    <WorkspaceBreadcrumb ariaLabel="Settings breadcrumb">
+    <WorkspaceBreadcrumb ariaLabel={t("settings.breadcrumb")}>
       {sectionLabel ? (
         <>
-          <WorkspaceBreadcrumbItem>Settings</WorkspaceBreadcrumbItem>
+          <WorkspaceBreadcrumbItem>{t("navigation.settings")}</WorkspaceBreadcrumbItem>
           <WorkspaceBreadcrumbSeparator />
         </>
       ) : null}
       <WorkspaceBreadcrumbItem current className="truncate">
-        {sectionLabel ?? "Settings"}
+        {sectionLabel ?? t("navigation.settings")}
       </WorkspaceBreadcrumbItem>
     </WorkspaceBreadcrumb>
   );

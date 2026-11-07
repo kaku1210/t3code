@@ -5,11 +5,18 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import type * as Electron from "electron";
+import {
+  DEFAULT_UI_LANGUAGE_PREFERENCE,
+  type UiLanguagePreference,
+} from "@t3tools/contracts/settings";
+import { resolveUiLanguage, type UiLanguage } from "@t3tools/shared/uiLanguage";
 
 import { makeComponentLogger } from "../app/DesktopObservability.ts";
+import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronMenu from "../electron/ElectronMenu.ts";
 import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
+import * as DesktopClientSettings from "../settings/DesktopClientSettings.ts";
 import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 import * as DesktopWindow from "./DesktopWindow.ts";
 
@@ -29,6 +36,7 @@ export class DesktopApplicationMenu extends Context.Service<
   DesktopApplicationMenu,
   {
     readonly configure: Effect.Effect<void>;
+    readonly applyLanguage: (preference: UiLanguagePreference) => Effect.Effect<void>;
   }
 >()("@t3tools/desktop/window/DesktopApplicationMenu") {}
 
@@ -40,6 +48,35 @@ type DesktopApplicationMenuRuntimeServices =
 const { logInfo: logUpdaterInfo } = makeComponentLogger("desktop-updater");
 
 const { logError: logMenuError } = makeComponentLogger("desktop-menu");
+
+const menuCopy = {
+  file: ["File", "文件"],
+  edit: ["Edit", "编辑"],
+  view: ["View", "视图"],
+  window: ["Window", "窗口"],
+  help: ["Help", "帮助"],
+  settings: ["Settings...", "设置…"],
+  checkForUpdates: ["Check for Updates...", "检查更新…"],
+  closeWindow: ["Close Window", "关闭窗口"],
+  quit: ["Quit", "退出"],
+  undo: ["Undo", "撤销"],
+  redo: ["Redo", "重做"],
+  cut: ["Cut", "剪切"],
+  copy: ["Copy", "复制"],
+  paste: ["Paste", "粘贴"],
+  pasteAsText: ["Paste as Text", "粘贴为纯文本"],
+  delete: ["Delete", "删除"],
+  selectAll: ["Select All", "全选"],
+  reload: ["Reload", "重新加载"],
+  forceReload: ["Force Reload", "强制重新加载"],
+  devTools: ["Toggle Developer Tools", "显示或隐藏开发者工具"],
+  actualSize: ["Actual Size", "实际大小"],
+  zoomIn: ["Zoom In", "放大"],
+  zoomOut: ["Zoom Out", "缩小"],
+  fullScreen: ["Toggle Full Screen", "切换全屏"],
+  minimize: ["Minimize", "最小化"],
+  zoomWindow: ["Zoom", "缩放窗口"],
+} as const;
 
 const dispatchMenuAction = Effect.fn("desktop.menu.dispatchMenuAction")(function* (
   action: string,
@@ -115,6 +152,8 @@ const handleCheckForUpdatesMenuClick = Effect.gen(function* () {
 /** @public */
 export const make = Effect.gen(function* () {
   const electronMenu = yield* ElectronMenu.ElectronMenu;
+  const electronApp = yield* ElectronApp.ElectronApp;
+  const clientSettings = yield* DesktopClientSettings.DesktopClientSettings;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
   const context = yield* Effect.context<DesktopApplicationMenuRuntimeServices>();
   const runPromise = Effect.runPromiseWith(context);
@@ -135,7 +174,18 @@ export const make = Effect.gen(function* () {
     );
   };
 
-  const configure = Effect.gen(function* () {
+  let appliedLanguage: UiLanguage | undefined;
+  const applyLanguage = Effect.fn("desktop.menu.applyLanguage")(function* (
+    preference: UiLanguagePreference,
+  ) {
+    const language = resolveUiLanguage(
+      preference,
+      preference === "system" ? yield* electronApp.systemLocale : null,
+    );
+    if (appliedLanguage === language) return;
+    const t = (key: keyof typeof menuCopy) => menuCopy[key][language === "zh-CN" ? 1 : 0];
+    const localizedRole = (key: keyof typeof menuCopy) =>
+      language === "zh-CN" ? { label: t(key) } : {};
     const checkForUpdatesClick = () => {
       runMenuEffect("check-for-updates", handleCheckForUpdatesMenuClick);
     };
@@ -165,12 +215,12 @@ export const make = Effect.gen(function* () {
         submenu: [
           { role: "about", label: `About ${environment.displayName}` },
           {
-            label: "Check for Updates...",
+            label: t("checkForUpdates"),
             click: checkForUpdatesClick,
           },
           { type: "separator" },
           {
-            label: "Settings...",
+            label: t("settings"),
             accelerator: "CmdOrCtrl+,",
             click: settingsClick,
           },
@@ -188,13 +238,13 @@ export const make = Effect.gen(function* () {
 
     template.push(
       {
-        label: "File",
+        label: t("file"),
         submenu: [
           ...(environment.platform === "darwin"
             ? []
             : [
                 {
-                  label: "Settings...",
+                  label: t("settings"),
                   accelerator: "CmdOrCtrl+,",
                   click: settingsClick,
                 },
@@ -202,27 +252,27 @@ export const make = Effect.gen(function* () {
               ]),
           // Cmd/Ctrl+W belongs to the renderer's tab close; it must never close the window.
           environment.platform === "darwin"
-            ? { label: "Close Window", click: (_item, window) => window?.close() }
-            : { role: "quit" },
+            ? { label: t("closeWindow"), click: (_item, window) => window?.close() }
+            : { role: "quit", ...localizedRole("quit") },
         ],
       },
       {
-        label: "Edit",
+        label: t("edit"),
         submenu: [
-          { role: "undo" },
-          { role: "redo" },
+          { role: "undo", ...localizedRole("undo") },
+          { role: "redo", ...localizedRole("redo") },
           { type: "separator" },
-          { role: "cut" },
-          { role: "copy" },
-          { role: "paste" },
+          { role: "cut", ...localizedRole("cut") },
+          { role: "copy", ...localizedRole("copy") },
+          { role: "paste", ...localizedRole("paste") },
           {
-            label: "Paste as Text",
+            label: t("pasteAsText"),
             accelerator: "CmdOrCtrl+Shift+V",
             click: pasteAsTextClick,
           },
-          { role: "delete" },
+          { role: "delete", ...localizedRole("delete") },
           { type: "separator" },
-          { role: "selectAll" },
+          { role: "selectAll", ...localizedRole("selectAll") },
           ...(environment.platform === "darwin"
             ? [
                 { type: "separator" as const },
@@ -235,25 +285,25 @@ export const make = Effect.gen(function* () {
         ],
       },
       {
-        label: "View",
+        label: t("view"),
         submenu: [
           /* Native reload/DevTools/zoom roles target focused guests; these commands must target the app. */
-          { label: "Reload", accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
+          { label: t("reload"), accelerator: "CmdOrCtrl+R", click: mainContentsClick("reload") },
           {
-            label: "Force Reload",
+            label: t("forceReload"),
             accelerator: "Shift+CmdOrCtrl+R",
             click: mainContentsClick("forceReload"),
           },
           {
-            label: "Toggle Developer Tools",
+            label: t("devTools"),
             accelerator: environment.platform === "darwin" ? "Alt+Command+I" : "Ctrl+Shift+I",
             click: mainContentsClick("toggleDevTools"),
           },
           { type: "separator" },
-          { label: "Actual Size", accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
-          { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
+          { label: t("actualSize"), accelerator: "CmdOrCtrl+0", click: zoomClick("reset") },
+          { label: t("zoomIn"), accelerator: "CmdOrCtrl+=", click: zoomClick("in") },
           {
-            label: "Zoom In",
+            label: t("zoomIn"),
             accelerator: "CmdOrCtrl+Plus",
             visible: false,
             click: zoomClick("in"),
@@ -261,43 +311,44 @@ export const make = Effect.gen(function* () {
           ...(environment.platform === "darwin"
             ? [
                 {
-                  label: "Zoom In",
+                  label: t("zoomIn"),
                   accelerator: "CmdOrCtrl+Shift+=",
                   visible: false,
                   click: zoomClick("in"),
                 },
               ]
             : []),
-          { label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
+          { label: t("zoomOut"), accelerator: "CmdOrCtrl+-", click: zoomClick("out") },
           // Keypad codes do not match number-row accelerators.
           {
-            label: "Actual Size",
+            label: t("actualSize"),
             accelerator: "CmdOrCtrl+num0",
             visible: false,
             click: zoomClick("reset"),
           },
           {
-            label: "Zoom In",
+            label: t("zoomIn"),
             accelerator: "CmdOrCtrl+numadd",
             visible: false,
             click: zoomClick("in"),
           },
           {
-            label: "Zoom Out",
+            label: t("zoomOut"),
             accelerator: "CmdOrCtrl+numsub",
             visible: false,
             click: zoomClick("out"),
           },
           { type: "separator" },
-          { role: "togglefullscreen" },
+          { role: "togglefullscreen", ...localizedRole("fullScreen") },
         ],
       },
       {
         // Electron's default Window submenu adds a Ctrl+W close role off macOS.
         role: "windowMenu",
+        ...localizedRole("window"),
         submenu: [
-          { role: "minimize" },
-          { role: "zoom" },
+          { role: "minimize", ...localizedRole("minimize") },
+          { role: "zoom", ...localizedRole("zoomWindow") },
           ...(environment.platform === "darwin"
             ? [{ type: "separator" as const }, { role: "front" as const }]
             : []),
@@ -305,9 +356,10 @@ export const make = Effect.gen(function* () {
       },
       {
         role: "help",
+        ...localizedRole("help"),
         submenu: [
           {
-            label: "Check for Updates...",
+            label: t("checkForUpdates"),
             click: checkForUpdatesClick,
           },
         ],
@@ -315,10 +367,30 @@ export const make = Effect.gen(function* () {
     );
 
     yield* electronMenu.setApplicationMenu(template);
-  }).pipe(Effect.withSpan("desktop.menu.configure"));
+    appliedLanguage = language;
+  });
+
+  const configure = clientSettings.get.pipe(
+    Effect.catchTags({
+      DesktopClientSettingsReadError: (error) =>
+        logMenuError("Could not read the desktop menu language preference", { error }).pipe(
+          Effect.as(Option.none()),
+        ),
+    }),
+    Effect.flatMap((settings) =>
+      applyLanguage(
+        Option.match(settings, {
+          onNone: () => DEFAULT_UI_LANGUAGE_PREFERENCE,
+          onSome: (value) => value.uiLanguage,
+        }),
+      ),
+    ),
+    Effect.withSpan("desktop.menu.configure"),
+  );
 
   return DesktopApplicationMenu.of({
     configure,
+    applyLanguage,
   });
 });
 

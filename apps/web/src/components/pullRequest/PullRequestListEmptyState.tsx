@@ -2,6 +2,7 @@ import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { PlusIcon, SearchIcon } from "lucide-react";
 
 import { openCommandPalette } from "../../commandPaletteBus";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../ui/button";
 import { PullRequestListGhost } from "./PullRequestGhosts";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from "../ui/empty";
@@ -68,20 +69,19 @@ export function PullRequestListEmptyState({
   onLoadMore: () => void;
   onRefresh: () => void;
 }) {
+  const { t } = useUiLanguage();
   if (!hasProjects) {
     return (
       <Empty>
         <BranchMark joined={false} />
         <EmptyHeader>
-          <EmptyTitle>No projects in this workspace</EmptyTitle>
-          <EmptyDescription>
-            Add a project, and the pull requests from its repository appear here.
-          </EmptyDescription>
+          <EmptyTitle>{t("pullRequests.noProjects")}</EmptyTitle>
+          <EmptyDescription>{t("pullRequests.addProjectDescription")}</EmptyDescription>
         </EmptyHeader>
         <EmptyContent>
           <Button size="sm" onClick={() => openCommandPalette({ open: "add-project" })}>
             <PlusIcon className="size-3.5" />
-            Add project
+            {t("project.add")}
           </Button>
         </EmptyContent>
       </Empty>
@@ -127,11 +127,9 @@ export function PullRequestListEmptyState({
     <Empty>
       <BranchMark joined={false} />
       <EmptyHeader>
-        <EmptyTitle>{filtered ? "Nothing under these filters" : "No pull requests"}</EmptyTitle>
+        <EmptyTitle>{t(filtered ? "pullRequests.noFiltered" : "pullRequests.empty")}</EmptyTitle>
         <EmptyDescription>
-          {filtered
-            ? "Widen the state, involvement or project filter to see more."
-            : "Pull requests from every project in this workspace appear here."}
+          {filtered ? t("pullRequests.noFilteredDescription") : t("pullRequests.emptyDescription")}
         </EmptyDescription>
       </EmptyHeader>
       <div className="flex flex-wrap justify-center gap-2">

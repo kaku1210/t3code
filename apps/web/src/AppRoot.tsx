@@ -2,6 +2,7 @@ import { RouterProvider } from "@tanstack/react-router";
 
 import { ElectronBrowserHost } from "./browser/ElectronBrowserHost";
 import { QuitHoldOverlay } from "./components/QuitHoldOverlay";
+import { UiLanguageProvider } from "./i18n/UiLanguageProvider";
 import { AppAtomRegistryProvider } from "./rpc/atomRegistry";
 import type { AppRouter } from "./router";
 
@@ -9,9 +10,11 @@ import type { AppRouter } from "./router";
 export function AppRoot({ router }: { readonly router: AppRouter }) {
   return (
     <AppAtomRegistryProvider>
-      <RouterProvider router={router} />
-      <ElectronBrowserHost />
-      <QuitHoldOverlay />
+      <UiLanguageProvider>
+        <RouterProvider router={router} />
+        <ElectronBrowserHost />
+        <QuitHoldOverlay />
+      </UiLanguageProvider>
     </AppAtomRegistryProvider>
   );
 }

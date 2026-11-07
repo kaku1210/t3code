@@ -1,6 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { observeResize } from "~/lib/observeResize";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 
 export function DraftHeroProjectHeading({
   children,
@@ -11,6 +12,9 @@ export function DraftHeroProjectHeading({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const inlineRef = useRef<HTMLSpanElement>(null);
+  const { t } = useUiLanguage();
+  const prefix = t("composer.projectHeadingPrefix");
+  const suffix = t("composer.projectHeadingSuffix");
   const [fitsInline, setFitsInline] = useState(false);
 
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- measures the heading against its container via ResizeObserver to choose inline or stacked layout
@@ -39,22 +43,24 @@ export function DraftHeroProjectHeading({
           ref={inlineRef}
           className="flex w-max items-baseline gap-2 whitespace-nowrap font-normal text-3xl tracking-tight"
         >
-          <span>What should we build in</span>
+          <span>{prefix}</span>
           <span>
-            <span className="font-medium">{projectName}</span>?
+            <span className="font-medium">{projectName}</span>
+            {suffix}
           </span>
         </span>
       </span>
       <h1 className="flex w-full flex-col items-center justify-center gap-2 text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl lg:group-data-[inline=true]/draft-hero:flex-row">
         <span className="max-w-full lg:group-data-[inline=true]/draft-hero:shrink-0 [@media(max-height:28rem)]:sr-only">
-          What should we build
-          <span className="lg:group-data-[inline=true]/draft-hero:hidden">?</span>
-          <span className="hidden lg:group-data-[inline=true]/draft-hero:inline"> in</span>
+          <span className="lg:group-data-[inline=true]/draft-hero:hidden">
+            {t("composer.projectHeadingStacked")}
+          </span>
+          <span className="hidden lg:group-data-[inline=true]/draft-hero:inline">{prefix}</span>
         </span>
         <span className="flex min-w-0 max-w-full items-baseline justify-center text-base tracking-normal lg:group-data-[inline=true]/draft-hero:text-3xl lg:group-data-[inline=true]/draft-hero:tracking-tight">
           <span className="min-w-0">{children}</span>
           <span className="hidden shrink-0 lg:group-data-[inline=true]/draft-hero:inline [@media(max-height:28rem)]:hidden!">
-            ?
+            {suffix}
           </span>
         </span>
       </h1>

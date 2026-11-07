@@ -312,6 +312,19 @@ describe("ClientSettings notifications", () => {
   });
 });
 
+describe("ClientSettings interface language", () => {
+  it("follows the system when loading settings from an older installation", () => {
+    expect(decodeClientSettings({}).uiLanguage).toBe("system");
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("uiLanguage");
+  });
+
+  it.each(["en", "zh-CN", "system"])("round-trips the %s preference", (uiLanguage) => {
+    const settings = decodeClientSettings({ uiLanguage });
+    expect(decodeClientSettings(encodeClientSettings(settings)).uiLanguage).toBe(uiLanguage);
+    expect(decodeClientSettingsPatch({ uiLanguage })).toEqual({ uiLanguage });
+  });
+});
+
 describe("ClientSettings quit confirmation", () => {
   it.each([
     [true, "hold"],

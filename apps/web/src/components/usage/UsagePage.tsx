@@ -35,6 +35,7 @@ import {
 
 import { cn } from "../../lib/utils";
 import { usePrimarySettings } from "../../hooks/useSettings";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { resolveHour12 } from "../../timestampFormat";
 import { appAtomRegistry } from "~/rpc/atomRegistry";
 import { environmentPresentations } from "../../state/presentation";
@@ -180,6 +181,7 @@ function UsageModelDialogHost({
 }
 
 export function UsagePage() {
+  const { t } = useUiLanguage();
   const [preferences, setPreferences] = useState(readUsagePagePreferences);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const hour12 = usePrimarySettings((settings) => resolveHour12(settings.timestampFormat));
@@ -367,9 +369,9 @@ export function UsagePage() {
       : `${formatDayShort(shownWindow.sinceDay)} to ${formatDayShort(shownWindow.untilDay)}`;
   const topbarContent = (
     <div className="grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 @4xl/usage-header:flex">
-      <WorkspaceBreadcrumb ariaLabel="Usage breadcrumb" className="min-w-0">
+      <WorkspaceBreadcrumb ariaLabel={t("usage.breadcrumb")} className="min-w-0">
         <WorkspaceBreadcrumbItem>
-          <h1>Usage</h1>
+          <h1>{t("navigation.usage")}</h1>
         </WorkspaceBreadcrumbItem>
         <WorkspaceBreadcrumbSeparator />
         <WorkspaceBreadcrumbItem className="min-w-10 shrink">
@@ -404,7 +406,7 @@ export function UsagePage() {
             tabs so dropping it never moves them. */}
         {showingLimits ? null : (
           <ToggleGroup
-            aria-label="Usage period"
+            aria-label={t("usage.period")}
             variant="segmented"
             value={[String(windowDays)]}
             onValueChange={(next) => {
@@ -414,13 +416,13 @@ export function UsagePage() {
           >
             {WINDOW_OPTIONS.map((option) => (
               <Toggle key={option.days} value={String(option.days)} title={shortcutTitle(option)}>
-                {option.label}
+                {t(`usage.period.${option.days}`)}
               </Toggle>
             ))}
           </ToggleGroup>
         )}
         <ToggleGroup
-          aria-label="Usage metric"
+          aria-label={t("usage.metric")}
           variant="segmented"
           value={[metric]}
           onValueChange={(next) => {
@@ -430,13 +432,13 @@ export function UsagePage() {
         >
           {METRIC_OPTIONS.map((option) => (
             <Toggle key={option.value} value={option.value} title={shortcutTitle(option)}>
-              {option.label}
+              {t(`usage.metric.${option.value}`)}
             </Toggle>
           ))}
         </ToggleGroup>
         <Button
           onClick={refreshWindow}
-          aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
+          aria-label={t(showingLimits ? "usage.refreshLimits" : "usage.refreshUsage")}
           aria-busy={isRefreshing}
           disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
           size="icon-sm"
@@ -449,14 +451,12 @@ export function UsagePage() {
         {showingLimits ? null : (
           <Select value={String(windowDays)} onValueChange={(value) => selectWindow(Number(value))}>
             <SelectTrigger
-              aria-label="Usage period"
+              aria-label={t("usage.period")}
               size="compact"
               variant="ghost"
               className="w-auto min-w-0"
             >
-              <SelectValue>
-                {WINDOW_OPTIONS.find((option) => option.days === windowDays)?.label}
-              </SelectValue>
+              <SelectValue>{t(`usage.period.${windowDays}`)}</SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
               {WINDOW_OPTIONS.map((option) => (
@@ -465,7 +465,7 @@ export function UsagePage() {
                   value={String(option.days)}
                   title={shortcutTitle(option)}
                 >
-                  {option.label}
+                  {t(`usage.period.${option.days}`)}
                 </SelectItem>
               ))}
             </SelectPopup>
@@ -478,26 +478,24 @@ export function UsagePage() {
           }}
         >
           <SelectTrigger
-            aria-label="Usage metric"
+            aria-label={t("usage.metric")}
             size="compact"
             variant="ghost"
             className="w-auto min-w-0"
           >
-            <SelectValue>
-              {METRIC_OPTIONS.find((option) => option.value === metric)?.label}
-            </SelectValue>
+            <SelectValue>{t(`usage.metric.${metric}`)}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
             {METRIC_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value} title={shortcutTitle(option)}>
-                {option.label}
+                {t(`usage.metric.${option.value}`)}
               </SelectItem>
             ))}
           </SelectPopup>
         </Select>
         <Button
           onClick={refreshWindow}
-          aria-label={showingLimits ? "Refresh limits" : "Refresh usage"}
+          aria-label={t(showingLimits ? "usage.refreshLimits" : "usage.refreshUsage")}
           aria-busy={isRefreshing}
           disabled={isRefreshing || (!showingLimits && !canReadDiagnostics)}
           size="icon-sm"
@@ -510,7 +508,7 @@ export function UsagePage() {
   );
 
   return (
-    <AppRouteModal label="Usage">
+    <AppRouteModal label={t("navigation.usage")}>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="@container/usage-header flex min-h-12 shrink-0 items-center gap-1 border-b ps-5 pe-2">
           {topbarContent}

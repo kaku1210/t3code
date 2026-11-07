@@ -21,6 +21,7 @@ import {
 import { useCustomThemes } from "../../hooks/useCustomThemes";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { useTheme } from "../../hooks/useTheme";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { Switch } from "../ui/switch";
@@ -73,18 +74,19 @@ function environmentIdentificationOptions(
   ];
 }
 
-const CHAT_WIDTH_LABELS: Record<ChatWidth, string> = {
-  comfortable: "Comfortable",
-  wide: "Wide",
-  full: "Full",
-};
+const CHAT_WIDTH_MESSAGES = {
+  comfortable: "settings.appearance.widthComfortable",
+  wide: "settings.appearance.widthWide",
+  full: "settings.appearance.widthFull",
+} as const satisfies Record<ChatWidth, string>;
 
-const EFFORT_DISPLAY_LABELS: Record<EffortDisplay, string> = {
-  label: "Word",
-  bars: "Bars",
-};
+const EFFORT_DISPLAY_MESSAGES = {
+  label: "settings.appearance.effortWord",
+  bars: "settings.appearance.effortBars",
+} as const satisfies Record<EffortDisplay, string>;
 
 export function AppearanceSettingsPanel() {
+  const { t } = useUiLanguage();
   const {
     appearanceMode,
     refreshTheme,
@@ -278,12 +280,14 @@ export function AppearanceSettingsPanel() {
                 }}
               >
                 <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Chat width">
-                  <SelectValue>{CHAT_WIDTH_LABELS[settings.chatWidth]}</SelectValue>
+                  <SelectValue>{t(CHAT_WIDTH_MESSAGES[settings.chatWidth])}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="comfortable">Comfortable (default)</SelectItem>
-                  <SelectItem value="wide">Wide</SelectItem>
-                  <SelectItem value="full">Full</SelectItem>
+                  <SelectItem value="comfortable">
+                    {t("settings.appearance.widthDefault")}
+                  </SelectItem>
+                  <SelectItem value="wide">{t(CHAT_WIDTH_MESSAGES.wide)}</SelectItem>
+                  <SelectItem value="full">{t(CHAT_WIDTH_MESSAGES.full)}</SelectItem>
                 </SelectPopup>
               </Select>
             </div>
@@ -313,11 +317,11 @@ export function AppearanceSettingsPanel() {
                 }}
               >
                 <SelectTrigger size="sm" className="w-full min-w-0" aria-label="Effort display">
-                  <SelectValue>{EFFORT_DISPLAY_LABELS[settings.effortDisplay]}</SelectValue>
+                  <SelectValue>{t(EFFORT_DISPLAY_MESSAGES[settings.effortDisplay])}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  <SelectItem value="label">Word (default)</SelectItem>
-                  <SelectItem value="bars">Bars</SelectItem>
+                  <SelectItem value="label">{t("settings.appearance.effortDefault")}</SelectItem>
+                  <SelectItem value="bars">{t(EFFORT_DISPLAY_MESSAGES.bars)}</SelectItem>
                 </SelectPopup>
               </Select>
             </div>

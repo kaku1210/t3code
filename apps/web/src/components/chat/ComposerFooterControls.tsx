@@ -18,8 +18,9 @@ import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ContextWindowMeter, ContextWindowMeterPlaceholder } from "./ContextWindowMeter";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
-import { runtimeModeConfig } from "./runtimeModeConfig";
+import { runtimeModeConfig, runtimeModeCopy } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 
 export type RuntimeModeOption = {
   mode: RuntimeMode;
@@ -43,6 +44,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   onToggleInteractionMode: () => void;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const { language, t } = useUiLanguage();
   const size = props.size ?? "sm";
   const accessDisplay = props.accessDisplay ?? "label";
   const composerFloatingLayerProps = useComposerMenuProps();
@@ -52,10 +54,10 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
     props.runtimeModeOptions.find((option) => option.mode === props.runtimeMode) ??
     supervisedRuntimeModeOption;
   const RuntimeModeIcon = runtimeModeOption.icon;
-  const interactionModeTooltip =
-    props.interactionMode === "plan"
-      ? "Plan mode. Click to return to normal build mode"
-      : "Default mode. Click to enter plan mode";
+  const modeCopy = runtimeModeCopy(language, runtimeModeOption.mode);
+  const interactionModeTooltip = t(
+    props.interactionMode === "plan" ? "composer.planModeHint" : "composer.buildModeHint",
+  );
 
   const interactionModeToggle = props.showInteractionModeToggle ? (
     <Tooltip>
@@ -89,7 +91,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
           data-composer-control-label
           className={size === "xs" ? "sr-only" : "sr-only sm:not-sr-only"}
         >
-          {props.interactionMode === "plan" ? "Plan" : "Build"}
+          {t(props.interactionMode === "plan" ? "composer.plan" : "composer.build")}
         </span>
       </TooltipTrigger>
       <TooltipPopup side="top">{interactionModeTooltip}</TooltipPopup>
@@ -97,7 +99,10 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
   ) : null;
 
   // The chip opens the same Permissions toggle used in the model picker and the overflow menu.
-  const permissionsTooltip = `Permissions: ${runtimeModeOption.label}. ${runtimeModeOption.description}`;
+  const permissionsTooltip = t("permission.tooltip", {
+    mode: modeCopy.label,
+    description: modeCopy.description,
+  });
   const permissionsChip = (
     <Menu
       open={open}
@@ -117,7 +122,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
                   size={size}
                   // Mirrors the model trigger's trailing pe-1 so the gaps on both sides of the chip match.
                   className="ps-1.5"
-                  aria-label={`Permissions: ${runtimeModeOption.label}`}
+                  aria-label={t("permission.label", { mode: modeCopy.label })}
                 />
               }
             />
@@ -133,7 +138,7 @@ export const ComposerFooterModeControls = memo(function ComposerFooterModeContro
             data-composer-control-label
             className={accessDisplay === "icon" ? "sr-only" : undefined}
           >
-            {runtimeModeOption.label}
+            {modeCopy.label}
           </span>
         </TooltipTrigger>
         <TooltipPopup side="top">{permissionsTooltip}</TooltipPopup>
@@ -167,6 +172,7 @@ export function ComposerPermissionsSection(props: {
   runtimeModeOptions: ReadonlyArray<RuntimeModeOption>;
   onRuntimeModeChange: (mode: RuntimeMode) => void;
 }) {
+  const { language, t } = useUiLanguage();
   // Hover or keyboard focus previews a mode's name and description before a pick.
   const [previewMode, setPreviewMode] = useState<RuntimeMode | null>(null);
   const shownMode = previewMode ?? props.runtimeMode;
@@ -174,11 +180,12 @@ export function ComposerPermissionsSection(props: {
     props.runtimeModeOptions.find((option) => option.mode === shownMode) ??
     supervisedRuntimeModeOption;
   const descriptionId = useId();
+  const shownCopy = runtimeModeCopy(language, shown.mode);
   return (
     <div data-composer-permissions className="grid w-72 gap-1.5 px-2 py-1.5">
-      <div className="font-medium text-muted-foreground text-xs">Permissions</div>
+      <div className="font-medium text-muted-foreground text-xs">{t("permission.title")}</div>
       <MenuPrimitive.RadioGroup
-        aria-label="Permissions"
+        aria-label={t("permission.title")}
         value={props.runtimeMode}
         onValueChange={(value: RuntimeMode) => {
           if (value !== props.runtimeMode) props.onRuntimeModeChange(value);
@@ -200,13 +207,14 @@ export function ComposerPermissionsSection(props: {
       >
         {props.runtimeModeOptions.map((option) => {
           const OptionIcon = option.icon;
+          const { label } = runtimeModeCopy(language, option.mode);
           return (
             <MenuPrimitive.RadioItem
               key={option.mode}
               value={option.mode}
               disabled={option.disabledReason !== undefined}
-              label={option.label}
-              aria-label={option.label}
+              label={label}
+              aria-label={label}
               aria-describedby={`${descriptionId}-${option.mode}`}
               closeOnClick
               onPointerEnter={() => setPreviewMode(option.mode)}
@@ -223,7 +231,7 @@ export function ComposerPermissionsSection(props: {
       {/* Static per-mode descriptions for screen readers; the preview below is visual only. */}
       {props.runtimeModeOptions.map((option) => (
         <span key={option.mode} id={`${descriptionId}-${option.mode}`} className="sr-only">
-          {option.disabledReason ?? option.description}
+          {option.disabledReason ?? runtimeModeCopy(language, option.mode).description}
         </span>
       ))}
       <div className="grid gap-0.5" aria-hidden="true">
@@ -234,11 +242,11 @@ export function ComposerPermissionsSection(props: {
               : "text-muted-foreground text-sm"
           }
         >
-          {shown.label}
+          {shownCopy.label}
         </span>
         {/* Two lines reserved so the menu does not shift while you preview modes. */}
         <span className="min-h-8 text-muted-foreground text-xs leading-4">
-          {shown.disabledReason ?? shown.description}
+          {shown.disabledReason ?? shownCopy.description}
         </span>
       </div>
     </div>

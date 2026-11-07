@@ -21,6 +21,13 @@ Android uses **Material You Layout** by default unless you have turned it off in
 It changes shapes, spacing, and controls independently
 of the selected theme.
 
+## Interface language
+
+On desktop and web, choose **Follow system**, **English**, or **简体中文** in
+**Settings → General → Display → Interface language**. The choice takes effect immediately
+and is saved for this device or browser. **Follow system** uses Simplified Chinese for
+Simplified Chinese system locales and English for other locales.
+
 ## Composer context
 
 Git-backed projects show branch and worktree controls below the composer while you create a thread.

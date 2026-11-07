@@ -4,27 +4,33 @@ import { useState } from "react";
 import {
   hasDesktopNotifications,
   hasNotificationSound,
-  NOTIFICATION_MODE_LABELS,
   unlockNotificationAudio,
 } from "../../threadNotifications";
+import type { MessageKey } from "../../i18n/messages";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
 import { searchableSetting } from "./settingsSearch";
 import { useScopedSettings, useUpdateScopedSettings } from "./useScopedSettings";
 
+const notificationModeMessages = {
+  off: "settings.notifications.off",
+  notifications: "settings.notifications.system",
+  sound: "settings.notifications.sound",
+  "notifications-and-sound": "settings.notifications.both",
+} as const;
+
 export function NotificationSettings() {
+  const { t } = useUiLanguage();
   const mode = useScopedSettings((settings) => settings.notificationMode);
   const updateSettings = useUpdateScopedSettings();
-  const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
+  const [permissionMessage, setPermissionMessage] = useState<MessageKey | null>(null);
   const [requesting, setRequesting] = useState(false);
 
   return (
     <SettingsRow
       {...searchableSetting("thread-notifications")}
-      description={
-        permissionMessage ??
-        "System alerts when a thread finishes, fails, or needs input or approval. Applies to this device while T3 Code is open."
-      }
+      description={t(permissionMessage ?? "settings.notifications.description")}
       control={
         <Select
           value={mode}
@@ -41,37 +47,35 @@ export function NotificationSettings() {
             if (hasNotificationSound(value)) unlockNotificationAudio();
             if (hasDesktopNotifications(value)) {
               if (typeof Notification === "undefined" || !window.isSecureContext) {
-                setPermissionMessage(
-                  "Notifications need a supported browser over HTTPS, or the desktop app. Sound only is still available.",
-                );
+                setPermissionMessage("settings.notifications.secureContext");
                 return;
               }
               setRequesting(true);
               const permission = await settlePromise(() => Notification.requestPermission());
               setRequesting(false);
               if (permission._tag === "Failure") {
-                setPermissionMessage(
-                  "Notifications are unavailable in this browser. Sound only is still available.",
-                );
+                setPermissionMessage("settings.notifications.unavailable");
                 return;
               }
               if (permission.value !== "granted") {
-                setPermissionMessage(
-                  "Allow notifications in your browser or system settings, then choose this option again. Sound only is still available.",
-                );
+                setPermissionMessage("settings.notifications.permission");
                 return;
               }
             }
             updateSettings({ notificationMode: value });
           }}
         >
-          <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="Thread notifications">
-            <SelectValue>{NOTIFICATION_MODE_LABELS[mode]}</SelectValue>
+          <SelectTrigger
+            size="sm"
+            className="w-full sm:w-56"
+            aria-label={t("settings.notifications.title")}
+          >
+            <SelectValue>{t(notificationModeMessages[mode])}</SelectValue>
           </SelectTrigger>
           <SelectPopup align="end" alignItemWithTrigger={false}>
-            {Object.entries(NOTIFICATION_MODE_LABELS).map(([value, label]) => (
+            {Object.entries(notificationModeMessages).map(([value, label]) => (
               <SelectItem key={value} hideIndicator value={value}>
-                {label}
+                {t(label)}
               </SelectItem>
             ))}
           </SelectPopup>

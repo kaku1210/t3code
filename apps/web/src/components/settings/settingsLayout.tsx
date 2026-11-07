@@ -18,6 +18,8 @@ import {
   usePrimarySettingsAvailable,
 } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
+import { settingsRowText, settingsSectionTitle } from "../../i18n/settingsCopy";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { WorkspacePageContainer, type WorkspacePageWidth } from "../WorkspacePageContainer";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
@@ -205,7 +207,7 @@ export function PolicyTooltip({ children }: { readonly children: string }) {
 }
 
 export function SettingsSection({
-  title,
+  title: sourceTitle,
   hideTitle = false,
   icon,
   titleAction,
@@ -224,6 +226,8 @@ export function SettingsSection({
   children: ReactNode;
 }) {
   const targetRef = useSettingsSearchTarget<HTMLElement>(sectionProps.id);
+  const { language } = useUiLanguage();
+  const title = settingsSectionTitle(language, sectionProps.id, sourceTitle);
 
   return (
     <section
@@ -303,8 +307,8 @@ function projectOverrides(
 }
 
 export function SettingsRow({
-  title,
-  description,
+  title: sourceTitle,
+  description: sourceDescription,
   status,
   resetAction,
   onResetOverride,
@@ -334,6 +338,15 @@ export function SettingsRow({
   children?: ReactNode;
 }) {
   const targetRef = useSettingsSearchTarget<HTMLDivElement>(rowProps.id);
+  const { language } = useUiLanguage();
+  const title =
+    typeof sourceTitle === "string"
+      ? settingsRowText(language, rowProps.id, "title", sourceTitle)
+      : sourceTitle;
+  const description =
+    typeof sourceDescription === "string"
+      ? settingsRowText(language, rowProps.id, "description", sourceDescription)
+      : sourceDescription;
   const primarySettingsAvailable = usePrimarySettingsAvailable();
   const context = useOptionalSettingsScope();
   const primaryEnvironmentId = usePrimaryEnvironmentId();

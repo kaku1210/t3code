@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./uiLanguage": {
+      "types": "./src/uiLanguage.ts",
+      "import": "./src/uiLanguage.ts"
+    },
     "./changedFileKind": {
       "types": "./src/changedFileKind.ts",
       "import": "./src/changedFileKind.ts"

@@ -11,6 +11,7 @@ import { CheckIcon, ChevronRightIcon, ChevronUpIcon, WorkflowIcon } from "lucide
 import { type KeyboardEvent, type ReactNode, use, useRef, useState } from "react";
 
 import { cn } from "~/lib/utils";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import {
   Menu,
   MenuPopup,
@@ -26,6 +27,7 @@ import { ComposerPermissionsSection, type RuntimeModeOption } from "./ComposerFo
 import { composerFloatingLayerProps, focusCheckedPermission } from "./composerEventScope";
 import { EffortGlyph, FastBolt, resolveEffortGlyph } from "./EffortGlyph";
 import { DockedPickerContext } from "./ProviderModelPicker";
+import { runtimeModeCopy } from "./runtimeModeConfig";
 import {
   getTraitsSectionVisibility,
   type TraitsSelectionInput,
@@ -636,9 +638,11 @@ function PermissionsMenu(props: {
   onChange: (mode: RuntimeMode) => void;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const { language, t } = useUiLanguage();
   const current = props.options.find((option) => option.mode === props.runtimeMode);
   if (!current) return null;
   const CurrentIcon = current.icon;
+  const { label } = runtimeModeCopy(language, current.mode);
   return (
     <Menu
       onOpenChangeComplete={(open) => {
@@ -651,13 +655,13 @@ function PermissionsMenu(props: {
             ref={triggerRef}
             type="button"
             data-composer-permissions-trigger
-            aria-label={`Permissions: ${current.label}`}
+            aria-label={t("permission.label", { mode: label })}
             className="ms-auto flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-muted-foreground text-xs outline-none hover:bg-foreground/[0.09] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-popup-open:bg-foreground/[0.09] data-popup-open:text-foreground"
           />
         }
       >
         <CurrentIcon aria-hidden="true" className="size-3.5" />
-        {current.label}
+        {label}
         <ChevronUpIcon aria-hidden="true" className="size-3" />
       </MenuTrigger>
       <MenuPopup side="top" align="end" {...composerFloatingLayerProps}>

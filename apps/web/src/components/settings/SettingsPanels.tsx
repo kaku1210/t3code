@@ -1,5 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
+import { UiLanguageSetting } from "./UiLanguageSetting";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { CheckIcon } from "lucide-react";
 import { Link, useNavigate } from "@tanstack/react-router";
@@ -120,29 +122,29 @@ const RESPONSE_STREAMING_MODE_DESCRIPTIONS: Record<ResponseStreamingMode, string
   paragraph: "Each paragraph or code block appears as soon as it is complete.",
 };
 
-const SIDEBAR_PROJECT_SORT_ORDER_LABELS: Record<SidebarProjectSortOrder, string> = {
-  updated_at: "Last user message",
-  created_at: "Created at",
-  manual: "Manual",
-};
+const SIDEBAR_PROJECT_SORT_ORDER_MESSAGES = {
+  updated_at: "settings.projectSort.updated",
+  created_at: "settings.projectSort.created",
+  manual: "settings.projectSort.manual",
+} as const satisfies Record<SidebarProjectSortOrder, string>;
 const isSidebarProjectSortOrder = Schema.is(SidebarProjectSortOrder);
 
-const TIMESTAMP_FORMAT_LABELS = {
-  locale: "System default",
-  "12-hour": "12-hour",
-  "24-hour": "24-hour",
+const TIMESTAMP_FORMAT_MESSAGES = {
+  locale: "settings.time.system",
+  "12-hour": "settings.time.twelve",
+  "24-hour": "settings.time.twentyFour",
 } as const;
 
-const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
-  stacked: "Stacked",
-  split: "Split",
-};
+const DIFF_LAYOUT_MESSAGES = {
+  stacked: "settings.diffs.stacked",
+  split: "settings.diffs.split",
+} as const satisfies Record<DiffLayout, string>;
 
-const QUIT_CONFIRMATION_MODE_LABELS: Record<QuitConfirmationMode, string> = {
-  direct: "Direct",
-  hold: "Hold",
-  "double-click": "Double press",
-};
+const QUIT_CONFIRMATION_MODE_MESSAGES = {
+  direct: "settings.quit.direct",
+  hold: "settings.quit.hold",
+  "double-click": "settings.quit.doublePress",
+} as const satisfies Record<QuitConfirmationMode, string>;
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
@@ -422,6 +424,7 @@ function AboutVersionSection() {
 }
 
 export function useSettingsRestore(onRestored?: () => void) {
+  const { t } = useUiLanguage();
   const {
     theme,
     setTheme,
@@ -467,6 +470,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
       ? ["Time format"]
+      : []),
+    ...(settings.uiLanguage !== DEFAULT_UNIFIED_SETTINGS.uiLanguage
+      ? [t("settings.language")]
       : []),
     ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
       ? ["Thread notifications"]
@@ -633,6 +639,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       effortDisplay: DEFAULT_UNIFIED_SETTINGS.effortDisplay,
       mathRenderingEnabled: DEFAULT_UNIFIED_SETTINGS.mathRenderingEnabled,
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
+      uiLanguage: DEFAULT_UNIFIED_SETTINGS.uiLanguage,
       notificationMode: DEFAULT_UNIFIED_SETTINGS.notificationMode,
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
@@ -783,6 +790,7 @@ export function LegacyFeaturesSection() {
 }
 
 export function GeneralSettingsPanel() {
+  const { t } = useUiLanguage();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   const lastEnabledProjectGroupingMode = useRef<SidebarProjectGroupingMode>(
@@ -867,15 +875,19 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-44" aria-label="Project order">
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-44"
+                aria-label={t("settings.projectSort.label")}
+              >
                 <SelectValue>
-                  {SIDEBAR_PROJECT_SORT_ORDER_LABELS[settings.sidebarProjectSortOrder]}
+                  {t(SIDEBAR_PROJECT_SORT_ORDER_MESSAGES[settings.sidebarProjectSortOrder])}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 {SidebarProjectSortOrder.literals.map((sortOrder) => (
                   <SelectItem hideIndicator key={sortOrder} value={sortOrder}>
-                    {SIDEBAR_PROJECT_SORT_ORDER_LABELS[sortOrder]}
+                    {t(SIDEBAR_PROJECT_SORT_ORDER_MESSAGES[sortOrder])}
                   </SelectItem>
                 ))}
               </SelectPopup>
@@ -1014,12 +1026,14 @@ export function GeneralSettingsPanel() {
                   className="w-full sm:w-40"
                   aria-label="Quit shortcut behavior"
                 >
-                  <SelectValue>{QUIT_CONFIRMATION_MODE_LABELS[settings.confirmQuit]}</SelectValue>
+                  <SelectValue>
+                    {t(QUIT_CONFIRMATION_MODE_MESSAGES[settings.confirmQuit])}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="end" alignItemWithTrigger={false}>
-                  {Object.entries(QUIT_CONFIRMATION_MODE_LABELS).map(([value, label]) => (
+                  {Object.entries(QUIT_CONFIRMATION_MODE_MESSAGES).map(([value, label]) => (
                     <SelectItem hideIndicator key={value} value={value}>
-                      {label}
+                      {t(label)}
                     </SelectItem>
                   ))}
                 </SelectPopup>
@@ -1030,6 +1044,7 @@ export function GeneralSettingsPanel() {
       </SettingsSection>
 
       <SettingsSection id="display" title="Display">
+        <UiLanguageSetting />
         <SettingsRow
           {...searchableSetting("time-format")}
           description="System default follows your browser or OS clock preference."
@@ -1054,18 +1069,22 @@ export function GeneralSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Timestamp format">
-                <SelectValue>{TIMESTAMP_FORMAT_LABELS[settings.timestampFormat]}</SelectValue>
+              <SelectTrigger
+                size="sm"
+                className="w-full sm:w-40"
+                aria-label={t("settings.time.format")}
+              >
+                <SelectValue>{t(TIMESTAMP_FORMAT_MESSAGES[settings.timestampFormat])}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="locale">
-                  {TIMESTAMP_FORMAT_LABELS.locale}
+                  {t("settings.time.system")}
                 </SelectItem>
                 <SelectItem hideIndicator value="12-hour">
-                  {TIMESTAMP_FORMAT_LABELS["12-hour"]}
+                  {t("settings.time.twelve")}
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
-                  {TIMESTAMP_FORMAT_LABELS["24-hour"]}
+                  {t("settings.time.twentyFour")}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1077,11 +1096,15 @@ export function GeneralSettingsPanel() {
 }
 
 export function ChatSettingsPanel() {
+  const { t } = useUiLanguage();
   const modifierLabel = isMacPlatform(navigator.platform) ? "⌘" : "Ctrl";
   const sendShortcutOptions = [
     { value: "enter", label: "Enter" },
-    { value: "mod-enter-multiline", label: `${modifierLabel} + Enter for multiline prompts` },
-    { value: "mod-enter", label: `${modifierLabel} + Enter always` },
+    {
+      value: "mod-enter-multiline",
+      label: t("settings.chat.multilineSend", { modifier: modifierLabel }),
+    },
+    { value: "mod-enter", label: t("settings.chat.alwaysSend", { modifier: modifierLabel }) },
   ] as const;
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
@@ -1139,7 +1162,7 @@ export function ChatSettingsPanel() {
               <SelectTrigger
                 size="sm"
                 className="w-auto min-w-0 max-w-full"
-                aria-label="Send shortcut"
+                aria-label={t("settings.chat.sendShortcut")}
               >
                 <SelectValue>
                   {
@@ -1220,14 +1243,22 @@ export function ChatSettingsPanel() {
                 }
               }}
             >
-              <SelectTrigger size="sm" className="w-auto min-w-0" aria-label="Follow-up behavior">
+              <SelectTrigger
+                size="sm"
+                className="w-auto min-w-0"
+                aria-label={t("settings.chat.followUp")}
+              >
                 <SelectValue>
-                  {settings.followUpBehavior === "queue" ? "Queue" : "Steer"}
+                  {t(
+                    settings.followUpBehavior === "queue"
+                      ? "settings.chat.queue"
+                      : "settings.chat.steer",
+                  )}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem value="queue">Queue</SelectItem>
-                <SelectItem value="steer">Steer</SelectItem>
+                <SelectItem value="queue">{t("settings.chat.queue")}</SelectItem>
+                <SelectItem value="steer">{t("settings.chat.steer")}</SelectItem>
               </SelectPopup>
             </Select>
           }
@@ -1238,6 +1269,7 @@ export function ChatSettingsPanel() {
 }
 
 function DiffColorsSettingsRow() {
+  const { t } = useUiLanguage();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
   return (
@@ -1276,12 +1308,16 @@ function DiffColorsSettingsRow() {
                 <span className="size-2 rounded-full bg-diff-addition" />
               </span>
               <SelectValue>
-                {settings.diffColorScheme === "blue-orange" ? "Blue & orange" : "Red & green"}
+                {t(
+                  settings.diffColorScheme === "blue-orange"
+                    ? "settings.diffs.blueOrange"
+                    : "settings.diffs.redGreen",
+                )}
               </SelectValue>
             </SelectTrigger>
             <SelectPopup align="end" alignItemWithTrigger={false}>
-              <SelectItem value="red-green">Red & green (default)</SelectItem>
-              <SelectItem value="blue-orange">Blue & orange</SelectItem>
+              <SelectItem value="red-green">{t("settings.diffs.redGreenDefault")}</SelectItem>
+              <SelectItem value="blue-orange">{t("settings.diffs.blueOrange")}</SelectItem>
             </SelectPopup>
           </Select>
         </div>
@@ -1291,6 +1327,7 @@ function DiffColorsSettingsRow() {
 }
 
 export function DiffsSettingsPanel() {
+  const { t } = useUiLanguage();
   const settings = useScopedSettings();
   const updateSettings = useUpdateScopedSettings();
 
@@ -1318,14 +1355,14 @@ export function DiffsSettingsPanel() {
               }}
             >
               <SelectTrigger size="sm" className="w-full sm:w-40" aria-label="Diff layout">
-                <SelectValue>{DIFF_LAYOUT_LABELS[settings.diffLayout]}</SelectValue>
+                <SelectValue>{t(DIFF_LAYOUT_MESSAGES[settings.diffLayout])}</SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="stacked">
-                  {DIFF_LAYOUT_LABELS.stacked}
+                  {t(DIFF_LAYOUT_MESSAGES.stacked)}
                 </SelectItem>
                 <SelectItem hideIndicator value="split">
-                  {DIFF_LAYOUT_LABELS.split}
+                  {t(DIFF_LAYOUT_MESSAGES.split)}
                 </SelectItem>
               </SelectPopup>
             </Select>
@@ -1385,14 +1422,20 @@ export function DiffsSettingsPanel() {
                 className="w-full sm:w-40"
                 aria-label="Default diff file state"
               >
-                <SelectValue>{settings.diffFilesCollapsed ? "Collapsed" : "Expanded"}</SelectValue>
+                <SelectValue>
+                  {t(
+                    settings.diffFilesCollapsed
+                      ? "settings.diffs.collapsed"
+                      : "settings.diffs.expanded",
+                  )}
+                </SelectValue>
               </SelectTrigger>
               <SelectPopup align="end" alignItemWithTrigger={false}>
                 <SelectItem hideIndicator value="expanded">
-                  Expanded
+                  {t("settings.diffs.expanded")}
                 </SelectItem>
                 <SelectItem hideIndicator value="collapsed">
-                  Collapsed
+                  {t("settings.diffs.collapsed")}
                 </SelectItem>
               </SelectPopup>
             </Select>

@@ -66,6 +66,10 @@ export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"])
 export type TimestampFormat = typeof TimestampFormat.Type;
 const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
 
+export const UiLanguagePreference = Schema.Literals(["system", "en", "zh-CN"]);
+export type UiLanguagePreference = typeof UiLanguagePreference.Type;
+export const DEFAULT_UI_LANGUAGE_PREFERENCE: UiLanguagePreference = "system";
+
 export const DiffLayout = Schema.Literals(["stacked", "split"]);
 export type DiffLayout = typeof DiffLayout.Type;
 const DEFAULT_DIFF_LAYOUT: DiffLayout = "stacked";
@@ -545,6 +549,9 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   timestampFormat: TimestampFormat.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_TIMESTAMP_FORMAT)),
+  ),
+  uiLanguage: UiLanguagePreference.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_UI_LANGUAGE_PREFERENCE)),
   ),
   // Device-local input device id. An empty string follows the operating system default.
   voiceMicrophone: Schema.String.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
@@ -1928,6 +1935,7 @@ export const ClientSettingsPatch = Schema.Struct({
   sidebarProjectSortOrder: Schema.optionalKey(SidebarProjectSortOrder),
   sidebarThreadSortOrder: Schema.optionalKey(SidebarThreadSortOrder),
   timestampFormat: Schema.optionalKey(TimestampFormat),
+  uiLanguage: Schema.optionalKey(UiLanguagePreference),
   voiceMicrophone: Schema.optionalKey(Schema.String),
   voiceShortcutMode: Schema.optionalKey(VoiceShortcutMode),
   speechLanguage: Schema.optionalKey(SpeechLanguage),
