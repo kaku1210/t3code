@@ -817,7 +817,11 @@ function useSidebarLookups() {
   const projectDisplayNameByKey = new Map(
     projectGroups.flatMap((group) =>
       group.memberProjects.map(
-        (project) => [`${project.environmentId}:${project.id}`, group.displayName] as const,
+        (project) =>
+          [
+            `${project.environmentId}:${project.id}`,
+            group.isScratch ? t("project.none") : group.displayName,
+          ] as const,
       ),
     ),
   );
@@ -898,7 +902,7 @@ function readRouteThreadKey(router: AnyRouter): string | null {
 }
 
 export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReveal }) {
-  const { t } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const {
     projects,
     serverConfigs,
@@ -2315,6 +2319,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         menuOpenedAt,
         timestampFormat,
         selectedThreads[0]!.environmentId,
+        language,
       );
       const clicked = await settlePromise(() =>
         api.contextMenu.show(
@@ -2545,6 +2550,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildDraftActionMenuItems({
+              language,
               hasPath: Boolean(workspacePath),
               hasBranch: Boolean(session.branch),
               hasProject: projectGroup != null,
@@ -2607,6 +2613,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           new Date(),
           timestampFormat,
           thread.environmentId,
+          language,
         );
         const threadProjectGroup =
           projectGroupsRef.current.find((project) =>
@@ -2619,6 +2626,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
         const clicked = await settlePromise(() =>
           api.contextMenu.show(
             buildThreadActionMenuItems({
+              language,
               canOperate: readEnvironmentScope(
                 threadRef.environmentId,
                 AuthOrchestrationOperateScope,
@@ -2628,7 +2636,9 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               projectFilter:
                 threadProjectGroup && !threadProjectGroup.archived
                   ? {
-                      label: threadProjectGroup.displayName,
+                      label: threadProjectGroup.isScratch
+                        ? t("project.none")
+                        : threadProjectGroup.displayName,
                       isActive: projectScopeKeys.includes(threadProjectGroup.projectKey),
                     }
                   : null,
@@ -2817,7 +2827,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
           case "archive": {
             if (confirmThreadArchive) {
               const confirmed = await settlePromise(() =>
-                api.dialogs.confirm(`Archive thread "${thread.title}"?`),
+                api.dialogs.confirm(t("thread.actions.confirmArchive", { title: thread.title })),
               );
               if (confirmed._tag === "Failure" || !confirmed.value) return;
             }
@@ -2847,8 +2857,8 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               const confirmed = await settlePromise(() =>
                 api.dialogs.confirm(
                   [
-                    `Delete thread "${thread.title}"?`,
-                    "This permanently clears conversation history for this thread.",
+                    t("thread.actions.confirmDelete", { title: thread.title }),
+                    t("thread.actions.deleteEffect"),
                   ].join("\n"),
                   { variant: "destructive" },
                 ),
@@ -3618,10 +3628,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                           {/* Plus means "add", so revealing more uses a chevron. */}
                           <ChevronDownIcon aria-hidden className="size-4 shrink-0" />
                           {olderSettledShelf.loading
-                            ? "Loading"
+                            ? t("common.loading")
                             : olderSettledShelf.failed
-                              ? "Could not load older threads. Retry"
-                              : `Show ${Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT)} more`}
+                              ? t("thread.list.retryOlder")
+                              : t("thread.list.showMore", {
+                                  count: Math.min(hiddenSettledCount, SETTLED_TAIL_PAGE_COUNT),
+                                })}
                         </button>
                       </li>
                     ) : null}
@@ -3655,7 +3667,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
               ) : scopedProjectGroups.length > 1 ? (
                 t("thread.emptyInProjects")
               ) : scopedProjectGroups[0] ? (
-                `No threads in ${scopedProjectGroups[0].displayName} yet`
+                t("thread.list.emptyInProject", { project: scopedProjectGroups[0].displayName })
               ) : (
                 t("thread.empty")
               )}

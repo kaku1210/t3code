@@ -217,6 +217,8 @@ export interface SnoozePreset {
 
 export interface SnoozePresetOptions {
   readonly presets?: ReadonlyArray<SnoozePresetSetting>;
+  readonly formatLabel?: (setting: SnoozePresetSetting, daysAhead: number, wake: Date) => string;
+  readonly weekdayLocale?: string;
   readonly formatTime?: (date: Date) => string;
 }
 
@@ -279,6 +281,8 @@ export function resolveSnoozePreset(
   setting: SnoozePresetSetting,
   now: Date,
   formatTime: (date: Date) => string = snoozeTimeOfDayLabel,
+  formatLabel: NonNullable<SnoozePresetOptions["formatLabel"]> = snoozePresetLabel,
+  weekdayLocale?: string,
 ): SnoozePreset | null {
   let wake: Date;
   let daysAhead = 0;
@@ -291,9 +295,9 @@ export function resolveSnoozePreset(
     // A today option whose time has passed is left out until tomorrow.
     if (wake.getTime() <= now.getTime()) return null;
   }
-  const label = snoozePresetLabel(setting, daysAhead);
+  const label = formatLabel(setting, daysAhead, wake);
   // Durations and "Next week" don't name the wake day, so a wake on another day shows it.
-  const labelNamesDay = setting.kind === "at" && label !== "Next week";
+  const labelNamesDay = setting.kind === "at" && (daysAhead <= 1 || setting.day !== "monday");
   const time = formatTime(wake);
   return {
     id: snoozePresetId(setting),
@@ -301,7 +305,7 @@ export function resolveSnoozePreset(
     whenLabel:
       labelNamesDay || wake.toDateString() === now.toDateString()
         ? time
-        : `${wake.toLocaleDateString(undefined, { weekday: "short" })} ${time}`,
+        : `${wake.toLocaleDateString(weekdayLocale, { weekday: "short" })} ${time}`,
     snoozedUntil: wake.toISOString(),
   };
 }
@@ -317,7 +321,16 @@ export function resolveSnoozePresets(
   const seen = new Set<number>();
   return (
     (options.presets ?? DEFAULT_SNOOZE_PRESETS)
-      .flatMap((setting) => resolveSnoozePreset(setting, now, options.formatTime) ?? [])
+      .flatMap(
+        (setting) =>
+          resolveSnoozePreset(
+            setting,
+            now,
+            options.formatTime,
+            options.formatLabel,
+            options.weekdayLocale,
+          ) ?? [],
+      )
       // flatMap returned a new array; Hermes has no `toSorted`.
       .sort((a, b) => wakeMinute(a) - wakeMinute(b))
       .filter((preset) => {

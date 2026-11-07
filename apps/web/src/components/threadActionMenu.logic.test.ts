@@ -65,6 +65,17 @@ describe("buildThreadActionMenuItems", () => {
     },
   );
 
+  it("keeps the same action IDs and targets across languages", () => {
+    const labels = buildThreadActionMenuItems({ ...baseState, isSettled: true, language: "zh-CN" });
+    const original = buildThreadActionMenuItems({ ...baseState, isSettled: true });
+    expect(labels.map(({ id }) => id)).toEqual(original.map(({ id }) => id));
+    expect(labels.find(({ id }) => id === "unsettle")?.label).toBe("取消收起会话");
+    expect(
+      labels.find(({ id }) => id === "snooze")?.children?.find(({ id }) => id === "snooze:custom")
+        ?.label,
+    ).toBe("自定义…");
+  });
+
   it("disables archive and turning into a project while the thread is running", () => {
     const items = buildThreadActionMenuItems({
       ...baseState,

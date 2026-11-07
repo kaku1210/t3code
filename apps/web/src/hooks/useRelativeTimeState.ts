@@ -1,3 +1,4 @@
+import type { UiLanguage } from "@t3tools/shared/uiLanguage";
 import { useSyncExternalStore } from "react";
 
 import {
@@ -7,7 +8,10 @@ import {
   type RelativeTimeState,
 } from "../timestampFormat";
 
-export function useRelativeTimeState(isoDate: string | null): RelativeTimeState {
+export function useRelativeTimeState(
+  isoDate: string | null,
+  language: UiLanguage = "en",
+): RelativeTimeState {
   const subscribe = (onChange: () => void) => {
     if (isoDate === null) return () => {};
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -27,5 +31,5 @@ export function useRelativeTimeState(isoDate: string | null): RelativeTimeState 
 
   if (isoDate === null) return { status: "missing" };
   if (elapsedMs === null) return { status: "invalid" };
-  return { status: "relative", ...formatRelativeElapsed(elapsedMs) };
+  return { status: "relative", ...formatRelativeElapsed(elapsedMs, language) };
 }

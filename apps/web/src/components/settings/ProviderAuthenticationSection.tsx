@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
@@ -40,6 +41,7 @@ export function ProviderAuthenticationSection({
   readonly provider: ServerProvider;
   readonly readOnly: boolean;
 }) {
+  const { t } = useUiLanguage();
   const target = { environmentId, input: { instanceId } };
   const query = useEnvironmentQuery(serverEnvironment.providerAuthState(target));
   const commands = { reportFailure: false, reportDefect: false };
@@ -165,11 +167,11 @@ export function ProviderAuthenticationSection({
 
   return (
     <SettingsRow
-      title="Account"
+      title={t("settings.providerAuth.account")}
       description={
         signedIn && !active && provider.auth.email?.trim() ? (
           <span>
-            Signed in as{" "}
+            {t("settings.providerAuth.signedInAs")}{" "}
             <RedactedSensitiveText
               key={provider.auth.email}
               value={provider.auth.email}
@@ -198,14 +200,18 @@ export function ProviderAuthenticationSection({
               disabled={disabled}
               onValueChange={(value) => setMethodId(value ?? "")}
             >
-              <SelectTrigger size="sm" aria-label="Sign-in method" className="w-44">
+              <SelectTrigger
+                size="sm"
+                aria-label={t("settings.providerAuth.method")}
+                className="w-44"
+              >
                 <SelectValue>
                   {auth?.methods?.find((method) => method.id === methodId)?.name ??
-                    "Provider default"}
+                    t("settings.providerAuth.default")}
                 </SelectValue>
               </SelectTrigger>
               <SelectPopup>
-                <SelectItem value="">Provider default</SelectItem>
+                <SelectItem value="">{t("settings.providerAuth.default")}</SelectItem>
                 {auth?.methods?.map((method) => (
                   <SelectItem key={method.id} value={method.id}>
                     {method.name}
@@ -222,13 +228,13 @@ export function ProviderAuthenticationSection({
                 disabled={disabled}
                 onClick={() => void openBrowser()}
               >
-                Open browser
+                {t("settings.providerAuth.openBrowser")}
               </Button>
               <Tooltip>
                 <TooltipTrigger
                   render={
                     <Button
-                      aria-label="Copy sign-in link"
+                      aria-label={t("settings.providerAuth.copyLink")}
                       size="icon-sm"
                       variant="ghost-muted"
                       disabled={disabled}
@@ -247,7 +253,7 @@ export function ProviderAuthenticationSection({
                     </Button>
                   }
                 />
-                <TooltipPopup>Copy sign-in link</TooltipPopup>
+                <TooltipPopup>{t("settings.providerAuth.copyLink")}</TooltipPopup>
               </Tooltip>
             </>
           ) : null}
@@ -260,13 +266,13 @@ export function ProviderAuthenticationSection({
                   <a href={provider.setup.documentationUrl} target="_blank" rel="noreferrer" />
                 }
               >
-                Open docs
+                {t("settings.providerAuth.openDocs")}
               </Button>
             ) : active && auth?.flowId ? (
               <Button
                 size="sm"
                 variant="ghost-muted"
-                aria-label="Cancel sign-in"
+                aria-label={t("settings.providerAuth.cancelSignIn")}
                 disabled={disabled}
                 onClick={() =>
                   void run(() =>
@@ -274,7 +280,7 @@ export function ProviderAuthenticationSection({
                   )
                 }
               >
-                Cancel
+                {t("settings.providerAuth.cancel")}
               </Button>
             ) : !active && !needsExternalSetup && provider.setup?.canAuthenticate !== false ? (
               <Button
@@ -296,14 +302,14 @@ export function ProviderAuthenticationSection({
                 }
               >
                 {signedIn
-                  ? "Change account"
+                  ? t("settings.providerAuth.changeAccount")
                   : auth?.phase === "failed" || auth?.phase === "cancelled"
                     ? usesCredentials
-                      ? "Retry connection"
-                      : "Retry sign-in"
+                      ? t("settings.providerAuth.retryConnection")
+                      : t("settings.providerAuth.retrySignIn")
                     : usesCredentials
-                      ? "Connect"
-                      : "Sign in"}
+                      ? t("settings.providerAuth.connect")
+                      : t("settings.providerAuth.signIn")}
               </Button>
             ) : null}
             {!active && signedIn && (provider.auth.canLogout ?? provider.setup?.canAuthenticate) ? (
@@ -321,7 +327,7 @@ export function ProviderAuthenticationSection({
                     });
                 }}
               >
-                Sign out
+                {t("settings.providerAuth.signOut")}
               </Button>
             ) : null}
           </>
@@ -346,7 +352,9 @@ export function ProviderAuthenticationSection({
             <div className="py-2">
               <Suspense
                 fallback={
-                  <p className="text-xs text-muted-foreground">Loading sign-in terminal…</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("settings.providerAuth.loadingTerminal")}
+                  </p>
                 }
               >
                 <ProviderAuthTerminal
@@ -427,7 +435,7 @@ export function ProviderAuthenticationSection({
                 className="w-fit"
                 disabled={disabled}
               >
-                Connect
+                {t("settings.providerAuth.connect")}
               </Button>
             </form>
           ) : null}
@@ -448,7 +456,7 @@ export function ProviderAuthenticationSection({
               }}
             >
               <label className="grid gap-1">
-                If the final localhost page does not load, paste its full URL here.
+                {t("settings.providerAuth.localhostHelp")}
                 <Input
                   size="sm"
                   id={`provider-callback-${instanceId}`}
@@ -467,7 +475,7 @@ export function ProviderAuthenticationSection({
                 className="w-fit"
                 disabled={disabled || !values.callback?.trim()}
               >
-                Continue
+                {t("settings.providerAuth.continue")}
               </Button>
             </form>
           ) : null}

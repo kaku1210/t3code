@@ -1,3 +1,5 @@
+import type { UiLanguage } from "@t3tools/shared/uiLanguage";
+import { translate } from "./i18n/messages";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
 
 function getTimestampFormatOptions(
@@ -259,29 +261,44 @@ export function msUntilRelativeTimeChange(
   return Math.min(nextChangeMs - nowMs, DAY_MS);
 }
 
-export function formatRelativeElapsed(elapsedMs: number): RelativeTimeParts {
+export function formatRelativeElapsed(
+  elapsedMs: number,
+  language: UiLanguage = "en",
+): RelativeTimeParts {
   const seconds = Math.floor(elapsedMs / 1000);
-  if (seconds < 60) return { value: "just now", suffix: null };
+  if (seconds < 60) return { value: translate(language, "time.justNow"), suffix: null };
+  const suffix = translate(language, "time.ago");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return { value: `${minutes}m`, suffix: "ago" };
+  if (minutes < 60)
+    return { value: translate(language, "time.minutes", { count: minutes }), suffix };
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return { value: `${hours}h`, suffix: "ago" };
+  if (hours < 24) return { value: translate(language, "time.hours", { count: hours }), suffix };
   const days = Math.floor(hours / 24);
-  return { value: `${days}d`, suffix: "ago" };
+  return { value: translate(language, "time.days", { count: days }), suffix };
 }
 
 export function formatRelativeTime(
   isoDate: string,
   nowMs: number = Date.now(),
+  language: UiLanguage = "en",
 ): RelativeTimeParts | null {
   const elapsedMs = relativeTimeElapsedMs(isoDate, nowMs);
-  return elapsedMs === null ? null : formatRelativeElapsed(elapsedMs);
+  return elapsedMs === null ? null : formatRelativeElapsed(elapsedMs, language);
 }
 
-export function formatRelativeTimeLabel(isoDate: string, nowMs: number = Date.now()) {
-  const relative = formatRelativeTime(isoDate, nowMs);
-  if (!relative) return "";
-  return relative.suffix ? `${relative.value} ${relative.suffix}` : relative.value;
+export function formatRelativeTimePartsLabel(relative: RelativeTimeParts, language: UiLanguage) {
+  return relative.suffix
+    ? translate(language, "time.relative", { value: relative.value, suffix: relative.suffix })
+    : relative.value;
+}
+
+export function formatRelativeTimeLabel(
+  isoDate: string,
+  nowMs: number = Date.now(),
+  language: UiLanguage = "en",
+) {
+  const relative = formatRelativeTime(isoDate, nowMs, language);
+  return relative ? formatRelativeTimePartsLabel(relative, language) : "";
 }
 
 export function formatElapsedDurationLabel(isoDate: string, nowMs: number = Date.now()): string {

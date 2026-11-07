@@ -1,7 +1,11 @@
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
 import { DEFAULT_COMPOSER_PLACEHOLDER } from "../composerPlaceholder";
+import { threadMessages } from "./threadMessages";
+import { settingsDetailMessages } from "./settingsDetailMessages";
 
 const messages = {
+  ...threadMessages,
+  ...settingsDetailMessages,
   "common.search": ["Search", "搜索"],
   "common.close": ["Close", "关闭"],
   "common.cancel": ["Cancel", "取消"],

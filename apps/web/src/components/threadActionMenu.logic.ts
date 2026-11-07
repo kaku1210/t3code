@@ -1,5 +1,7 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
+import type { UiLanguage } from "@t3tools/shared/uiLanguage";
+import { translate } from "../i18n/messages";
 
 export type ThreadActionMenuId =
   | "find"
@@ -37,29 +39,33 @@ export type DraftActionMenuId =
   | "discard";
 
 export function buildDraftActionMenuItems(options: {
+  readonly language?: UiLanguage;
   readonly hasPath: boolean;
   readonly hasBranch: boolean;
   readonly hasProject: boolean;
 }): ReadonlyArray<ContextMenuItem<DraftActionMenuId>> {
+  const t = translate.bind(null, options.language ?? "en");
   return [
     {
       id: "copy",
-      label: "Copy",
+      label: t("common.copy"),
       icon: "copy",
       disabled: !options.hasPath && !options.hasBranch,
       children: [
-        ...(options.hasPath ? [{ id: "copy-path" as const, label: "Path", icon: "folder" }] : []),
+        ...(options.hasPath
+          ? [{ id: "copy-path" as const, label: t("thread.actions.path"), icon: "folder" }]
+          : []),
         ...(options.hasBranch
-          ? [{ id: "copy-branch" as const, label: "Branch", icon: "git-branch" }]
+          ? [{ id: "copy-branch" as const, label: t("thread.actions.branch"), icon: "git-branch" }]
           : []),
       ],
     },
     ...(options.hasProject
-      ? [{ id: "project-settings" as const, label: "Project settings", icon: "settings" }]
+      ? [{ id: "project-settings" as const, label: t("project.settings"), icon: "settings" }]
       : []),
     {
       id: "discard",
-      label: "Discard draft",
+      label: t("thread.actions.discardDraft"),
       icon: "trash",
       destructive: true,
       separatorBefore: true,
@@ -68,6 +74,7 @@ export function buildDraftActionMenuItems(options: {
 }
 
 export interface ThreadActionMenuState {
+  readonly language?: UiLanguage;
   readonly canOperate: boolean;
   readonly canFind?: boolean;
   readonly branch: string | null;
@@ -116,15 +123,16 @@ export function threadActionRequiresOperate(action: ThreadActionMenuId): boolean
 export function buildThreadActionMenuItems(
   state: ThreadActionMenuState,
 ): ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> {
+  const t = translate.bind(null, state.language ?? "en");
   const items: ReadonlyArray<ContextMenuItem<ThreadActionMenuId>> = [
     ...(state.canFind
-      ? [{ id: "find" as const, label: "Find in thread", icon: "text-search" }]
+      ? [{ id: "find" as const, label: t("thread.actions.find"), icon: "text-search" }]
       : []),
     ...(state.branch
       ? [
           {
             id: "new-thread-on-branch" as const,
-            label: `New thread on ${state.branch}`,
+            label: t("thread.actions.newOnBranch", { branch: state.branch }),
             icon: "message-square-plus",
           },
         ]
@@ -132,24 +140,24 @@ export function buildThreadActionMenuItems(
     ...(state.supports.pinning
       ? [
           state.isPinned
-            ? { id: "unpin" as const, label: "Unpin thread", icon: "pin-off" }
-            : { id: "pin" as const, label: "Pin thread", icon: "pin" },
+            ? { id: "unpin" as const, label: t("thread.actions.unpin"), icon: "pin-off" }
+            : { id: "pin" as const, label: t("thread.actions.pin"), icon: "pin" },
         ]
       : []),
     ...(state.supports.settlement
       ? [
           state.isSettled
-            ? { id: "unsettle" as const, label: "Un-settle thread", icon: "circle-check" }
-            : { id: "settle" as const, label: "Settle thread", icon: "circle-check" },
+            ? { id: "unsettle" as const, label: t("thread.actions.unsettle"), icon: "circle-check" }
+            : { id: "settle" as const, label: t("thread.actions.settle"), icon: "circle-check" },
         ]
       : []),
     ...(state.supports.snooze
       ? [
           state.isSnoozed
-            ? { id: "unsnooze" as const, label: "Wake thread", icon: "clock" }
+            ? { id: "unsnooze" as const, label: t("thread.actions.wake"), icon: "clock" }
             : {
                 id: "snooze" as const,
-                label: "Snooze",
+                label: t("thread.actions.snooze"),
                 icon: "clock",
                 disabled: !state.canSnoozeNow,
                 children: [
@@ -159,35 +167,39 @@ export function buildThreadActionMenuItems(
                   })),
                   {
                     id: "snooze:custom" as const,
-                    label: "Custom…",
+                    label: t("thread.actions.snoozeCustom"),
                     separatorBefore: state.snoozePresets.length > 0,
                   },
                 ],
               },
         ]
       : []),
-    { id: "rename", label: "Rename thread", icon: "pencil", separatorBefore: true },
+    { id: "rename", label: t("thread.actions.rename"), icon: "pencil", separatorBefore: true },
     ...(state.supports.titleRegeneration
       ? [
           {
             id: "regenerate-title" as const,
-            label: state.isRegeneratingTitle ? "Regenerating…" : "Regenerate title",
+            label: t(
+              state.isRegeneratingTitle
+                ? "thread.actions.regenerating"
+                : "thread.actions.regenerate",
+            ),
             icon: "refresh-cw",
             disabled: state.isRegeneratingTitle,
           },
         ]
       : []),
-    { id: "mark-unread", label: "Mark unread", icon: "mail-open" },
+    { id: "mark-unread", label: t("thread.actions.markUnread"), icon: "mail-open" },
     ...(state.canShareWithGuest
-      ? [{ id: "share-guest" as const, label: "Share with guest", icon: "user-plus" }]
+      ? [{ id: "share-guest" as const, label: t("thread.actions.shareGuest"), icon: "user-plus" }]
       : []),
     ...(state.projectFilter
       ? [
           {
             id: "filter-by-project" as const,
             label: state.projectFilter.isActive
-              ? "Show all projects"
-              : `Filter by ${state.projectFilter.label}`,
+              ? t("thread.actions.showAllProjects")
+              : t("thread.actions.filterProject", { project: state.projectFilter.label }),
             icon: "folder-tree",
           },
         ]
@@ -196,7 +208,7 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "turn-into-project" as const,
-            label: "Turn into project",
+            label: t("thread.actions.promote"),
             icon: "folder-plus",
             disabled: state.isRunning,
           },
@@ -206,17 +218,17 @@ export function buildThreadActionMenuItems(
       ? [
           {
             id: "auto-settle" as const,
-            label: "Auto-settle behavior",
+            label: t("thread.actions.autoSettle"),
             icon: "timer",
             children: [
               {
                 id: "auto-settle:enabled" as const,
-                label: "Enabled",
+                label: t("common.enabled"),
                 checked: state.autoSettleEnabled,
               },
               {
                 id: "auto-settle:disabled" as const,
-                label: "Disabled",
+                label: t("common.disabled"),
                 checked: !state.autoSettleEnabled,
               },
             ],
@@ -225,29 +237,29 @@ export function buildThreadActionMenuItems(
       : []),
     {
       id: "copy",
-      label: "Copy",
+      label: t("common.copy"),
       icon: "copy",
       separatorBefore: true,
       children: [
-        { id: "copy-path", label: "Path", icon: "folder" },
+        { id: "copy-path", label: t("thread.actions.path"), icon: "folder" },
         ...(state.branch
-          ? [{ id: "copy-branch" as const, label: "Branch", icon: "git-branch" }]
+          ? [{ id: "copy-branch" as const, label: t("thread.actions.branch"), icon: "git-branch" }]
           : []),
-        { id: "copy-thread", label: "Thread", icon: "message-square" },
-        { id: "copy-thread-id", label: "Thread ID", icon: "hash" },
+        { id: "copy-thread", label: t("thread.actions.copyThread"), icon: "message-square" },
+        { id: "copy-thread-id", label: t("thread.actions.copyId"), icon: "hash" },
       ],
     },
-    { id: "project-settings", label: "Project settings", icon: "settings" },
+    { id: "project-settings", label: t("project.settings"), icon: "settings" },
     {
       id: "archive",
-      label: "Archive thread",
+      label: t("thread.actions.archive"),
       icon: "archive",
       disabled: state.isRunning,
       separatorBefore: true,
     },
     {
       id: "delete",
-      label: "Delete",
+      label: t("common.delete"),
       destructive: true,
       icon: "trash",
     },

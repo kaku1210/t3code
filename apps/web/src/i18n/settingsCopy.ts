@@ -1,5 +1,7 @@
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
 
+import { settingsDetailMessages } from "./settingsDetailMessages";
+
 type CopyPair = readonly [source: string, simplifiedChinese: string];
 type SettingCopy = Readonly<Partial<Record<"title" | "description", CopyPair>>>;
 
@@ -65,6 +67,47 @@ const groupCopy: Readonly<Partial<Record<string, CopyPair>>> = {
 };
 
 const settingCopy: Readonly<Partial<Record<string, SettingCopy>>> = {
+  "snap-shot-enabled": { title: ["SnapShots", "快照"] },
+  "snap-shot-accessibility": { title: ["Include app text", "包含应用文本"] },
+  "snap-shot-shortcut": { title: ["Capture shortcut", "捕获快捷键"] },
+  "snap-shot-sound": { title: ["Capture sound", "捕获音效"] },
+  "snap-shot-flash": { title: ["Capture flash", "捕获闪光提示"] },
+  "snap-shot-animations": { title: ["Capture animations", "捕获动画"] },
+  "browser-profiles": { title: ["Browser profiles", "浏览器配置"] },
+  "browser-default-profile": { title: ["Default browser profile", "默认浏览器配置"] },
+  "browser-default-viewport": { title: settingsDetailMessages["settings.browser.viewport"] },
+  "browser-default-zoom": { title: settingsDetailMessages["settings.browser.zoom"] },
+  "browser-default-appearance": { title: settingsDetailMessages["settings.browser.appearance"] },
+  "browser-recording-frame-rate": { title: settingsDetailMessages["settings.browser.frameRate"] },
+  "browser-recording-key-presses": { title: settingsDetailMessages["settings.browser.recordKeys"] },
+  "browser-recording-mouse-presses": {
+    title: settingsDetailMessages["settings.browser.recordMouse"],
+  },
+  "browser-link-target": { title: settingsDetailMessages["settings.browser.links"] },
+  "browser-search-engine": { title: settingsDetailMessages["settings.browser.searchEngine"] },
+  "agent-browser-access": { title: settingsDetailMessages["settings.browser.access"] },
+  "browser-auto-show-floating-preview": {
+    title: settingsDetailMessages["settings.browser.preview"],
+  },
+  "voice-transcription-destination": {
+    title: settingsDetailMessages["settings.voice.transcribeWith"],
+  },
+  "voice-microphone": { title: settingsDetailMessages["settings.voice.microphone"] },
+  "dictation-shortcut-mode": { title: settingsDetailMessages["settings.voice.shortcut"] },
+  "speech-language": { title: ["Transcription language", "转录语言"] },
+  "speech-dictionary": { title: settingsDetailMessages["settings.voice.dictionary"] },
+  "speech-project-dictionary": { title: ["Project dictionary", "项目词典"] },
+  "speech-post-processing-model": { title: ["Cleanup model", "润色模型"] },
+  "speech-correction-word": { title: settingsDetailMessages["settings.voice.correctionCue"] },
+  "speech-silence-filtering": { title: settingsDetailMessages["settings.voice.silenceFiltering"] },
+  "remove-filler-words": { title: settingsDetailMessages["settings.voice.removeFillerWords"] },
+  "speech-post-processing": { title: settingsDetailMessages["settings.voice.cleanupWithProvider"] },
+  "speech-models": { title: ["Transcription models", "转录模型"] },
+  "speech-hardware": {
+    title: ["Transcription hardware and model unloading", "转录硬件和模型卸载"],
+  },
+  "microphone-test": { title: settingsDetailMessages["settings.microphoneTest.test"] },
+  "transcription-test": { title: ["Test model", "测试模型"] },
   "project-grouping": {
     title: ["Project grouping", "项目分组"],
     description: [

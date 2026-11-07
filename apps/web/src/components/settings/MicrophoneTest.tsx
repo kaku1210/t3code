@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { MICROPHONE_PERMISSION_ERROR } from "@t3tools/client-runtime/voice-input";
 import { CheckIcon, MicIcon, PauseIcon, PlayIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +29,7 @@ type Capture = {
  * at the microphone rather than at transcription.
  */
 export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
+  const { t } = useUiLanguage();
   const [phase, setPhase] = useState<"idle" | "starting" | "recording" | "ready">("idle");
   const [recording, setRecording] = useState<{ url: string; duration: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -195,7 +197,7 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
     return (
       <Button size="sm" variant="outline" onClick={() => void start()}>
         <MicIcon />
-        Test microphone
+        {t("settings.microphoneTest.test")}
       </Button>
     );
   }
@@ -215,7 +217,7 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
       <Button
         size="icon-sm-pill"
         variant="ghost"
-        aria-label="Cancel microphone test"
+        aria-label={t("settings.microphoneTest.cancel")}
         onClick={cancel}
       >
         <XIcon />
@@ -226,12 +228,12 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
           <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" />
           <span
             className="shrink-0 text-xs tabular-nums text-muted-foreground"
-            aria-label="Recording time"
+            aria-label={t("settings.microphoneTest.recordingTime")}
           >
             {formatTime(elapsed)} / {formatTime(LOOPBACK_SECONDS)}
           </span>
           <meter
-            aria-label="Microphone input level"
+            aria-label={t("settings.microphoneTest.inputLevel")}
             min={0}
             max={1}
             value={level}
@@ -240,12 +242,12 @@ export function MicrophoneTest({ microphoneId }: { microphoneId: string }) {
         </>
       ) : (
         <span role="status" className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          Opening microphone…
+          {t("settings.microphoneTest.opening")}
         </span>
       )}
       <Button
         size="icon-sm-pill"
-        aria-label="Stop recording"
+        aria-label={t("settings.microphoneTest.stop")}
         disabled={phase !== "recording"}
         onClick={() => {
           const recorder = capture.current?.recorder;
@@ -269,6 +271,7 @@ function MicrophonePlayback({
   onRetry(): void;
   onDone(): void;
 }) {
+  const { t } = useUiLanguage();
   const audio = useRef<HTMLAudioElement>(null);
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -307,14 +310,16 @@ function MicrophonePlayback({
         <Button
           size="icon-sm-pill"
           variant="ghost"
-          aria-label={playing ? "Pause recording" : "Play recording"}
+          aria-label={
+            playing ? t("settings.microphoneTest.pause") : t("settings.microphoneTest.play")
+          }
           onClick={() => void togglePlayback()}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </Button>
         <input
           type="range"
-          aria-label="Recording playback position"
+          aria-label={t("settings.microphoneTest.position")}
           min={0}
           max={duration}
           step={0.01}
@@ -333,16 +338,21 @@ function MicrophonePlayback({
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
           {formatTime(position)}
         </span>
-        <Button size="icon-sm-pill" variant="ghost" aria-label="Record again" onClick={onRetry}>
+        <Button
+          size="icon-sm-pill"
+          variant="ghost"
+          aria-label={t("settings.microphoneTest.again")}
+          onClick={onRetry}
+        >
           <RotateCcwIcon />
         </Button>
-        <Button size="icon-sm-pill" aria-label="Done" onClick={onDone}>
+        <Button size="icon-sm-pill" aria-label={t("settings.microphoneTest.done")} onClick={onDone}>
           <CheckIcon />
         </Button>
       </VoiceInputPill>
       {failed ? (
         <p role="alert" className="text-xs text-destructive">
-          Could not play this recording. Try recording again.
+          {t("settings.microphoneTest.playError")}
         </p>
       ) : null}
     </div>

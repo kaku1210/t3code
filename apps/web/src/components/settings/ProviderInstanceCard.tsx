@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Spinner } from "~/components/ui/spinner";
 
 import {
@@ -343,6 +344,7 @@ export function ProviderEnvironmentSection(props: {
   readonly managed?: { readonly names: ReadonlySet<string>; readonly reason: string } | undefined;
   readonly secretSources?: ReadonlyArray<SecretSource>;
 }) {
+  const { t } = useUiLanguage();
   const [storedDraft, setDraft] = useState(() =>
     seedRowsDraft(props.environment, toEnvironmentDraftRows),
   );
@@ -424,12 +426,12 @@ export function ProviderEnvironmentSection(props: {
 
   return (
     <SettingsRow
-      title="Variables"
-      description="API keys, base URLs, and other per-instance CLI settings."
+      title={t("settings.providerCard.variables")}
+      description={t("settings.providerCard.variablesHelp")}
       control={
         <Button type="button" size="sm" variant="outline" onClick={addVariable}>
           <PlusIcon className="size-3" />
-          Add variable
+          {t("settings.providerCard.addVariable")}
         </Button>
       }
     >
@@ -500,7 +502,9 @@ export function ProviderEnvironmentSection(props: {
                     }
                   />
                   <TooltipPopup side="top">
-                    {variable.sensitive ? "Sensitive, stored separately" : "Plain text"}
+                    {variable.sensitive
+                      ? t("settings.providerCard.sensitive")
+                      : t("settings.providerCard.plain")}
                   </TooltipPopup>
                 </Tooltip>
               ) : null;
@@ -559,7 +563,7 @@ export function ProviderEnvironmentSection(props: {
             );
           })}
           <p className="text-xs text-muted-foreground">
-            Sensitive values are stored separately and never returned to the app.
+            {t("settings.providerCard.sensitiveHelp")}
             {rows.some((row) => row.valueRedacted === true)
               ? " Enter a new value to rename a saved one or make it plain text."
               : null}
@@ -577,9 +581,20 @@ function ProjectOverrideInheritance({
   readonly projectEnabled: boolean;
   readonly deviceEnabled: boolean;
 }) {
+  const { t } = useUiLanguage();
   const layers = [
-    { key: "project", label: "Project", enabled: projectEnabled, effective: true },
-    { key: "device", label: "Device", enabled: deviceEnabled, effective: false },
+    {
+      key: "project",
+      label: t("settings.providerCard.project"),
+      enabled: projectEnabled,
+      effective: true,
+    },
+    {
+      key: "device",
+      label: t("settings.providerCard.device"),
+      enabled: deviceEnabled,
+      effective: false,
+    },
   ];
   return (
     <Popover>
@@ -591,7 +606,7 @@ function ProjectOverrideInheritance({
                 <Button
                   size="icon-micro"
                   variant="ghost-muted"
-                  aria-label="Overridden for this project. Show where this value comes from"
+                  aria-label={t("settings.providerCard.showOverride")}
                 />
               }
             />
@@ -599,7 +614,7 @@ function ProjectOverrideInheritance({
         >
           <LayersIcon className="size-3 text-primary" />
         </TooltipTrigger>
-        <TooltipPopup side="top">Overridden for this project</TooltipPopup>
+        <TooltipPopup side="top">{t("settings.providerCard.overridden")}</TooltipPopup>
       </Tooltip>
       <PopoverPopup align="end" width="md" padding="none">
         <ol role="list" className="px-3 py-2.5 text-sm">
@@ -625,7 +640,7 @@ function ProjectOverrideInheritance({
                   layer.effective ? "text-foreground" : "text-muted-foreground",
                 )}
               >
-                {layer.enabled ? "On" : "Off"}
+                {layer.enabled ? t("settings.providerCard.on") : t("settings.providerCard.off")}
                 {layer.effective ? (
                   <CheckIcon aria-hidden className="size-3.5 shrink-0 text-primary" />
                 ) : (
@@ -725,14 +740,15 @@ export function ProviderInstanceCard({
   secretSources = NO_SECRET_SOURCES,
   projectOverride,
 }: ProviderInstanceCardProps) {
+  const { language, t } = useUiLanguage();
   const enabled = projectOverride?.effectiveEnabled ?? resolveProviderInstanceEnabled(instance);
   const effectiveProvider = liveProvider && { ...liveProvider, enabled };
   const compatibility = enabled ? liveProvider?.compatibilityAdvisory : undefined;
   const statusKey = enabled ? getProviderStatusKey(effectiveProvider) : "disabled";
   const statusStyle = PROVIDER_STATUS_STYLES[statusKey];
   const summary = enabled
-    ? getProviderSummary(effectiveProvider)
-    : { headline: "Disabled", detail: null };
+    ? getProviderSummary(effectiveProvider, language)
+    : { headline: t("common.disabled"), detail: null };
   const authEmail = liveProvider?.auth.email?.trim();
   const isAuthenticated = enabled && liveProvider?.auth.status === "authenticated";
   const authLabel =
@@ -744,13 +760,14 @@ export function ProviderInstanceCard({
     liveProvider?.versionAdvisory,
     liveProvider?.compatibilityAdvisory,
     enabled,
+    language,
   );
   const updateCommand = versionAdvisory?.updateCommand ?? null;
   const updateState = liveProvider?.updateState;
   const updateProgress = isUpdating
     ? ((updateState?.status === "queued" || updateState?.status === "running"
         ? updateState.message
-        : null) ?? "Starting update")
+        : null) ?? t("settings.providerCard.startingUpdate"))
     : null;
   const updateProblem =
     !isUpdating && (updateState?.status === "failed" || updateState?.status === "unchanged")
@@ -783,7 +800,7 @@ export function ProviderInstanceCard({
       toastManager.add({
         type: "success",
         title: `${providerName} update command copied`,
-        description: "Run it in a terminal when you are ready to update.",
+        description: t("settings.providerCard.runUpdate"),
       });
     },
     onError: (error, { providerName }) => {
@@ -933,16 +950,16 @@ export function ProviderInstanceCard({
   const statusDiagnostic = hasCompatibilityWarning && needsAttention ? summary.detail : null;
   const inlineStatusDetail = hasCompatibilityWarning
     ? compatibility?.status === "broken"
-      ? "Incompatible"
+      ? t("settings.providerCard.incompatible")
       : compatibility?.status === "unsupported"
-        ? "Unsupported"
-        : "Limited support"
+        ? t("settings.providerCard.unsupported")
+        : t("settings.providerCard.limitedSupport")
     : summary.detail;
   const editorStatusNode =
     isAuthenticated && authEmail ? (
       <>
         {needsAttention ? statusDotNode : null}
-        <span>Authenticated as</span>
+        <span>{t("settings.providerCard.authenticatedAs")}</span>
         <ProviderAuthEmail email={authEmail} />
         {authLabel ? <span>· {authLabel}</span> : null}
         {inlineStatusDetail ? (
@@ -970,7 +987,7 @@ export function ProviderInstanceCard({
                   size={mode === "list" ? "icon-micro" : "icon-xs"}
                   variant="ghost-muted"
                   className={mode === "list" ? "pointer-events-auto relative shrink-0" : undefined}
-                  aria-label={`${updateProgress ? "Updating" : versionAdvisory.title}, view details`}
+                  aria-label={`${updateProgress ? t("settings.providerCard.updating") : versionAdvisory.title}, view details`}
                 >
                   {updateProgress ? (
                     <Spinner tone="muted" {...(mode === "list" ? { size: "sm" as const } : {})} />
@@ -988,7 +1005,7 @@ export function ProviderInstanceCard({
           }
         />
         <TooltipPopup side="top">
-          {updateProgress ? "Updating" : versionAdvisory.title}
+          {updateProgress ? t("settings.providerCard.updating") : versionAdvisory.title}
         </TooltipPopup>
       </Tooltip>
       <PopoverPopup side="bottom" align="end" width="md" aria-label={versionAdvisory.title}>
@@ -1017,10 +1034,10 @@ export function ProviderInstanceCard({
             >
               {isUpdating ? <Spinner /> : <DownloadIcon />}
               {isUpdating
-                ? "Updating"
+                ? t("settings.providerCard.updating")
                 : versionAdvisory.targetVersion
                   ? `Install ${getProviderVersionLabel(versionAdvisory.targetVersion)}`
-                  : "Update now"}
+                  : t("settings.providerCard.update")}
             </Button>
           ) : null}
           {updateProgress || updateProblem ? (
@@ -1037,7 +1054,7 @@ export function ProviderInstanceCard({
           {onRunVersionAction && updateCommand ? (
             <div className="flex items-center gap-2 text-3xs font-medium uppercase tracking-wider text-muted-foreground">
               <span aria-hidden className="h-px flex-1 bg-border" />
-              or, update manually using
+              {t("settings.providerCard.manualUpdate")}
               <span aria-hidden className="h-px flex-1 bg-border" />
             </div>
           ) : null}
@@ -1055,13 +1072,13 @@ export function ProviderInstanceCard({
                       variant="ghost-muted"
                       className="shrink-0"
                       onClick={() => copyToClipboard(updateCommand, { providerName: displayName })}
-                      aria-label="Copy update command"
+                      aria-label={t("settings.providerCard.copyUpdateCommand")}
                     >
                       <CopyIcon className="size-3" />
                     </Button>
                   }
                 />
-                <TooltipPopup side="top">Copy command</TooltipPopup>
+                <TooltipPopup side="top">{t("settings.providerCard.copyCommand")}</TooltipPopup>
               </Tooltip>
             </div>
           ) : null}
@@ -1135,7 +1152,7 @@ export function ProviderInstanceCard({
               />
               <SettingResetButton
                 label={`${displayName} enablement`}
-                tooltip="Reset to the device setting"
+                tooltip={t("settings.providerCard.reset")}
                 disabled={readOnly || !canWriteSettings}
                 onClick={projectOverride.onReset}
               />
@@ -1217,7 +1234,7 @@ export function ProviderInstanceCard({
             disabled={readOnly}
           >
             <ExternalLinkIcon />
-            Continue authentication
+            {t("settings.providerCard.continueAuth")}
           </Button>
         </div>
       ) : null}
@@ -1236,7 +1253,7 @@ export function ProviderInstanceCard({
     />
   ) : (
     <SettingsRow
-      title="Driver"
+      title={t("settings.providerCard.driver")}
       description={
         <span>
           This instance uses <code className="text-foreground">{String(instance.driver)}</code>,
@@ -1249,9 +1266,9 @@ export function ProviderInstanceCard({
   return (
     <>
       <SettingsSection title={displayName} icon={titleIconNode} headerAction={editorHeaderAction}>
-        <SettingsRow title="Status" status={statusContent} />
+        <SettingsRow title={t("settings.providerCard.status")} status={statusContent} />
         <SettingsRow
-          title="Display name"
+          title={t("settings.providerCard.displayName")}
           control={
             <div
               inert={readOnly}
@@ -1273,7 +1290,7 @@ export function ProviderInstanceCard({
                 className="min-w-0 flex-1 @min-[32rem]/settings-row:w-56"
                 value={instance.displayName ?? ""}
                 onCommit={updateDisplayName}
-                placeholder={driverOption?.label ?? "Instance label"}
+                placeholder={driverOption?.label ?? t("settings.providerCard.instanceLabel")}
                 spellCheck={false}
               />
             </div>
@@ -1282,7 +1299,7 @@ export function ProviderInstanceCard({
       </SettingsSection>
 
       {setup || environmentFields.length > 0 ? (
-        <SettingsSection title="Setup">
+        <SettingsSection title={t("settings.providerCard.setup")}>
           {setup}
           {environmentFields.length > 0 ? (
             <div
@@ -1322,7 +1339,7 @@ export function ProviderInstanceCard({
           <FoldedSettingsSection
             key={instanceId}
             id={`provider-instance-${instanceId}-runtime`}
-            title="Runtime"
+            title={t("settings.providerCard.runtime")}
             headerPlacement="outside"
           >
             {runtime ?? runtimeFields}
@@ -1330,7 +1347,7 @@ export function ProviderInstanceCard({
         </div>
       ) : !driverOption || deriveProviderSettingsFields(driverOption).length > 0 ? (
         <SettingsSection
-          title="Runtime"
+          title={t("settings.providerCard.runtime")}
           inert={readOnly}
           aria-disabled={readOnly || undefined}
           className={readOnly ? "opacity-50 select-none" : undefined}
@@ -1340,7 +1357,7 @@ export function ProviderInstanceCard({
       ) : null}
 
       <SettingsSection
-        title="Environment"
+        title={t("settings.providerCard.environment")}
         inert={readOnly || instanceLocks?.wholeEnvironment}
         aria-disabled={readOnly || instanceLocks?.wholeEnvironment || undefined}
         className={readOnly ? "opacity-50 select-none" : undefined}
@@ -1373,11 +1390,10 @@ export function ProviderInstanceCard({
       ) : null}
 
       {driverOption !== undefined ? (
-        <SettingsSection title="Models">
+        <SettingsSection title={t("settings.providerCard.models")}>
           <div className="px-3 py-3 sm:px-4">
             <p className="mb-3 text-xs text-muted-foreground">
-              Model preferences and custom models are saved on the selected environment and shared
-              across connected devices.
+              {t("settings.providerCard.modelsHelp")}
             </p>
             <ProviderModelsSection
               canManageCustomModels={!readOnly}

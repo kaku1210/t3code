@@ -59,7 +59,9 @@ import { useChildThreadInputs, readThreadShell, waitForThreadShell } from "../..
 import { serverEnvironment } from "../../state/server";
 import { environmentShell } from "../../state/shell";
 import { ThreadStatusLine } from "./ThreadStatusLine";
+import { formatSnoozeWakeDuration } from "../Sidebar.snooze";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { appAtomRegistry } from "../../rpc/atomRegistry";
 import { readEnvironmentScope } from "../../state/session";
 import { useAtomCommand } from "../../state/use-atom-command";
@@ -139,6 +141,7 @@ interface ThreadLifecycleInput {
  * banners, opening related threads, and standalone slash commands.
  */
 export function useThreadLifecycle(input: ThreadLifecycleInput) {
+  const { language, t } = useUiLanguage();
   const {
     environmentId,
     routeThreadKey,
@@ -605,20 +608,24 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
         onOpenThread: onOpenRelatedThreadStable,
       })
     : null;
-  // The relative times read the clock; nowMinute re-renders them on the minute.
+  const now = `${nowMinute}:00.000Z`;
   const snoozedUntil = activeThreadShell?.snoozedUntil ?? null;
   const settledAt = activeThreadShell?.settledAt ?? null;
   // Same rounding as the sidebar's snoozed shelf, so both read the same hour.
-  const snoozeWake = snoozedUntil
-    ? snoozeWakeLabel(snoozedUntil, { now: `${nowMinute}:00.000Z` })
-    : null;
+  const snoozeWake = snoozedUntil ? snoozeWakeLabel(snoozedUntil, { now }) : null;
   const threadStatusLine = activeThreadSnoozed ? (
     limitRecoveryHoldsSnooze ? null : (
       <ThreadStatusLine
         icon={<AlarmClockIcon />}
-        label={snoozeWake && snoozeWake !== "now" ? `Snoozed, ${snoozeWake} left` : "Snoozed"}
+        label={
+          snoozeWake && snoozeWake !== "now"
+            ? t("thread.status.snoozedUntil", {
+                remaining: formatSnoozeWakeDuration(snoozeWake, language),
+              })
+            : t("thread.status.snoozed")
+        }
         clockMinute={nowMinute}
-        actionLabel={isUnsnoozing ? "Waking..." : "Wake now"}
+        actionLabel={t(isUnsnoozing ? "thread.status.waking" : "thread.status.wakeNow")}
         actionDisabled={!canOperateThread || isUnsnoozing}
         onAction={() => void handleUnsnoozeActiveThreadStable()}
       />
@@ -626,17 +633,23 @@ export function useThreadLifecycle(input: ThreadLifecycleInput) {
   ) : activeThreadSettled ? (
     <ThreadStatusLine
       icon={<CheckCircle2Icon />}
-      label={settledAt ? `Settled ${formatRelativeTimeLabel(settledAt)}` : "Settled"}
+      label={
+        settledAt
+          ? t("thread.status.settledAt", {
+              time: formatRelativeTimeLabel(settledAt, Date.parse(now), language),
+            })
+          : t("thread.status.settled")
+      }
       clockMinute={nowMinute}
-      actionLabel={isUnsettling ? "Un-settling..." : "Un-settle"}
+      actionLabel={t(isUnsettling ? "thread.status.unsettling" : "thread.status.unsettle")}
       actionDisabled={!canOperateThread || isUnsettling}
       onAction={() => void handleUnsettleActiveThreadStable()}
     />
   ) : activeThreadWokeVisible ? (
     <ThreadStatusLine
       icon={<AlarmClockIcon />}
-      label="Woke from snooze"
-      actionLabel="Dismiss"
+      label={t("thread.status.woke")}
+      actionLabel={t("common.dismiss")}
       onAction={acknowledgeActiveThreadWokeStable}
     />
   ) : null;
