@@ -9,6 +9,39 @@ remain stable and nightly. To ship 0.1.0 Beta, use `channel=stable` and
 `version=0.1.0`. Removing the Beta label later is a branding change independent of
 the version.
 
+## Local Windows portable builds
+
+From the checkout, build a portable release with:
+
+```sh
+vp run dist:desktop:win:portable --arch x64 --build-version 1.2.3
+```
+
+The default `release/` output is gitignored. Alongside the ordinary application ZIP, the build
+exports the complete unpacked application directory, `Install-T3-Code-Plus.cmd`,
+`install-desktop-portable.ps1`, and a fresh `release.json` describing that build's version,
+executable name, payload directory, and file sizes. Custom `--output-dir` paths work the same way.
+The NSIS installer build is unchanged.
+
+For a reusable double-click entry, run `Migrate-T3-Code-Plus.cmd` at the checkout root.
+It always uses that checkout's default `release/` output, so the same entry works after each
+new portable build. It does not build from source. For a custom `--output-dir`, use the
+installer exported into that directory instead. Keep the checkout entry in Git so each
+development machine can use its own local release without hard-coded source paths.
+
+To migrate on either Windows development machine, keep the **entire output directory** together,
+exit the installed client including its tray icon, then run the exported CMD. Its default target
+is `D:\AI Program Files\T3 Code Plus`; pass `-DestinationRoot "E:\Apps\T3 Code Plus"` for a
+different location. The tool checks and stages the complete payload, retains the old installation
+as a timestamped backup, and restores it if activation fails. It does not start the app or copy
+profile data. The scripts under `scripts/` are templates; run the copies shipped with a release.
+Existing manifests without `payloadDirectory` continue to use `win-unpacked`.
+
+Keep source, installer templates and these instructions in Git. Distribute application binaries
+separately; never commit release directories, profile databases, credentials or local `.t3` state.
+Use an isolated development home when running from source, as described in
+[Development](development.md), so development and everyday use do not share a live database.
+
 ## What the workflow does
 
 - Workflow: `.github/workflows/release.yml`

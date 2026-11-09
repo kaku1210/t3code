@@ -44,6 +44,7 @@ import {
   resolveMergedStageDependencies,
   resolveBuildOptions,
   stageWslRuntimeArchive,
+  stageWindowsPortableInstaller,
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
   LinuxBrowserSecretHostError,
@@ -76,6 +77,7 @@ const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String)
 const decodePackageVersion = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
 );
+const decodeJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 // Keeps pnpm from auto-installing TypeScript, a types-only peer, into the app.
 
@@ -529,6 +531,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       );
 
       assert.isNull(preview.publish);
+      assert.isString(preview.afterPack);
+      assert.notProperty(preview, "afterSign");
       assert.isNull(previewChannel.publish);
       assert.deepStrictEqual(release.publish, [
         {
@@ -1592,7 +1596,12 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     Effect.gen(function* () {
       const signedWinConfig = (hostPlatform: string) =>
         createBuildConfig("win", "nsis", "1.2.3", true, false, undefined, undefined).pipe(
-          Effect.map((config) => config.win as Record<string, unknown>),
+          Effect.map((config) => {
+            // Running the final EXE before resource editing leaves it locked on Windows.
+            assert.notProperty(config, "afterPack");
+            assert.isString(config.afterSign);
+            return config.win as Record<string, unknown>;
+          }),
           Effect.provideService(HostProcess.Platform, hostPlatform),
         );
 
@@ -1773,6 +1782,70 @@ it.effect.skipIf(!symlinksSupported)("rebases packaged links into the isolated t
       resolvedCopiedPackage,
     );
   }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect.each(["win-unpacked", "win-arm64-unpacked"])(
+  "exports a complete portable installer for %s with this build's metadata",
+  (payloadDirectory) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-portable-release-" });
+      const stageDistDir = path.join(root, "stage");
+      const packagedAppDir = path.join(stageDistDir, payloadDirectory);
+      const output = path.join(root, "release");
+      const appName = "T3 Code Plus (Nightly)";
+      const repoRoot = path.join(import.meta.dirname, "..");
+      yield* fs.makeDirectory(path.join(packagedAppDir, "resources"), { recursive: true });
+      yield* fs.writeFileString(path.join(packagedAppDir, `${appName}.exe`), "electron");
+      yield* fs.writeFileString(path.join(packagedAppDir, "resources/app.asar"), "bundle");
+      yield* fs.writeFileString(path.join(stageDistDir, "portable.zip"), "zip");
+      yield* stageWindowsPortableInstaller({
+        repoRoot,
+        stageDistDir,
+        packagedAppDir,
+        appName,
+        version: "1.2.3-nightly.1",
+        sourceRevision: "012345abcdef",
+      });
+      yield* copyDesktopBuildArtifacts(stageDistDir, output, true);
+
+      assert.deepStrictEqual(
+        yield* decodeJson(yield* fs.readFileString(path.join(output, "release.json"))),
+        {
+          appName,
+          version: "1.2.3-nightly.1",
+          sourceRevision: "012345abcdef",
+          payloadDirectory,
+          files: [
+            { path: `${appName}.exe`, length: 8 },
+            { path: "resources/app.asar", length: 6 },
+          ],
+        },
+      );
+      assert.equal(
+        yield* fs.readFileString(path.join(output, payloadDirectory, "resources/app.asar")),
+        "bundle",
+      );
+      assert.equal(
+        yield* fs.readFileString(path.join(output, "install-desktop-portable.ps1")),
+        yield* fs.readFileString(path.join(repoRoot, "scripts/install-desktop-portable.ps1")),
+      );
+      assert.equal(
+        yield* fs.readFileString(path.join(output, "Install-T3-Code-Plus.cmd")),
+        yield* fs.readFileString(path.join(repoRoot, "scripts/install-desktop-portable.cmd")),
+      );
+      assert.deepStrictEqual(
+        (yield* fs.readDirectory(output)).sort(),
+        [
+          "Install-T3-Code-Plus.cmd",
+          "install-desktop-portable.ps1",
+          "portable.zip",
+          "release.json",
+          payloadDirectory,
+        ].sort(),
+      );
+    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
 );
 
 it.effect("preserves packaged app directories from the dir target", () =>

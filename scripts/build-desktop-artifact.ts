@@ -2758,9 +2758,10 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
+  const productName = desktopPackageJson.productName ?? "T3 Code Plus";
   return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+    ? `${productName} (Nightly)`
+    : productName;
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2780,10 +2781,15 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   arch?: typeof BuildArch.Type,
 ) {
   const buildConfig: Record<string, unknown> = {
-    afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
+    // Windows must finish editing the EXE before running it to prepare bytecode: executing it
+    // first can leave the image locked (EBUSY). macOS must prepare resources before signing.
+    [platform === "win" ? "afterSign" : "afterPack"]: (yield* Path.Path).join(
+      yield* RepoRoot,
+      "scripts/prepare-server-compile-cache.cjs",
+    ),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: "T3-Code-Plus-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
@@ -4050,8 +4056,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     });
   }
 
+  const windowsPortable = options.platform === "win" && options.target === "zip";
   if (options.platform === "win") {
-    yield* validateWindowsPackagedPayload({
+    const payload = yield* validateWindowsPackagedPayload({
       stageDistDir,
       appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
       targetArch: options.arch,
@@ -4062,6 +4069,16 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       }),
       verbose: options.verbose,
     });
+    if (windowsPortable) {
+      yield* stageWindowsPortableInstaller({
+        repoRoot,
+        stageDistDir,
+        packagedAppDir: payload.packagedAppDir,
+        appName: resolveDesktopProductName(appVersion),
+        version: appVersion,
+        sourceRevision: commitHash,
+      });
+    }
   }
   // x64 builds on arm64 runners; the arm64 check covers the shared JS bundle.
   if (options.platform === "mac" && options.arch === "arm64" && hostPlatform === "darwin") {
@@ -4071,7 +4088,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const copiedArtifacts = yield* copyDesktopBuildArtifacts(
     stageDistDir,
     options.outputDir,
-    options.target === "dir",
+    options.target === "dir" || windowsPortable,
   );
 
   if (copiedArtifacts.length === 0) {
@@ -4093,6 +4110,50 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   const repoRoot = yield* RepoRoot;
   return yield* withDesktopBuildLock(repoRoot, buildDesktopArtifactUnlocked(options));
 });
+
+/**
+ * Adds the manual installer beside a validated Windows payload. The manifest describes only
+ * this build's application files; no machine paths, profile data or credentials are copied.
+ * The final artifact export includes the payload directory for ZIP builds as well as dir builds.
+ */
+export const stageWindowsPortableInstaller = Effect.fn("stageWindowsPortableInstaller")(
+  function* (input: {
+    readonly repoRoot: string;
+    readonly stageDistDir: string;
+    readonly packagedAppDir: string;
+    readonly appName: string;
+    readonly version: string;
+    readonly sourceRevision: string;
+  }) {
+    const fs = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const files: Array<{ path: string; length: number }> = [];
+    for (const relative of (yield* fs.readDirectory(input.packagedAppDir, {
+      recursive: true,
+    })).sort()) {
+      const stat = yield* fs.stat(path.join(input.packagedAppDir, relative));
+      if (stat.type === "File") {
+        files.push({ path: relative.split(path.sep).join("/"), length: Number(stat.size) });
+      }
+    }
+    yield* fs.copyFile(
+      path.join(input.repoRoot, "scripts/install-desktop-portable.ps1"),
+      path.join(input.stageDistDir, "install-desktop-portable.ps1"),
+    );
+    yield* fs.copyFile(
+      path.join(input.repoRoot, "scripts/install-desktop-portable.cmd"),
+      path.join(input.stageDistDir, "Install-T3-Code-Plus.cmd"),
+    );
+    const manifest = yield* encodeJsonString({
+      appName: input.appName,
+      version: input.version,
+      sourceRevision: input.sourceRevision,
+      payloadDirectory: path.basename(input.packagedAppDir),
+      files,
+    });
+    yield* fs.writeFileString(path.join(input.stageDistDir, "release.json"), `${manifest}\n`);
+  },
+);
 
 export const copyDesktopBuildArtifacts = Effect.fn("copyDesktopBuildArtifacts")(function* (
   stageDistDir: string,
