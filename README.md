@@ -1,5 +1,12 @@
 # T3 Code
 
+## T3 Code Plus TODO
+
+- [ ] 多 Agent 协作页面。
+- [ ] 左侧会话列表参考 Codex，按项目分组显示，并支持折叠与展开。
+- [ ] 优化会话内切换模型执行任务的流程与界面展示。
+- [ ] 优化会话进行中将子任务转交给其他模型或 Agent 的流程与界面展示。
+
 T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
 
 Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, OpenCode, Google Antigravity, and fx. If they're set up on your computer, T3 Code can control them.
