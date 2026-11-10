@@ -156,14 +156,25 @@ the text is an unedited recalled prompt, with the caret on the first visual line
 the last visual line for `ArrowDown`, counting wrapped lines. Editing a recalled prompt turns it
 into a normal draft.
 
+## Change the input placeholder
+
+Open **Settings → Chat → Input placeholder** to edit the text shown in an empty composer.
+It is saved only on this device. Clear it to restore the default for the interface language.
+Approval requests and other actions that need a specific response keep their own instructions.
+
 ## Suggest the next prompt
 
-On web and desktop, open **Settings → Threads → Next prompt suggestions** to choose
+On web and desktop, open **Settings → Chat → Next prompt suggestions** to choose
 a provider, model, and reasoning effort, then enable automatic suggestions. Opening
 a conversation with a completed reply and an empty composer can make one model request
 using an excerpt of that turn. Suggestions stay in the client until it closes or a newer
 completed turn takes their place. Press **Tab** or click a suggestion to fill the draft,
 then review it and send it when ready.
+
+On mobile, configure the same environment-specific model and reasoning effort in
+**Settings → Chat → Next step**. A suggestion appears above an empty composer after
+a completed turn. Tap it to insert an editable draft, then send it when ready. Drafts,
+attachments, queued edits, active turns and hidden chats suppress suggestions.
 
 ## Edit an earlier prompt
 

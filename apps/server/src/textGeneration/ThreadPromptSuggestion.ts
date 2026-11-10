@@ -1,4 +1,5 @@
 import {
+  type ThreadPromptSuggestionEmptyReason,
   type ThreadPromptSuggestionInput,
   type ThreadPromptSuggestionResult,
   TextGenerationError,
@@ -20,6 +21,10 @@ const encodeExcerpt = Schema.encodeEffect(
   Schema.fromJsonString(Schema.Struct({ user: Schema.String, assistant: Schema.String })),
 );
 const isTextGenerationError = Schema.is(TextGenerationError);
+const noSuggestion = (emptyReason: ThreadPromptSuggestionEmptyReason) => ({
+  suggestion: null,
+  emptyReason,
+});
 
 /** Generates an editable suggestion for a still-current, completed turn. */
 export class ThreadPromptSuggestion extends Context.Service<
@@ -43,7 +48,7 @@ const make = Effect.gen(function* () {
       const currentSettings = yield* settings.getSettings;
       const selection = currentSettings.nextPromptSuggestionModelSelection;
       if (!currentSettings.nextPromptSuggestionsEnabled || selection === null) {
-        return { suggestion: null };
+        return noSuggestion("not-configured");
       }
 
       const shell = yield* threads.getThreadShell(threadId);
@@ -52,7 +57,7 @@ const make = Effect.gen(function* () {
         shell.activeRunId !== null ||
         shell.pendingRuntimeRequest !== null
       ) {
-        return { suggestion: null };
+        return noSuggestion("turn-not-ready");
       }
       const records = yield* threads.getThreadRecords(threadId, ["runs", "messages"], {
         runIds: [runId],
@@ -60,7 +65,7 @@ const make = Effect.gen(function* () {
         messageRoles: ["user", "assistant"],
       });
       const run = records.runs[0];
-      if (run?.status !== "completed") return { suggestion: null };
+      if (run?.status !== "completed") return noSuggestion("turn-not-ready");
       if (
         !resolveProjectProviderInstanceEnabled(
           currentSettings,
@@ -68,14 +73,14 @@ const make = Effect.gen(function* () {
           selection.instanceId,
         )
       ) {
-        return { suggestion: null };
+        return noSuggestion("provider-disabled");
       }
       const userMessage = records.messages.find((message) => message.id === run.userMessageId);
       const reply = records.messages.findLast(
         (message) =>
           message.role === "assistant" && !message.streaming && message.text.trim().length > 0,
       );
-      if (!userMessage?.text.trim() || !reply) return { suggestion: null };
+      if (!userMessage?.text.trim() || !reply) return noSuggestion("missing-context");
 
       const excerpt = yield* encodeExcerpt({
         user: userMessage.text.slice(0, MAX_EXCERPT_LENGTH),
@@ -95,10 +100,13 @@ const make = Effect.gen(function* () {
         prompt,
         modelSelection: selection,
       });
-      const suggestion = result.suggestion?.replace(/\s+/g, " ").trim();
-      return {
-        suggestion: suggestion && suggestion.length <= MAX_SUGGESTION_LENGTH ? suggestion : null,
-      };
+      if (result.suggestion === null) {
+        return noSuggestion(result.emptyReason ?? "no-next-step");
+      }
+      const suggestion = result.suggestion.replace(/\s+/g, " ").trim();
+      return suggestion && suggestion.length <= MAX_SUGGESTION_LENGTH
+        ? { suggestion }
+        : noSuggestion("invalid-suggestion");
     },
     Effect.scoped,
     Effect.mapError((cause) =>

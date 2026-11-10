@@ -1399,9 +1399,23 @@ const WsAgentSessionsImportRpc = Rpc.make(WS_METHODS.agentSessionsImport, {
 export const ThreadPromptSuggestionInput = Schema.Struct({ threadId: ThreadId, runId: RunId });
 export type ThreadPromptSuggestionInput = typeof ThreadPromptSuggestionInput.Type;
 
-/** A null suggestion means the completed turn has no actionable next prompt. */
+/** Explains why the server could not offer a suggestion for this request. */
+export const ThreadPromptSuggestionEmptyReason = Schema.Literals([
+  "not-configured",
+  "turn-not-ready",
+  "provider-disabled",
+  "provider-unavailable",
+  "missing-context",
+  "quota-exhausted",
+  "no-next-step",
+  "invalid-suggestion",
+]);
+export type ThreadPromptSuggestionEmptyReason = typeof ThreadPromptSuggestionEmptyReason.Type;
+
+/** An empty result includes one reason when known; older servers may omit it. */
 export const ThreadPromptSuggestionResult = Schema.Struct({
   suggestion: Schema.NullOr(Schema.String),
+  emptyReason: Schema.optionalKey(ThreadPromptSuggestionEmptyReason),
 });
 export type ThreadPromptSuggestionResult = typeof ThreadPromptSuggestionResult.Type;
 

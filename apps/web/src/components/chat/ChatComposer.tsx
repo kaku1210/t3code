@@ -2313,29 +2313,46 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const expandMobileComposerStable = useStableCallback(expandMobileComposer);
 
-  const promptSuggestion = useNextPromptSuggestion(
-    routeThreadRef,
-    promptSuggestionRunId ?? null,
-    routeKind === "server" &&
-      activeThreadId === routeThreadRef.threadId &&
-      canOperateThread &&
-      phase !== "running" &&
-      !isSendBusy &&
-      !isRevertingCheckpoint &&
-      !isCompacting &&
-      !isPreparingWorktree &&
-      !isEditingQueuedMessage &&
-      !composerMenuOpen &&
-      !projectSelectionRequired &&
-      !showProviderUnavailable &&
-      !showPlanFollowUpPrompt &&
-      environmentUnavailable === null &&
-      pendingApprovals.length === 0 &&
-      incomingPendingUserInputs.length === 0 &&
-      speechInput.state.phase === "idle" &&
-      prompt.length === 0 &&
-      !composerDraftHasUserContent(composerDraft),
-  );
+  const { outcome: promptSuggestionOutcome, retry: retryPromptSuggestion } =
+    useNextPromptSuggestion(
+      routeThreadRef,
+      promptSuggestionRunId ?? null,
+      routeKind === "server" &&
+        activeThreadId === routeThreadRef.threadId &&
+        canOperateThread &&
+        phase !== "running" &&
+        !isSendBusy &&
+        !isRevertingCheckpoint &&
+        !isCompacting &&
+        !isPreparingWorktree &&
+        !isEditingQueuedMessage &&
+        !composerMenuOpen &&
+        !projectSelectionRequired &&
+        !showProviderUnavailable &&
+        !showPlanFollowUpPrompt &&
+        environmentUnavailable === null &&
+        pendingApprovals.length === 0 &&
+        incomingPendingUserInputs.length === 0 &&
+        speechInput.state.phase === "idle" &&
+        prompt.length === 0 &&
+        !composerDraftHasUserContent(composerDraft),
+    );
+  const promptSuggestionRetrying = promptSuggestionOutcome === "retrying";
+  const promptSuggestionResult =
+    typeof promptSuggestionOutcome === "object" ? promptSuggestionOutcome : null;
+  const promptSuggestion = promptSuggestionResult?.suggestion ?? null;
+  let promptSuggestionStatus: string | null = null;
+  if (promptSuggestionOutcome === "failed") {
+    promptSuggestionStatus = t("composer.promptSuggestionFailed");
+  } else if (promptSuggestionRetrying) {
+    promptSuggestionStatus = t("composer.promptSuggestionRetrying");
+  } else if (promptSuggestionResult?.suggestion === null) {
+    promptSuggestionStatus = t(
+      promptSuggestionResult.emptyReason
+        ? `composer.promptSuggestionEmpty.${promptSuggestionResult.emptyReason}`
+        : "composer.promptSuggestionEmpty",
+    );
+  }
   const acceptPromptSuggestion = () =>
     promptSuggestion !== null &&
     promptRef.current.length === 0 &&
@@ -3575,7 +3592,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                               : showProviderUnavailable
                                 ? t("composer.enableProviderToSend")
                                 : promptSuggestion === null
-                                  ? t("composer.placeholder")
+                                  ? settings.composerPlaceholder.trim() || t("composer.placeholder")
                                   : ""
                     }
                     disabled={
@@ -3599,6 +3616,22 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     </button>
                     <span>{t("composer.acceptSuggestion")}</span>
                     <span>{t("composer.shortcutHints")}</span>
+                  </div>
+                ) : null}
+                {promptSuggestionStatus !== null ? (
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                    <span role="status">{promptSuggestionStatus}</span>
+                    {retryPromptSuggestion !== null || promptSuggestionRetrying ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        disabled={promptSuggestionRetrying}
+                        onClick={retryPromptSuggestion ?? undefined}
+                      >
+                        {t("composer.promptSuggestionRetry")}
+                      </Button>
+                    ) : null}
                   </div>
                 ) : null}
                 {showMobilePendingAnswerActions ? (

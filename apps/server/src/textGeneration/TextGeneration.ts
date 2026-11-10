@@ -142,14 +142,11 @@ export const make = Effect.gen(function* () {
           !isProviderAvailable(snapshot) ||
           !isProviderTextGenerationCapable(snapshot)
         ) {
-          return yield* new TextGenerationError({
-            operation: "generatePromptSuggestion",
-            detail: "The selected prompt suggestion provider is unavailable.",
-          });
+          return { suggestion: null, emptyReason: "provider-unavailable" } as const;
         }
         const now = DateTime.toEpochMillis(yield* DateTime.now);
         if (exhaustedUsageWindow(snapshot, now, input.modelSelection.model)) {
-          return { suggestion: null };
+          return { suggestion: null, emptyReason: "quota-exhausted" } as const;
         }
         // Conversation excerpts stay with the provider explicitly selected for suggestions.
         return yield* instance.textGeneration.generatePromptSuggestion(input);

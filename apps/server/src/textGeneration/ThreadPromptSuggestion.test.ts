@@ -54,7 +54,7 @@ it.effect("uses the finished turn's text and the selected suggestion model", () 
   return Effect.gen(function* () {
     const service = yield* ThreadPromptSuggestion.ThreadPromptSuggestion;
     const stale = yield* service.generate({ threadId, runId: RunId.make("previous-run") });
-    assert.deepEqual(stale, { suggestion: null });
+    assert.deepEqual(stale, { suggestion: null, emptyReason: "turn-not-ready" });
     assert.equal(generatePromptSuggestion.mock.calls.length, 0);
 
     const result = yield* service.generate({ threadId, runId });
@@ -65,5 +65,21 @@ it.effect("uses the finished turn's text and the selected suggestion model", () 
     assert.include(request.prompt, "Fix the menu.");
     assert.include(request.prompt, "The checks are still pending.");
     assert.notInclude(request.prompt, "Unfinished text");
+
+    generatePromptSuggestion.mockReturnValueOnce(Effect.succeed({ suggestion: null }));
+    assert.deepEqual(yield* service.generate({ threadId, runId }), {
+      suggestion: null,
+      emptyReason: "no-next-step",
+    });
+
+    const exhausted = { suggestion: null, emptyReason: "quota-exhausted" } as const;
+    generatePromptSuggestion.mockReturnValueOnce(Effect.succeed(exhausted));
+    assert.deepEqual(yield* service.generate({ threadId, runId }), exhausted);
+
+    generatePromptSuggestion.mockReturnValueOnce(Effect.succeed({ suggestion: "   " }));
+    assert.deepEqual(yield* service.generate({ threadId, runId }), {
+      suggestion: null,
+      emptyReason: "invalid-suggestion",
+    });
   }).pipe(Effect.provide(layer));
 });
