@@ -10,11 +10,45 @@
 
 This app has three variants:
 
-- `development`: Expo dev client, installable side-by-side as `T3 Code Dev`
-- `preview`: persistent internal preview build, installable side-by-side as `T3 Code Preview`
-- `production`: store/release build as `T3 Code`
+- `development`: Expo dev client, installable side-by-side as `T3 Code Plus Dev`
+- `preview`: persistent internal preview build, installable side-by-side as `T3 Code Plus Preview`
+- `production`: store/release build as `T3 Code Plus`
 
 Run commands from `apps/mobile`.
+
+## Fork builds on a Devin cloud Mac
+
+Use the existing Devin attachment handoff and Apple signing/upload process used by the other
+projects. Send a fixed source revision or an explicitly selected source snapshot; exclude local
+environment files, credentials, caches and installed dependencies. This app uses Expo and React
+Native, so generate its native iOS project on the Mac before archiving with Xcode; the Unity
+export and Unity-iPhone scheme in those projects do not apply here.
+
+Before a signed build, verify the App Store Connect record against `ios-release.json`, and check
+that the version/build is unused. Reuse an existing matching team certificate only after checking
+it; provisioning profiles must match this app and its widget/share extensions. Native identities
+and keychain/app groups are derived in `app.config.ts`; `eas.json` points at the same app record.
+
+This fork's release identity is recorded in [`ios-release.json`](ios-release.json):
+`T3 Code Plus`, `com.tingfeng.t3codeplus`, Team `L9NF344PND`, App Store Connect
+`6832172519`, internal TestFlight group `Self`. Version/build must be checked against Apple before
+upload. OTA is disabled in this fork until a separate Expo project is configured. The initial
+build supports direct pairing with existing desktop servers; verified hosted links and cloud
+sign-in require separately configured services owned by the fork.
+
+Check the Mac's installed Node/package-manager versions against the root `package.json`, plus
+Xcode, CocoaPods, free space and signing access. Do not install or upgrade system tools as part
+of that check. Generate the first native project with `expo prebuild --platform ios`. Expo SDK 58
+recreates native folders by default; on an existing build workspace, use
+`expo prebuild --platform ios --no-clean --no-install` to preserve the generated project and Pods.
+If native dependencies changed, update Pods before archiving. Archive the generated workspace and
+its actual scheme in Release for a generic iOS device. Export the App Store Connect IPA and retain
+the matching archive/dSYMs. This build must run without Metro.
+
+Upload, Apple processing, TestFlight group availability and an actual iPhone run are separate
+results. Only upload after the app identity and distribution scope are confirmed. The upstream
+`mobile-eas-production.yml` is restricted to the official repository and is not this fork's
+Devin build entry point.
 
 T3 Connect is optional and disabled in a fresh clone. Public configuration belongs in the
 repository-root `.env` or `.env.local`, not an `apps/mobile/.env` file. See

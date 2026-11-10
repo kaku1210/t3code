@@ -1,8 +1,7 @@
-import { DEFAULT_HOSTED_APP_URL } from "@t3tools/shared/connectAuth";
 import { afterEach, expect, it, vi } from "vite-plus/test";
 
-import appleAppSiteAssociation from "../web/public/.well-known/apple-app-site-association.json";
-import assetLinks from "../web/public/.well-known/assetlinks.json";
+import easConfig from "./eas.json" with { type: "json" };
+import iosRelease from "./ios-release.json" with { type: "json" };
 
 // Keep config parsing independent of local env files and build credentials.
 vi.mock("../../scripts/lib/public-config.ts", () => ({
@@ -26,22 +25,33 @@ it.each(["prod", ""])("rejects APP_VARIANT=%j before selecting production IDs", 
 });
 
 it.each([
-  [undefined, "com.t3tools.t3code"],
-  ["development", "com.t3tools.t3code.dev"],
-  ["preview", "com.t3tools.t3code.preview"],
-  ["production", "com.t3tools.t3code"],
-])("keeps the iOS and Android identifiers for APP_VARIANT=%j", async (value, identifier) => {
+  [undefined, "com.tingfeng.t3codeplus"],
+  ["development", "com.tingfeng.t3codeplus.dev"],
+  ["preview", "com.tingfeng.t3codeplus.preview"],
+  ["production", "com.tingfeng.t3codeplus"],
+])("uses independent signed identities for APP_VARIANT=%j", async (value, identifier) => {
   const config = await loadConfig(value);
   expect(config.ios?.bundleIdentifier).toBe(identifier);
   expect(config.android?.package).toBe(identifier);
-  // Copied thread links open this app only while app.t3.codes lists it.
-  const host = new URL(DEFAULT_HOSTED_APP_URL).host;
-  expect(config.ios?.associatedDomains).toContain(`applinks:${host}`);
-  expect(appleAppSiteAssociation.applinks.details[0]?.appIDs).toContain(
-    `${config.ios?.appleTeamId}.${identifier}`,
-  );
-  expect(config.android?.intentFilters?.[0]?.data).toEqual([
-    { scheme: "https", host, pathPrefix: "/threads/" },
+  expect(config.ios?.appleTeamId).toBe("L9NF344PND");
+  expect(config.ios?.entitlements?.["keychain-access-groups"]).toEqual([
+    `$(AppIdentifierPrefix)${identifier}`,
   ]);
-  expect(assetLinks.map((link) => link.target.package_name)).toContain(identifier);
+  expect(config.plugins).toContainEqual([
+    "expo-widgets",
+    expect.objectContaining({
+      bundleIdentifier: `${identifier}.widgets`,
+      groupIdentifier: `group.${identifier}`,
+    }),
+  ]);
+  // This fork cannot register itself in the upstream domain or receive its OTA JavaScript.
+  expect(config.ios?.associatedDomains).toBeUndefined();
+  expect(config.android?.intentFilters).toBeUndefined();
+  expect(config.updates?.enabled).toBe(false);
+  expect(config.updates?.url).toBeUndefined();
+  expect(config.extra?.eas?.projectId).toBeUndefined();
+  expect(config.owner).toBeUndefined();
+  expect(config.version).toBe(iosRelease.version);
+  expect(config.ios?.buildNumber).toBe(iosRelease.buildNumber);
+  expect(easConfig.submit.production.ios.ascAppId).toBe(iosRelease.appStoreConnectAppId);
 });

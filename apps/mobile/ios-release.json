@@ -1,0 +1,10 @@
+{
+  "displayName": "T3 Code Plus",
+  "bundleId": "com.tingfeng.t3codeplus",
+  "teamId": "L9NF344PND",
+  "appStoreConnectAppId": "6832172519",
+  "sku": "ios-app-01",
+  "version": "1.0.0",
+  "buildNumber": "3",
+  "testFlightGroup": "Self"
+}
