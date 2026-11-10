@@ -1,6 +1,7 @@
 import { useAtomValue } from "@effect/atom-react";
 import { NotificationSettings } from "./NotificationSettings";
 import { UiLanguageSetting } from "./UiLanguageSetting";
+import { UpdateCenterSettings } from "./UpdateCenterSettings";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { PRIVACY_POLICY_URL } from "../../legalLinks";
 import { CheckIcon } from "lucide-react";
@@ -65,6 +66,7 @@ import { ThreadTitleInstructionsSettings } from "./ThreadTitleInstructionsSettin
 import { NextPromptSuggestionSettings } from "./NextPromptSuggestionSettings";
 import { SnoozePresetsRow } from "./SnoozePresetsSettings";
 import { useDesktopUpdateState } from "../../state/desktopUpdate";
+import { useDesktopUpdateCenter } from "../../state/desktopUpdateCenter";
 import { managedTelemetryOffMessage, usePrimaryManagedPolicy } from "../../state/managedPolicy";
 import {
   getCustomModelOptionsByInstance,
@@ -149,6 +151,7 @@ const QUIT_CONFIRMATION_MODE_MESSAGES = {
 
 const DEFAULT_DRIVER_KIND = ProviderDriverKind.make("codex");
 function AboutVersionSection() {
+  const updateCenter = useDesktopUpdateCenter();
   const updateState = useDesktopUpdateState();
   const [switchChannel, setSwitchChannel] = useState<DesktopUpdateChannel | null>(null);
   const [isUpdateActionPending, setIsUpdateActionPending] = useState(false);
@@ -307,24 +310,26 @@ function AboutVersionSection() {
         description={description}
         managed={updatesDenial}
         control={
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={buttonDisabled || isUpdateActionPending}
-                  onClick={handleButtonClick}
-                >
-                  {buttonLabel}
-                </Button>
-              }
-            />
-            {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
-          </Tooltip>
+          !updateCenter?.supported ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={buttonDisabled || isUpdateActionPending}
+                    onClick={handleButtonClick}
+                  >
+                    {buttonLabel}
+                  </Button>
+                }
+              />
+              {buttonTooltip ? <TooltipPopup>{buttonTooltip}</TooltipPopup> : null}
+            </Tooltip>
+          ) : undefined
         }
       />
-      {hasDesktopBridge ? (
+      {hasDesktopBridge && !updateCenter?.supported ? (
         <SettingsRow
           {...searchableSetting("update-track")}
           description={
@@ -1185,6 +1190,31 @@ export function ChatSettingsPanel() {
             </Select>
           }
         />
+        <SettingsRow
+          {...searchableSetting("composer-placeholder")}
+          description={t("settings.chat.placeholderHelp")}
+          resetAction={
+            settings.composerPlaceholder !== DEFAULT_UNIFIED_SETTINGS.composerPlaceholder ? (
+              <SettingResetButton
+                label={t("settings.chat.placeholder")}
+                onClick={() =>
+                  updateSettings({
+                    composerPlaceholder: DEFAULT_UNIFIED_SETTINGS.composerPlaceholder,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <DraftInput
+              value={settings.composerPlaceholder}
+              onCommit={(value) => updateSettings({ composerPlaceholder: value.trim() })}
+              placeholder={t("composer.placeholder")}
+              aria-label={t("settings.chat.placeholder")}
+              className="w-full sm:w-72"
+            />
+          }
+        />
         <AdvancedSettings targetIds={[searchableSetting("skills-in-slash-menu").id]}>
           <SettingsRow
             {...searchableSetting("skills-in-slash-menu")}
@@ -1213,6 +1243,8 @@ export function ChatSettingsPanel() {
           />
         </AdvancedSettings>
       </SettingsSection>
+
+      <NextPromptSuggestionSettings />
 
       <SettingsSection id="follow-ups" title="Follow-ups">
         <SettingsRow
@@ -1801,8 +1833,6 @@ export function ThreadsSettingsPanel() {
         </SettingsSection>
       ) : null}
 
-      <NextPromptSuggestionSettings />
-
       <SettingsSection id="text-generation" title="Text generation">
         <SettingsRow
           serverScoped
@@ -2114,6 +2144,7 @@ export function AboutSettingsPanel() {
           </>
         )}
         <MobileAppSettingsRow />
+        <UpdateCenterSettings />
       </SettingsSection>
 
       <SettingsSection id="legal" title="Legal">

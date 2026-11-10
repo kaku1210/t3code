@@ -706,6 +706,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["composer rich text tiptap bold italic markdown styled wysiwyg"],
   },
   {
+    id: "composer-placeholder",
+    title: "Input placeholder",
+    to: "/settings/chat",
+    searchTerms: ["composer placeholder empty input hint custom text 输入框提示文案 快捷提示"],
+  },
+  {
     id: "send-shortcut",
     title: "Send shortcut",
     to: "/settings/chat",
@@ -807,14 +813,14 @@ export const SETTINGS_SEARCH_ITEMS = [
   {
     id: "next-prompt-suggestions-enabled",
     title: "Automatically suggest a next prompt",
-    to: "/settings/threads",
+    to: "/settings/chat",
     scope: "environment",
-    searchTerms: ["composer next prompt suggestions follow-up Tab"],
+    searchTerms: ["composer next prompt suggestions follow-up Tab 下一步提示 下一步建议 推荐指令"],
   },
   {
     id: "next-prompt-suggestions-model",
     title: "Suggestion model",
-    to: "/settings/threads",
+    to: "/settings/chat",
     scope: "environment",
     searchTerms: ["next prompt suggestions provider model reasoning effort"],
   },
@@ -837,6 +843,14 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Version",
     to: "/settings/about",
     searchTerms: ["about check for updates download install upgrade release"],
+  },
+  {
+    id: "check-updates",
+    title: "Check for updates",
+    to: "/settings/about",
+    desktopOnly: true,
+    windowsOnly: true,
+    searchTerms: ["检查更新 上游 版本 plus repository update center"],
   },
   {
     id: "update-track",
@@ -1361,6 +1375,7 @@ const RENAMED_SETTINGS_PATHS: Readonly<Record<string, SettingsPath>> = {
   "/settings/beta": "/settings/labs",
 };
 const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
+  "/settings/threads",
   "/settings/general",
   "/settings/appearance",
   "/settings/source-control",
@@ -1369,6 +1384,7 @@ const SPLIT_SETTINGS_PATHS: ReadonlySet<string> = new Set([
 ]);
 // Section anchors that moved but are not search results themselves.
 const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
+  "next-prompt-suggestions": "/settings/chat",
   "authorized-clients": "/settings/access",
   "legacy-features": "/settings/labs",
   "text-generation": "/settings/threads",

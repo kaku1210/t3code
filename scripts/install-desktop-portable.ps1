@@ -16,7 +16,10 @@ template under scripts; the Windows ZIP build exports the ready-to-use release d
 [CmdletBinding()]
 param(
     [string]$DestinationRoot = 'D:\AI Program Files\T3 Code Plus',
-    [switch]$ValidateOnly
+    [switch]$ValidateOnly,
+    [string]$ExpectedExecutableName,
+    [string]$ExpectedVersion,
+    [string]$ExpectedBranch
 )
 
 $ErrorActionPreference = 'Stop'
@@ -64,6 +67,9 @@ try {
     $source = Get-ContainedPath $releaseRoot $payloadDirectory
     $installed = Get-ContainedPath $destination 'win-unpacked'
     $executableName = [string]$manifest.appName + '.exe'
+    if ($ExpectedExecutableName -and $ExpectedExecutableName -ne $executableName) { throw 'The package executable does not match this client.' }
+    if ($ExpectedVersion -and $ExpectedVersion -ne [string]$manifest.version) { throw 'The prepared package changed after confirmation. Check again.' }
+    if ($ExpectedBranch -and ($null -eq $manifest.PSObject.Properties['buildInfo'] -or [string]$manifest.buildInfo.sourceBranch -ne $ExpectedBranch)) { throw 'The package branch does not match this client.' }
     foreach ($directory in @($source, $destination, $installed)) {
         if ((Test-Path -LiteralPath $directory) -and
             ((Get-Item -LiteralPath $directory).Attributes -band [IO.FileAttributes]::ReparsePoint)) {

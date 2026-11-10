@@ -17,6 +17,8 @@ import {
 
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import * as HostProcess from "@t3tools/shared/HostProcess";
+import type { DesktopBuildInfo } from "@t3tools/contracts";
+import * as DateTime from "effect/DateTime";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
 import rootPackageJson from "../package.json" with { type: "json" };
@@ -962,6 +964,7 @@ interface ResolvedBuildOptions {
 }
 
 interface StagePackageJson {
+  readonly t3codeBuildInfo: DesktopBuildInfo;
   readonly name: string;
   readonly version: string;
   readonly buildVersion: string;
@@ -1061,7 +1064,8 @@ export function resolveWindowsServerAsarIgnoreGlobs(arch: typeof BuildArch.Type)
   ];
 }
 
-export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 80;
+// Bytecode caches vary with the bundled modules; allow modest growth while rejecting loose dependency trees.
+export const WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT = 96;
 export const WINDOWS_SERVER_RESOURCE_SOURCE_DIR = "apps/desktop/prod-resources/windows-server";
 export const WINDOWS_SERVER_EXTRA_RESOURCES = [
   {
@@ -3653,6 +3657,30 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const appVersion = options.version ?? serverPackageJson.version;
   const iconAssets = resolveDesktopBuildIconAssets(appVersion);
   const commitHash = yield* resolveGitCommitHash(repoRoot);
+  const gitSource = yield* Effect.forEach(
+    [
+      ["branch", "--show-current"],
+      ["rev-parse", "HEAD"],
+      ["remote", "get-url", "origin"],
+      ["status", "--porcelain"],
+    ],
+    (args) => spawnAndCollectOutput(ChildProcess.make("git", args, { cwd: repoRoot })),
+    { concurrency: "unbounded" },
+  );
+  const [branch, revision, origin, dirty] = gitSource;
+  const repositoryMatch = origin?.stdout.trim().match(/github\.com[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
+  const buildInfo: DesktopBuildInfo = {
+    artifactVersion: appVersion,
+    upstreamVersion: serverPackageJson.version,
+    repository: repositoryMatch?.[1] ?? "",
+    sourceBranch: branch?.stdout.trim() || null,
+    sourceRevision: revision?.stdout.trim() || null,
+    sourceDirty: Boolean(dirty?.stdout.trim()),
+    builtAt: DateTime.formatIso(yield* DateTime.now),
+    platform:
+      options.platform === "win" ? "win32" : options.platform === "mac" ? "darwin" : "linux",
+    arch: options.arch,
+  };
   const mkdir = options.keepStage ? fs.makeTempDirectory : fs.makeTempDirectoryScoped;
   const stageRoot = yield* mkdir({
     prefix: `t3code-desktop-${options.platform}-stage-`,
@@ -3869,6 +3897,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
+    t3codeBuildInfo: buildInfo,
     name: "t3code",
     version: appVersion,
     buildVersion: appVersion,
@@ -4077,6 +4106,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
         appName: resolveDesktopProductName(appVersion),
         version: appVersion,
         sourceRevision: commitHash,
+        buildInfo,
       });
     }
   }
@@ -4124,6 +4154,7 @@ export const stageWindowsPortableInstaller = Effect.fn("stageWindowsPortableInst
     readonly appName: string;
     readonly version: string;
     readonly sourceRevision: string;
+    readonly buildInfo?: DesktopBuildInfo;
   }) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -4148,6 +4179,7 @@ export const stageWindowsPortableInstaller = Effect.fn("stageWindowsPortableInst
       appName: input.appName,
       version: input.version,
       sourceRevision: input.sourceRevision,
+      ...(input.buildInfo ? { buildInfo: input.buildInfo } : {}),
       payloadDirectory: path.basename(input.packagedAppDir),
       files,
     });

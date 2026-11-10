@@ -4,20 +4,12 @@ import { ExternalLinkIcon } from "lucide-react";
 import {
   getDesktopUpdateReleaseHistoryUrl,
   getDesktopUpdateReleaseUrl,
+  keyReleaseNoteItems,
 } from "../desktopUpdate.logic";
 import { formatRelativeTimeLabel } from "../../timestampFormat";
 import { openDesktopUpdateReleaseNotes } from "../desktopUpdate.toast";
 
 type DesktopUpdateShell = Pick<DesktopBridge, "openExternal">;
-
-function keyReleaseNoteItems(items: ReadonlyArray<string>) {
-  const occurrences = new Map<string, number>();
-  return items.map((item) => {
-    const occurrence = occurrences.get(item) ?? 0;
-    occurrences.set(item, occurrence + 1);
-    return { item, key: JSON.stringify([item, occurrence]) };
-  });
-}
 
 /** Feed times read "3h ago"; build days from a prerelease version read "today" or "2d ago". */
 function formatReleaseAge(releasedAt: string): string {

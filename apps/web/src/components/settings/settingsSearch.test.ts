@@ -71,6 +71,13 @@ describe("searchSettings", () => {
         scope: "environment-defaults",
       });
     }
+    for (const [query, id] of [
+      ["输入框提示文案", "composer-placeholder"],
+      ["快捷提示", "composer-placeholder"],
+      ["下一步建议", "next-prompt-suggestions-enabled"],
+    ] as const) {
+      expect(searchSettings(query)[0]).toMatchObject({ id, to: "/settings/chat" });
+    }
   });
 
   it("hides the Secrets page from nav and search while the secrets feature is disabled", () => {
@@ -346,6 +353,13 @@ describe("source control host search items", () => {
 
 describe("movedSettingsPath", () => {
   it("sends old links to the page their row moved to", () => {
+    for (const anchor of [
+      "next-prompt-suggestions",
+      "next-prompt-suggestions-enabled",
+      "next-prompt-suggestions-model",
+    ]) {
+      expect(movedSettingsPath("/settings/threads", anchor)).toBe("/settings/chat");
+    }
     expect(movedSettingsPath("/settings/general", "text-generation-model")).toBe(
       "/settings/threads",
     );

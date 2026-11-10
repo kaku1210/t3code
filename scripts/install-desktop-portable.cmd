@@ -8,6 +8,7 @@ if errorlevel 1 (
   pwsh.exe -NoLogo -NoProfile -File "%~dp0install-desktop-portable.ps1" %*
 )
 set "install_result=%errorlevel%"
+if "%T3CODE_LOCAL_UPDATE%"=="1" exit /b %install_result%
 echo.
 pause
 exit /b %install_result%

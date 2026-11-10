@@ -534,6 +534,7 @@ export const make = Effect.gen(function* () {
     allowDowngrade = false,
   ) {
     yield* Effect.annotateCurrentSpan({ reason });
+    if (!(yield* desktopSettings.get).updateCenter.checkingEnabled) return false;
     if (yield* Ref.get(desktopState.quitting)) return false;
     if (!(yield* Ref.get(updaterConfiguredRef))) return false;
 

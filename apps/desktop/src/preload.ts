@@ -274,6 +274,19 @@ contextBridge.exposeInMainWorld("desktopBridge", {
     };
   },
   getUpdateState: () => ipcRenderer.invoke(IpcChannels.UPDATE_GET_STATE_CHANNEL),
+  updateCenter: {
+    getState: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_GET_CHANNEL),
+    configure: (change) => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CONFIGURE_CHANNEL, change),
+    chooseCommand: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CHOOSE_CHANNEL),
+    check: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CHECK_CHANNEL),
+    install: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_INSTALL_CHANNEL),
+    onState: (listener) => {
+      const wrapped = (_event: Electron.IpcRendererEvent, state: unknown) =>
+        listener(state as Parameters<typeof listener>[0]);
+      ipcRenderer.on(IpcChannels.UPDATE_CENTER_STATE_CHANNEL, wrapped);
+      return () => ipcRenderer.removeListener(IpcChannels.UPDATE_CENTER_STATE_CHANNEL, wrapped);
+    },
+  },
   setUpdateChannel: (channel, minimumVersion) =>
     ipcRenderer.invoke(IpcChannels.UPDATE_SET_CHANNEL_CHANNEL, { channel, minimumVersion }),
   checkForUpdate: () => ipcRenderer.invoke(IpcChannels.UPDATE_CHECK_CHANNEL),

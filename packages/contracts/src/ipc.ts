@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema";
+import type { DesktopUpdateCenterBridge } from "./desktopUpdateCenter.ts";
 import type { PreviewCaptureFailureEncoded } from "./previewCapture.ts";
 
 import { SnapShotSource } from "./chatAttachment.ts";
@@ -1028,6 +1029,7 @@ export const SystemSettingsPaneSchema = Schema.Literals(["full-disk-access"]);
 export type SystemSettingsPane = typeof SystemSettingsPaneSchema.Type;
 
 export interface DesktopBridge {
+  readonly updateCenter?: DesktopUpdateCenterBridge;
   getAppBranding: () => DesktopAppBranding | null;
   getRelayTelemetryEnabled: () => boolean;
   getPathForFile: (file: File) => string;

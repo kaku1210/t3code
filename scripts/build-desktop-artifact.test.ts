@@ -1796,6 +1796,17 @@ it.effect.each(["win-unpacked", "win-arm64-unpacked"])(
       const output = path.join(root, "release");
       const appName = "T3 Code Plus (Nightly)";
       const repoRoot = path.join(import.meta.dirname, "..");
+      const buildInfo = {
+        artifactVersion: "1.2.3-nightly.1",
+        upstreamVersion: "1.2.3",
+        repository: "kaku1210/t3code",
+        sourceBranch: "develop",
+        sourceRevision: "012345abcdef012345abcdef012345abcdef0123",
+        sourceDirty: false,
+        builtAt: "2026-11-09T00:00:00Z",
+        platform: "win32",
+        arch: payloadDirectory === "win-unpacked" ? "x64" : "arm64",
+      };
       yield* fs.makeDirectory(path.join(packagedAppDir, "resources"), { recursive: true });
       yield* fs.writeFileString(path.join(packagedAppDir, `${appName}.exe`), "electron");
       yield* fs.writeFileString(path.join(packagedAppDir, "resources/app.asar"), "bundle");
@@ -1807,6 +1818,7 @@ it.effect.each(["win-unpacked", "win-arm64-unpacked"])(
         appName,
         version: "1.2.3-nightly.1",
         sourceRevision: "012345abcdef",
+        buildInfo,
       });
       yield* copyDesktopBuildArtifacts(stageDistDir, output, true);
 
@@ -1817,6 +1829,7 @@ it.effect.each(["win-unpacked", "win-arm64-unpacked"])(
           version: "1.2.3-nightly.1",
           sourceRevision: "012345abcdef",
           payloadDirectory,
+          buildInfo,
           files: [
             { path: `${appName}.exe`, length: 8 },
             { path: "resources/app.asar", length: 6 },

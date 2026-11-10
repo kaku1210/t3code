@@ -1,4 +1,5 @@
 import * as Effect from "effect/Effect";
+import * as UpdateCenter from "./methods/updateCenter.ts";
 
 import { receiveProviderAuthCallback, cancelProviderAuthCallback } from "./methods/providerAuth.ts";
 import * as DesktopIpc from "./DesktopIpc.ts";
@@ -83,6 +84,11 @@ import {
 
 export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers")(function* () {
   const ipc = yield* DesktopIpc.DesktopIpc;
+  yield* ipc.handle(UpdateCenter.getState);
+  yield* ipc.handle(UpdateCenter.configure);
+  yield* ipc.handle(UpdateCenter.chooseCommand);
+  yield* ipc.handle(UpdateCenter.check);
+  yield* ipc.handle(UpdateCenter.install);
   yield* installNotificationBadge();
   yield* PreviewIpc.installPreviewEventForwarding();
 

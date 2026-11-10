@@ -4,7 +4,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 
-// afterPack runs before signing and installer creation, against the final ASAR layout.
+// Run against the final ASAR layout: after EXE editing on Windows, before signing on macOS.
 module.exports = async ({ appOutDir, electronPlatformName, arch, packager }) => {
   // Linux packaging and relocated AppImage cache reuse still need native validation.
   if (electronPlatformName !== "darwin" && electronPlatformName !== "win32") {

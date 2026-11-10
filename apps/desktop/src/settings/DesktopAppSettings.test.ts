@@ -96,6 +96,30 @@ function writeSettingsPatch(patch: typeof DesktopSettingsPatch.Type) {
 }
 
 describe("DesktopSettings", () => {
+  it.effect("persists update-center switches and this machine's CMD path across reloads", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        assert.deepEqual((yield* settings.load).updateCenter, {
+          checkingEnabled: true,
+          quickUpdateEnabled: false,
+          commandPath: null,
+        });
+        const preferences = {
+          checkingEnabled: false,
+          quickUpdateEnabled: true,
+          commandPath: "D:\\开发\\Migrate-T3-Code-Plus.cmd",
+        };
+        yield* settings.setUpdateCenter(preferences);
+        assert.deepEqual((yield* settings.load).updateCenter, preferences);
+        yield* settings.setUpdateCenter(DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter);
+        assert.deepEqual(
+          (yield* settings.load).updateCenter,
+          DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter,
+        );
+      }),
+    ),
+  );
   it.effect("records one bounds operation span with its input attributes", () =>
     Effect.gen(function* () {
       const spans: Array<Tracer.Span> = [];
@@ -179,6 +203,7 @@ describe("DesktopSettings", () => {
         );
 
         assert.deepEqual(yield* settings.load, {
+          updateCenter: DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: { x: 120, y: 80, width: 1280, height: 900 },
@@ -258,7 +283,7 @@ describe("DesktopSettings", () => {
         const dotfiles = yield* fileSystem.makeTempDirectoryScoped({
           prefix: "t3-desktop-settings-dotfiles-",
         });
-        const linkedSettingsPath = `${dotfiles}/desktop-settings.json`;
+        const linkedSettingsPath = environment.path.join(dotfiles, "desktop-settings.json");
         yield* fileSystem.writeFileString(linkedSettingsPath, "{}\n");
         yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
         yield* fileSystem.symlink(linkedSettingsPath, environment.desktopSettingsPath);
@@ -310,6 +335,7 @@ describe("DesktopSettings", () => {
         });
 
         assert.deepEqual(yield* settings.load, {
+          updateCenter: DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,
@@ -339,6 +365,7 @@ describe("DesktopSettings", () => {
         });
 
         assert.deepEqual(yield* settings.load, {
+          updateCenter: DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter,
           linuxPasswordStore: "auto",
           localEnvironmentEnabled: true,
           mainWindowBounds: null,

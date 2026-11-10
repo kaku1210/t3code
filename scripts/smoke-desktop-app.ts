@@ -7,6 +7,8 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeTimersPromises from "node:timers/promises";
 import * as NodeUtil from "node:util";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import * as Effect from "effect/Effect";
 import { _electron, type ElectronApplication } from "playwright-core";
 
 // A snapshot from an older build on purpose: the packaged server must migrate it forward, as it
@@ -34,6 +36,9 @@ NodeFS.copyFileSync(FIXTURE_DB, NodePath.join(t3Home, "userdata/statev2.sqlite")
 
 let step = "launching the app";
 let app: ElectronApplication | undefined;
+const desktopEnv = { ...process.env };
+delete desktopEnv.ELECTRON_RUN_AS_NODE;
+const isWindows = (await Effect.runPromise(HostProcess.Platform)) === "win32";
 try {
   app = await _electron.launch({
     executablePath: executable,
@@ -42,7 +47,13 @@ try {
     // HOME stays real: on macOS a fake HOME has no login keychain, and safeStorage blocks the
     // main process on a keychain dialog. macOS keeps its Electron profile in the runner's HOME.
     env: {
-      ...process.env,
+      ...desktopEnv,
+      ...(isWindows
+        ? {
+            APPDATA: NodePath.join(home, "roaming"),
+            LOCALAPPDATA: NodePath.join(home, "local"),
+          }
+        : {}),
       XDG_CONFIG_HOME: NodePath.join(home, ".config"),
       XDG_DATA_HOME: NodePath.join(home, ".local/share"),
       T3CODE_HOME: t3Home,
@@ -62,6 +73,63 @@ try {
     step = "opening the thread";
     await thread.click();
     await page.getByText(THREAD_MESSAGE).waitFor({ timeout: STEP_TIMEOUT_MS });
+    if (isWindows) {
+      step = "checking the native hit target of the update entry";
+      const updateEntry = page.getByRole("button", { name: /^(Updates|检查更新)$/ });
+      const point = await updateEntry.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return {
+          x: Math.round((bounds.x + bounds.width / 2) * devicePixelRatio),
+          y: Math.round((bounds.y + bounds.height / 2) * devicePixelRatio),
+        };
+      });
+      const hit = await app.evaluate(({ app, BrowserWindow }, point) => {
+        const require = process
+          .getBuiltinModule("node:module")
+          .createRequire(`${app.getAppPath()}/package.json`);
+        const { DataType, load, open } = require("ffi-rs");
+        open({ library: "desktop-launch-hit-test", path: "user32.dll" });
+        const handle = BrowserWindow.getAllWindows()[0]!.getNativeWindowHandle().readBigUInt64LE();
+        const coordinates = Buffer.alloc(8);
+        coordinates.writeInt32LE(point.x, 0);
+        coordinates.writeInt32LE(point.y, 4);
+        if (
+          !load({
+            library: "desktop-launch-hit-test",
+            funcName: "ClientToScreen",
+            retType: DataType.Boolean,
+            paramsType: [DataType.BigInt, DataType.U8Array],
+            paramsValue: [handle, coordinates],
+          })
+        )
+          throw new Error("ClientToScreen failed for the update entry.");
+        return Number(
+          load({
+            library: "desktop-launch-hit-test",
+            funcName: "SendMessageW",
+            retType: DataType.BigInt,
+            paramsType: [DataType.BigInt, DataType.U32, DataType.BigInt, DataType.BigInt],
+            paramsValue: [
+              handle,
+              0x84,
+              0n,
+              BigInt((coordinates.readInt32LE(4) << 16) | (coordinates.readInt32LE(0) & 0xffff)),
+            ],
+          }),
+        );
+      }, point);
+      // A renderer click bypasses Windows caption hit testing, which can swallow a real pointer.
+      if (hit !== 1)
+        throw new Error(`The update entry is not a client hit target (WM_NCHITTEST=${hit}).`);
+      step = "opening the desktop update center";
+      await updateEntry.click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: /^(Check now|立即检查)$/ })
+        .waitFor();
+      await page.keyboard.press("Escape");
+      console.log("Windows update entry passed native hit testing and opened the update center.");
+    }
   } catch (error) {
     NodeFS.mkdirSync(artifactsDir, { recursive: true });
     await page

@@ -164,3 +164,11 @@ export function getDesktopUpdateIdleTooltip(
     ? { title: "Updates unavailable", detail: disabledReason }
     : { title: "Check for updates", detail: null };
 }
+export function keyReleaseNoteItems(items: ReadonlyArray<string>) {
+  const occurrences = new Map<string, number>();
+  return items.map((item) => {
+    const occurrence = occurrences.get(item) ?? 0;
+    occurrences.set(item, occurrence + 1);
+    return { item, key: JSON.stringify([item, occurrence]) };
+  });
+}

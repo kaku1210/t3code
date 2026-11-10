@@ -14,7 +14,7 @@ the version.
 From the checkout, build a portable release with:
 
 ```sh
-vp run dist:desktop:win:portable --arch x64 --build-version 1.2.3
+vp run dist:desktop:win:portable --arch x64 --build-version 0.1.7-plus.20261109.1
 ```
 
 The default `release/` output is gitignored. Alongside the ordinary application ZIP, the build
@@ -22,6 +22,13 @@ exports the complete unpacked application directory, `Install-T3-Code-Plus.cmd`,
 `install-desktop-portable.ps1`, and a fresh `release.json` describing that build's version,
 executable name, payload directory, and file sizes. Custom `--output-dir` paths work the same way.
 The NSIS installer build is unchanged.
+
+Plus packages retain the upstream version followed by `-plus.YYYYMMDD.N`; increase `N` for each
+new package on the same day, even when only uncommitted source changes differ. The application
+and portable manifest both record the upstream version, full package version, repository,
+branch, commit, dirty state, build time, platform and architecture. The update center compares
+upstream releases, same-branch commits and prepared package versions separately. A missing
+source identity is unknown, not evidence that a build is current.
 
 For a reusable double-click entry, run `Migrate-T3-Code-Plus.cmd` at the checkout root.
 It always uses that checkout's default `release/` output, so the same entry works after each
@@ -36,6 +43,16 @@ different location. The tool checks and stages the complete payload, retains the
 as a timestamped backup, and restores it if activation fails. It does not start the app or copy
 profile data. The scripts under `scripts/` are templates; run the copies shipped with a release.
 Existing manifests without `payloadDirectory` continue to use `win-unpacked`.
+
+Packaged Windows builds from the exact `develop` branch also offer **Quick local update** in
+**Settings → About**. Select this checkout's migration CMD or an exported release CMD. Its
+prepared package must include the new source metadata and match the running branch, repository
+and architecture. The title-bar update center preflights the package, asks to exit, then hands
+off outside the installation. It explicitly targets the current installation root, preserves
+the installer's backup and rollback, and opens the new client once. Automated invocation skips
+the CMD pause and exits all coordinator processes. Logs and `result.json` remain in the temporary
+`t3code-local-update-*` directory named in a failure message. Manual CMD use still pauses and
+leaves launch timing to the user. The first update-center build must be installed manually.
 
 Keep source, installer templates and these instructions in Git. Distribute application binaries
 separately; never commit release directories, profile databases, credentials or local `.t3` state.

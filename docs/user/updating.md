@@ -4,6 +4,29 @@ The app you use and the server running your agents can be on different machines.
 When a server is behind your web or desktop app, the update button at the bottom
 of the sidebar and **Settings → Environments** offer to update it.
 
+## T3 Code Plus on Windows
+
+Use the title-bar **Updates** entry to check upstream T3 Code releases and the repository branch
+that built your client. These two checks show available versions or commits and links; they do
+not install them. **Settings → About → Check for updates** controls these checks and hides the
+entry when turned off.
+
+The popup shows GitHub release notes and commit messages for the detected branch update.
+Expand a commit to read its full message. Long lists show a summary and a link to the full
+GitHub page, opened with the system browser. If the branch is current, its current commit is
+shown instead. Git commit notes do not include uncommitted changes bundled into a local build.
+
+Packaged `develop` builds additionally offer **Quick local update** in **Settings → About**.
+Enable it and select your local migration CMD. Keep the CMD with its complete prepared release,
+or use your checkout's reusable migration entry after building a new package. A matching, newer
+package enables **Update and restart**. Confirming exits the app and its locally hosted tasks,
+installs with an old-version backup, then reopens the client without a remaining command window.
+If the CMD moves, select it again. Other branches show the release and repository checks only.
+
+Plus versions use `upstreamVersion-plus.YYYYMMDD.N`. The package version, upstream version and
+source branch are separate information. Old prepared packages without branch metadata must be
+rebuilt before quick update can use them.
+
 ## Update everything at once
 
 The update button at the bottom of the sidebar updates every connected machine

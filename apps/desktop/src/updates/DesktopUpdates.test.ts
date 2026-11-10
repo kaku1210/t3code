@@ -23,6 +23,34 @@ import * as DesktopUpdates from "./DesktopUpdates.ts";
 import { flushCallbacks, makeHarness } from "./updatesTestHarness.ts";
 
 describe("DesktopUpdates", () => {
+  it.effect(
+    "honors the update-center global switch for legacy manual and background checks",
+    () => {
+      const harness = makeHarness();
+      return Effect.scoped(
+        Effect.gen(function* () {
+          const settings = yield* DesktopAppSettings.DesktopAppSettings;
+          const updates = yield* DesktopUpdates.DesktopUpdates;
+          yield* settings.setUpdateCenter({
+            checkingEnabled: false,
+            quickUpdateEnabled: false,
+            commandPath: null,
+          });
+          yield* updates.configure;
+          yield* updates.check("manual");
+          yield* TestClock.adjust("5 minutes");
+          assert.equal(harness.checkCount(), 0);
+          yield* settings.setUpdateCenter({
+            checkingEnabled: true,
+            quickUpdateEnabled: false,
+            commandPath: null,
+          });
+          yield* updates.check("manual");
+          assert.equal(harness.checkCount(), 1);
+        }),
+      ).pipe(Effect.provide(harness.layer));
+    },
+  );
   it.effect("updates Linux .deb installs and leaves other non-AppImage installs off", () =>
     Effect.gen(function* () {
       const linuxState = (packageType: string | undefined) =>

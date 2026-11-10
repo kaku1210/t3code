@@ -7,7 +7,7 @@ if not exist "%release_installer%" (
   echo Build it from this checkout with:
   echo vp run dist:desktop:win:portable --arch x64
   echo.
-  pause
+  if not "%T3CODE_LOCAL_UPDATE%"=="1" pause
   exit /b 1
 )
 call "%release_installer%" %*
