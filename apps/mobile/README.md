@@ -18,6 +18,9 @@ Run commands from `apps/mobile`.
 
 ## Fork builds on a Devin cloud Mac
 
+For the repeatable TestFlight procedure, cache reuse, recovery steps and the verified build
+baseline, see [T3 Code Plus cloud Mac releases](../../docs/operations/mobile-testflight.md).
+
 Use the existing Devin attachment handoff and Apple signing/upload process used by the other
 projects. Send a fixed source revision or an explicitly selected source snapshot; exclude local
 environment files, credentials, caches and installed dependencies. This app uses Expo and React

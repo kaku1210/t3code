@@ -363,6 +363,10 @@ Git deployments remain disabled in `apps/marketing/vercel.ts`.
 
 ## Mobile TestFlight and store releases
 
+For this fork's T3 Code Plus builds on a Devin cloud Mac, follow
+[the TestFlight runbook](mobile-testflight.md). The EAS automation below describes the upstream
+release path.
+
 Merges to main publish compatible OTAs and build iOS prereleases with the `testflight`
 profile at version `3.0.0`. Build numbers increment automatically. The committed app
 version remains the App Store release version; Android keeps using that version.
