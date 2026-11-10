@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
@@ -33,6 +34,7 @@ export function PullRequestMergeControls(props: {
   readonly params: PullRequestParams;
   readonly stack: PullRequestStackState;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { pr, stack } = props;
   const terminology = sourceControlClients.get(pr.provider).changeRequest;
   const target = pullRequestTarget(props.params);
@@ -205,9 +207,9 @@ export function PullRequestMergeControls(props: {
       <SplitButton
         label={
           busy || stateAction.busy
-            ? "Working…"
+            ? uiText("Working…")
             : !permissions.connected
-              ? "Reconnect to merge"
+              ? uiText("Reconnect to merge")
               : (status?.label ?? label)
         }
         accessibilityLabel={
@@ -257,7 +259,7 @@ export function PullRequestMergeControls(props: {
         <Text className="px-1 text-xs text-foreground-muted">{reason}</Text>
       ) : null}
       {stack.error && stack.supportsStackActions ? (
-        <Button label="Retry stack lookup" tone="text" onPress={stack.refresh} />
+        <Button label={uiText("Retry stack lookup")} tone="text" onPress={stack.refresh} />
       ) : null}
     </View>
   );

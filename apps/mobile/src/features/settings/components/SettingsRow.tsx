@@ -9,6 +9,7 @@ import { cn } from "../../../lib/cn";
 import type { SettingsLegalDocumentTarget, SettingsPageTarget } from "./settings-page-targets";
 import { SettingsSidebarContext } from "./SettingsSection";
 import { openSettings } from "../settings-navigation";
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 
 export function SettingsRow(props: {
   readonly disabled?: boolean;
@@ -20,6 +21,8 @@ export function SettingsRow(props: {
   readonly fullScreenTarget?: SettingsLegalDocumentTarget;
   readonly onPress?: () => void;
 }) {
+  const { text } = useUiLanguage();
+  const label = text(props.label);
   const navigation = useNavigation();
   const sidebar = use(SettingsSidebarContext);
   // The Settings list opens pages in place of the detail column; a page's own rows push below.
@@ -29,7 +32,7 @@ export function SettingsRow(props: {
     (props.valuePosition === undefined && Platform.OS === "android");
   const content = {
     icon: props.icon,
-    label: props.label,
+    label,
     description: valueBelow ? props.value : undefined,
     detail: valueBelow ? undefined : props.value,
     disabled: props.disabled,
@@ -49,7 +52,7 @@ export function SettingsRow(props: {
     return (
       <RowPressable
         accessibilityRole="button"
-        accessibilityLabel={[props.label, props.value].filter(Boolean).join(", ")}
+        accessibilityLabel={[label, props.value].filter(Boolean).join(", ")}
         accessibilityState={{ disabled: Boolean(props.disabled), selected }}
         disabled={props.disabled}
         onPress={onPress}

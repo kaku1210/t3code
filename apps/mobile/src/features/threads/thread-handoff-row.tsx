@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
@@ -84,6 +85,7 @@ export function ThreadHandoffRow(props: {
   iconColor: ColorValue;
   surfaceColor: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { item } = props.projectedItem;
   const endpointsAtom = useMemo(
     () => handoffEndpointsAtom(props.environmentId, props.projectedItem),
@@ -98,7 +100,7 @@ export function ThreadHandoffRow(props: {
       endpoints={endpoints}
       iconColor={color}
       surfaceColor={props.surfaceColor}
-      label="Context handoff"
+      label={uiText("Context handoff")}
       failed={item.status === "failed"}
     />
   );
@@ -167,6 +169,7 @@ function HandoffEndpoint(props: {
   providers: ReadonlyArray<HandoffProvider>;
   surfaceColor: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const provider = props.providers.find((candidate) => candidate.instanceId === props.instanceId);
   const model = provider?.models.find((candidate) => candidate.slug === props.model);
   const label =
@@ -179,7 +182,7 @@ function HandoffEndpoint(props: {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint="Show provider account"
+      accessibilityHint={uiText("Show provider account")}
       className="min-h-6 max-w-full flex-row items-center justify-center gap-1.5"
       hitSlop={{ top: 8, bottom: 8 }}
       onPress={() =>

@@ -48,6 +48,7 @@ describe("filterSettingsSections", () => {
     { query: "appear", expected: [["Interface", ["Appearance"]]] },
     { query: "KEYBOARD", expected: [["Interface", ["Keyboard"]]] },
     { query: "dark mode", expected: [["Interface", ["Appearance"]]] },
+    { query: "中文", expected: [["Interface", ["Appearance"]]] },
     { query: "microphone", expected: [["Interface", ["Voice"]]] },
     { query: "agent credits", expected: [["Server settings", ["Source control"]]] },
     {
@@ -66,5 +67,16 @@ describe("filterSettingsSections", () => {
 
   it("drops sections that start empty", () => {
     expect(filterSettingsSections([{ rows: [] }, ...SECTIONS], "").length).toBe(SECTIONS.length);
+  });
+
+  it("finds translated page labels and the suggestion settings while preserving row identities", () => {
+    expect(
+      filterSettingsSections(SECTIONS, "外观", "zh-CN")
+        .flatMap((section) => section.rows)
+        .map((row) => row.id),
+    ).toEqual(["SettingsAppearance"]);
+    const chat = { rows: [{ id: "SettingsFollowUp", label: "Chat" }] };
+    expect(filterSettingsSections([chat], "下一步建议", "zh-CN")).toEqual([chat]);
+    expect(filterSettingsSections([chat], "输入框提示文案", "zh-CN")).toEqual([chat]);
   });
 });

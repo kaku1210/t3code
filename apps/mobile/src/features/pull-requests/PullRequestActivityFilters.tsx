@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Pressable, View } from "react-native";
 import { AppText as Text } from "../../components/ui/AppText";
 import { SymbolView } from "../../components/ui/AppSymbol";
@@ -13,6 +14,7 @@ export function PullRequestActivityFilters({
   readonly onChange: (value: ActivityFilter) => void;
   readonly hiddenCount: number;
 }) {
+  const { text: uiText } = useUiLanguage();
   const kinds = [
     { id: "all", title: "All activity" },
     { id: "comments", title: "Comments" },
@@ -21,7 +23,7 @@ export function PullRequestActivityFilters({
   return (
     <View className="mb-4 flex-row items-center justify-between gap-3">
       <Menu
-        title="Activity"
+        title={uiText("Activity")}
         actions={kinds.map((kind) => ({ ...kind, state: value.kind === kind.id ? "on" : "off" }))}
         onPressAction={({ nativeEvent }) => {
           const kind = kinds.find((item) => item.id === nativeEvent.event);
@@ -41,7 +43,7 @@ export function PullRequestActivityFilters({
       </Menu>
       <View className="flex-row items-center gap-3">
         <Menu
-          title="Show in activity"
+          title={uiText("Show in activity")}
           actions={[
             { id: "bots", title: "Bot comments", state: value.bots ? "on" : "off" },
             {
@@ -61,7 +63,9 @@ export function PullRequestActivityFilters({
             className="min-h-11 flex-row items-center gap-1.5 active:opacity-60"
           >
             {hiddenCount > 0 ? (
-              <Text className="text-xs text-foreground-muted">{hiddenCount} hidden</Text>
+              <Text className="text-xs text-foreground-muted">
+                {hiddenCount} {uiText("hidden")}
+              </Text>
             ) : null}
             <SymbolView
               name="line.3.horizontal.decrease"
@@ -72,7 +76,7 @@ export function PullRequestActivityFilters({
         </Menu>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={value.newestFirst ? "Newest first" : "Oldest first"}
+          accessibilityLabel={value.newestFirst ? uiText("Newest first") : uiText("Oldest first")}
           onPress={() => onChange({ ...value, newestFirst: !value.newestFirst })}
           className="h-11 flex-row items-center gap-1 active:opacity-60"
         >
@@ -82,7 +86,7 @@ export function PullRequestActivityFilters({
             tintColorClassName="accent-icon-muted"
           />
           <Text className="text-xs text-foreground-muted">
-            {value.newestFirst ? "Newest" : "Oldest"}
+            {value.newestFirst ? uiText("Newest") : uiText("Oldest")}
           </Text>
         </Pressable>
       </View>

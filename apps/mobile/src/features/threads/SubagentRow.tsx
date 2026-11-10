@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { scopeProjectRef, scopeThreadRef } from "@t3tools/client-runtime/environment";
 import {
   normalizeProviderAccentColor,
@@ -42,6 +43,7 @@ export function SubagentRow(props: {
   /** The task runs in a linked environment this app is connected to. */
   readonly canOpenRemote?: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const presentation = resolveSubagentRowPresentation(props.subagent, props.canOpenRemote);
   const detail = subagentCardDetail(presentation.detail);
   return (
@@ -75,7 +77,7 @@ export function SubagentRow(props: {
             </Text>
             {presentation.runsOn !== null ? (
               <Text numberOfLines={1} className="shrink text-xs text-foreground-muted">
-                on {presentation.runsOn}
+                {uiText("on")} {presentation.runsOn}
               </Text>
             ) : null}
           </View>

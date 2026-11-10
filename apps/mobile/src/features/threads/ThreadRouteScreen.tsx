@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import { useRememberThreadProject } from "./useRememberThreadProject";
 import { useOpenPullRequest } from "../../native/useOpenPullRequest";
@@ -130,13 +131,14 @@ function firstRouteParam(value: string | string[] | undefined): string | null {
 const InspectorHeaderShownContext = createContext(false);
 
 function ThreadRouteFallbackLayout(props: { readonly children: ReactNode }) {
+  const { text: uiText } = useUiLanguage();
   const goBack = useWorkspaceBackNavigation("threads");
   const inspectorHeaderShown = use(InspectorHeaderShownContext);
   return (
     <ThreadScreenFallback
       header={
         inspectorHeaderShown ? undefined : (
-          <AppBar title="Thread" onBackToList={goBack} hideBottomBorder />
+          <AppBar title={uiText("Thread")} onBackToList={goBack} hideBottomBorder />
         )
       }
     >
@@ -171,6 +173,7 @@ function ThreadUnavailableScreen(props: {
   readonly actionLabel: string;
   readonly onAction: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <ThreadRouteFallbackLayout>
       <ScrollView
@@ -184,7 +187,7 @@ function ThreadUnavailableScreen(props: {
         className="bg-screen flex-1 android:bg-transparent"
       >
         <EmptyState
-          title="Thread unavailable"
+          title={uiText("Thread unavailable")}
           detail="This thread is not available in the current mobile snapshot."
           actionLabel={props.actionLabel}
           onAction={props.onAction}
@@ -235,6 +238,7 @@ export function ThreadRouteScreen(props: ThreadRouteScreenProps) {
 }
 
 function LiveThreadRouteController(props: ThreadRouteScreenProps) {
+  const { text: uiText } = useUiLanguage();
   useAndroidWorkspaceBack("threads");
   const connectionsReady = useConnectionsReady();
   const { connectionState } = useRemoteConnectionStatus();
@@ -270,7 +274,7 @@ function LiveThreadRouteController(props: ThreadRouteScreenProps) {
     props.inspectorPresentation ? (
       <InspectorHeaderShownContext value>
         <ThreadInspectorHeader
-          title={selectedThread?.title ?? "Thread"}
+          title={selectedThread?.title ?? uiText("Thread")}
           {...props.inspectorPresentation}
         />
         {content}

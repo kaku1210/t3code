@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtom, useAtomValue } from "@effect/atom-react";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -28,6 +29,7 @@ export function OutdatedServerUpdateSection({
   readonly environmentId: EnvironmentId;
   readonly label: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const describe = useAtomCommand(describeOutdatedServer, { reportFailure: false });
   const update = useAtomCommand(updateOutdatedServer, { reportFailure: false });
   const state = useAtomValue(serverEnvironment.updateStateAtom(environmentId));
@@ -73,23 +75,23 @@ export function OutdatedServerUpdateSection({
   }
 
   return (
-    <SettingsSection title="T3 Code">
+    <SettingsSection title={uiText("T3 Code")}>
       <View className="gap-1 p-4">
         <Text className="text-base text-foreground">
-          {release ? `Version ${release.fromVersion}` : "Update required"}
+          {release ? `Version ${release.fromVersion}` : uiText("Update required")}
         </Text>
         <Text className="text-sm text-foreground-muted">
           {state.status === "running"
             ? state.stage === "resuming"
-              ? "Restarting and reconnecting…"
+              ? uiText("Restarting and reconnecting…")
               : state.stage === "installing"
-                ? "Installing update…"
-                : "Downloading update…"
+                ? uiText("Installing update…")
+                : uiText("Downloading update…")
             : release
               ? release.targetVersion
                 ? `Version ${release.targetVersion} is available.`
-                : "No newer version is available yet."
-              : "This app needs a newer version of T3 Code on this machine."}
+                : uiText("No newer version is available yet.")
+              : uiText("This app needs a newer version of T3 Code on this machine.")}
         </Text>
         {error || state.status === "failed" ? (
           <Text selectable accessibilityRole="alert" className="text-sm text-danger-foreground">
@@ -99,7 +101,7 @@ export function OutdatedServerUpdateSection({
       </View>
       <SettingsActionRow
         icon="arrow.clockwise"
-        label="Check for updates"
+        label={uiText("Check for updates")}
         disabled={busy}
         loading={checking}
         onPress={check}
@@ -107,7 +109,11 @@ export function OutdatedServerUpdateSection({
       {release?.targetVersion ? (
         <SettingsActionRow
           icon="arrow.up.circle"
-          label={state.status === "failed" ? "Retry update" : `Update to ${release.targetVersion}`}
+          label={
+            state.status === "failed"
+              ? uiText("Retry update")
+              : `Update to ${release.targetVersion}`
+          }
           disabled={busy}
           loading={state.status === "running"}
           onPress={requestUpdate}

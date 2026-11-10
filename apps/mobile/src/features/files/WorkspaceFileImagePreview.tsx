@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useId, useState } from "react";
 import { Image, Pressable, View } from "react-native";
 
@@ -14,6 +15,7 @@ function ResolvedWorkspaceFileImagePreview(props: {
   readonly uri: string;
   readonly actionsSource?: MediaActionsSource;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [loadError, setLoadError] = useState<string | null>(null);
   const [preview, setPreview] = useState<FilePreviewSource | null>(null);
   const sourceIdentifier = useId();
@@ -27,7 +29,7 @@ function ResolvedWorkspaceFileImagePreview(props: {
           accessibilityRole="button"
           accessibilityLabel={`Open full-screen preview of ${props.accessibilityLabel}`}
           accessibilityHint={
-            mediaActions.actions.length > 0 ? "Touch and hold for media actions" : undefined
+            mediaActions.actions.length > 0 ? uiText("Touch and hold for media actions") : undefined
           }
           disabled={loadError !== null}
           className="flex-1 p-4 active:bg-subtle-strong"
@@ -60,7 +62,7 @@ function ResolvedWorkspaceFileImagePreview(props: {
           pointerEvents="none"
           className="absolute inset-0 items-center justify-center bg-card px-6"
         >
-          <EmptyState title="Image unavailable" detail={loadError} />
+          <EmptyState title={uiText("Image unavailable")} detail={loadError} />
         </View>
       ) : null}
       <FilePreviewModal source={preview} onRequestClose={() => setPreview(null)} />

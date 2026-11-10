@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { SheetCloseButton } from "../../components/ui/SheetHeader";
 import { Button } from "../../components/ui/Button";
 import * as Dialog from "../../components/ui/Dialog";
@@ -88,6 +89,7 @@ export function DevicePreviewScreen({
   readonly onMaximize?: (deviceKey: string | null) => void;
   readonly initialDeviceKey?: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const embedded = onMaximize !== undefined;
   const insets = useSafeAreaInsets();
   // In a pane the stream sits below the pane's bar, which content otherwise slides under.
@@ -271,7 +273,7 @@ export function DevicePreviewScreen({
       {embedded ? (
         <>
           <AppBar
-            title={preview?.name ?? "Devices"}
+            title={preview?.name ?? uiText("Devices")}
             actions={[
               {
                 accessibilityLabel: "Maximize device",
@@ -299,7 +301,7 @@ export function DevicePreviewScreen({
                 {state.error}
               </AppText>
               <View className="items-center">
-                <Button label="Retry" tone="secondary" onPress={state.refresh} />
+                <Button label={uiText("Retry")} tone="secondary" onPress={state.refresh} />
               </View>
             </>
           ) : focused && foreground ? (
@@ -313,7 +315,7 @@ export function DevicePreviewScreen({
           style={{ paddingBottom: Math.max(insets.bottom, 8) }}
         >
           <ControlPill
-            accessibilityLabel="Home"
+            accessibilityLabel={uiText("Home")}
             icon="house"
             disabled={!inputConnected}
             onPress={pressHome}
@@ -329,19 +331,22 @@ export function DevicePreviewScreen({
         >
           {inputConnected ? (
             <Pressable
-              accessibilityLabel="Hide device controls"
+              accessibilityLabel={uiText("Hide device controls")}
               className="absolute inset-0 bg-black/30"
               onPress={() => setControlsVisible(false)}
             />
           ) : null}
           <View className="px-3" style={{ paddingTop: Math.max(insets.top, 12) }}>
             <GlassSurface className="flex-row items-center gap-1 p-1">
-              <SheetCloseButton accessibilityLabel="Close device preview" onClose={onClose} />
+              <SheetCloseButton
+                accessibilityLabel={uiText("Close device preview")}
+                onClose={onClose}
+              />
               <AppText numberOfLines={1} className="flex-1 text-center font-t3-medium text-base">
-                {preview?.name ?? "Devices"}
+                {preview?.name ?? uiText("Devices")}
               </AppText>
               <ControlPill
-                accessibilityLabel="Home"
+                accessibilityLabel={uiText("Home")}
                 icon="house"
                 disabled={!inputConnected}
                 onPress={pressHome}
@@ -360,9 +365,12 @@ export function DevicePreviewScreen({
           }}
         >
           <GlassSurface className="flex-row items-center gap-1 p-1">
-            <SheetCloseButton accessibilityLabel="Close device preview" onClose={onClose} />
+            <SheetCloseButton
+              accessibilityLabel={uiText("Close device preview")}
+              onClose={onClose}
+            />
             <ControlPill
-              accessibilityLabel="Show device controls"
+              accessibilityLabel={uiText("Show device controls")}
               icon="chevron.down"
               onPress={() => setControlsVisible(true)}
             />
@@ -374,18 +382,19 @@ export function DevicePreviewScreen({
 }
 
 function DeviceOptionsMenu({ items }: { readonly items: ReadonlyArray<AppBarMenuItem> }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <Menu
       actions={androidHeaderMenuActions(items)}
       isAnchoredToRight
-      title="Device options"
+      title={uiText("Device options")}
       onPressAction={({ nativeEvent }) => {
         const action = findHeaderMenuAction(items, nativeEvent.event);
         if (action && !action.disabled) action.onPress();
       }}
     >
       <Pressable
-        accessibilityLabel="Device options"
+        accessibilityLabel={uiText("Device options")}
         accessibilityRole="button"
         className="size-11 items-center justify-center rounded-full bg-subtle"
       >
@@ -406,6 +415,7 @@ function OpenDevicePreview({
   readonly streamRef: RefObject<DeviceStreamRef | null>;
   readonly onInputConnected: (connected: boolean) => Promise<void>;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { session } = preview;
   const { themeVariables } = useAppearancePreferences();
   const [viewer] = useState(uuidv4);
@@ -437,13 +447,15 @@ function OpenDevicePreview({
             {error}
           </AppText>
           <View className="items-center">
-            <Button label="Retry" tone="secondary" onPress={refresh} />
+            <Button label={uiText("Retry")} tone="secondary" onPress={refresh} />
           </View>
         </>
       ) : (
         <>
           <AppActivityIndicator color={themeVariables["--color-icon"]} />
-          <AppText className="text-sm text-foreground-muted">Connecting to device...</AppText>
+          <AppText className="text-sm text-foreground-muted">
+            {uiText("Connecting to device...")}
+          </AppText>
         </>
       )}
     </View>

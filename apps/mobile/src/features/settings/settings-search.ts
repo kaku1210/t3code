@@ -1,4 +1,6 @@
 import { foldSearchQuery, rankSearchItems, scoreSearchTerms } from "@t3tools/shared/paletteSearch";
+import type { UiLanguage } from "@t3tools/shared/uiLanguage";
+import { translateMobileText } from "../../i18n/messages";
 
 import type { SettingsPageTarget } from "./components/settings-page-targets";
 
@@ -26,6 +28,12 @@ const SETTINGS_SEARCH_TERMS = {
     "terminal",
     "word break",
     "math",
+    "language",
+    "语言",
+    "中文",
+    "英文",
+    "主题",
+    "字体",
   ],
   SettingsNavigation: ["tabs", "tab order", "reorder", "hide tabs"],
   SettingsKeyboard: ["return key", "send message", "new line", "hardware keyboard"],
@@ -69,7 +77,20 @@ const SETTINGS_SEARCH_TERMS = {
     "auto-resume",
     "thread behavior",
   ],
-  SettingsFollowUp: ["follow-ups", "queue", "steer", "while the agent is running"],
+  SettingsFollowUp: [
+    "input placeholder",
+    "输入框提示文案",
+    "快捷提示",
+    "follow-ups",
+    "queue",
+    "steer",
+    "while the agent is running",
+    "next prompt suggestions",
+    "next step",
+    "下一步建议",
+    "推荐",
+    "建议模型",
+  ],
   SettingsArchive: ["archive", "archived", "restore", "unarchive"],
   SettingsProviderAccounts: [
     "provider accounts",
@@ -144,7 +165,7 @@ export interface SettingsSearchSection<Row extends SettingsSearchRow> {
 export function filterSettingsSections<
   Row extends SettingsSearchRow,
   Section extends SettingsSearchSection<Row>,
->(sections: readonly Section[], query: string): Section[] {
+>(sections: readonly Section[], query: string, language: UiLanguage = "en"): Section[] {
   const normalizedQuery = foldSearchQuery(query);
   const rows = sections.flatMap((section) =>
     section.rows.map((row) => ({ row, section: section.title })),
@@ -154,7 +175,12 @@ export function filterSettingsSections<
         rankSearchItems(rows, ({ row, section }, options) =>
           scoreSearchTerms(
             normalizedQuery,
-            [row.label, ...(section ? [section] : []), ...(termsById.get(row.id) ?? [])],
+            [
+              row.label,
+              translateMobileText(language, row.label),
+              ...(section ? [section, translateMobileText(language, section)] : []),
+              ...(termsById.get(row.id) ?? []),
+            ],
             options,
           ),
         ).map(({ item }) => item.row),

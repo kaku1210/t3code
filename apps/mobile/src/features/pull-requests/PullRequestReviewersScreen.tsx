@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { AppBar, type AppBarSearch } from "../../components/ui/AppBar";
 import { AsyncResult } from "effect/reactivity";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
@@ -38,6 +39,7 @@ const TRUNCATED_LABELS: Record<ReviewerTruncation, (error: string | null) => str
 };
 
 export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequestParams>) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const contentTopInset = useContentTopInset();
   const listRef = useRef<FlatList<PullRequestReviewerCandidate>>(null);
@@ -143,7 +145,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
   return (
     <View className="flex-1 bg-sheet">
       <AppBar
-        title="Request review"
+        title={uiText("Request review")}
         subtitle={`#${route.params.number} · ${route.params.repository}`}
         onClose={() => navigation.goBack()}
         closeAccessibilityLabel="Close request review"
@@ -163,11 +165,13 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
           ListHeaderComponent={
             <View className="gap-3 px-4 py-4">
               <Text className="text-xs text-foreground-muted">
-                Tap someone to request a review. Tap a requested reviewer to remove the request.
+                {uiText(
+                  "Tap someone to request a review. Tap a requested reviewer to remove the request.",
+                )}
               </Text>
               {!allowed ? (
                 <Text className="text-xs text-foreground-muted">
-                  Requesting reviews requires write access and an open {singular}.
+                  {uiText("Requesting reviews requires write access and an open")} {singular}.
                 </Text>
               ) : null}
               {error ? (
@@ -182,7 +186,7 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
             return (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`${item.isRequested ? "Remove review request from" : "Request review from"} ${item.login}${item.kind === "team" ? " team" : ""}`}
+                accessibilityLabel={`${item.isRequested ? uiText("Remove review request from") : uiText("Request review from")} ${item.login}${item.kind === "team" ? uiText(" team") : ""}`}
                 accessibilityState={{ disabled: !allowed || pending !== null }}
                 disabled={!allowed || pending !== null}
                 onPress={() => void update(item)}
@@ -195,14 +199,14 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                   </Text>
                   <Text className="text-xs text-foreground-muted" numberOfLines={1}>
                     {item.login}
-                    {item.kind === "team" ? " · Team" : ""}
+                    {item.kind === "team" ? uiText(" · Team") : ""}
                   </Text>
                 </View>
                 {pending === id ? (
                   <AppActivityIndicator />
                 ) : item.isRequested ? (
                   <View className="flex-row items-center gap-1.5">
-                    <Text className="text-xs text-foreground-muted">Requested</Text>
+                    <Text className="text-xs text-foreground-muted">{uiText("Requested")}</Text>
                     <SymbolView name="checkmark" size={14} tintColorClassName="accent-icon" />
                   </View>
                 ) : (
@@ -219,17 +223,17 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                 <EmptyState
                   title={
                     queryError
-                      ? "Couldn't load reviewers"
+                      ? uiText("Couldn't load reviewers")
                       : query.trim()
-                        ? "No matching reviewers"
-                        : "No reviewers available"
+                        ? uiText("No matching reviewers")
+                        : uiText("No reviewers available")
                   }
                   detail={queryError ?? "Search people and teams with access to this repository."}
                   variant="plain"
                 />
                 {queryError ? (
                   <Button
-                    label="Retry"
+                    label={uiText("Retry")}
                     onPress={result.error ? result.refresh : searchResult.refresh}
                   />
                 ) : null}
@@ -262,11 +266,11 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
           ) : (
             <>
               <Text className="text-sm text-foreground-muted">
-                This provider accepts a reviewer ID but cannot list candidates.
+                {uiText("This provider accepts a reviewer ID but cannot list candidates.")}
               </Text>
               <TextInput
-                accessibilityLabel="Reviewer ID"
-                placeholder="Reviewer login or ID"
+                accessibilityLabel={uiText("Reviewer ID")}
+                placeholder={uiText("Reviewer login or ID")}
                 placeholderTextColorClassName="accent-foreground-muted"
                 value={query}
                 onChangeText={search}
@@ -275,13 +279,13 @@ export function PullRequestReviewersScreen({ route }: StaticScreenProps<PullRequ
                 className="min-h-12 rounded-xl bg-grouped-card px-3 text-base"
               />
               <Button
-                label="Request review"
+                label={uiText("Request review")}
                 fullWidth
                 disabled={!allowed || !query.trim() || pending !== null}
                 onPress={() => void update({ id: query.trim(), kind: "user", isRequested: false })}
               />
               <Button
-                label="Remove review request"
+                label={uiText("Remove review request")}
                 fullWidth
                 tone="text"
                 disabled={!allowed || !query.trim() || pending !== null}

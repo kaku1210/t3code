@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useState } from "react";
 import { View } from "react-native";
 import { WebView } from "react-native-webview";
@@ -21,6 +22,7 @@ export function WorkspaceFileWebPreview(props: { readonly uri: string | null }) 
 }
 
 function DocumentWebPreview(props: { readonly uri: string }) {
+  const { text: uiText } = useUiLanguage();
   const headerInset = useContentTopInset();
   const [loadProgress, setLoadProgress] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -46,7 +48,7 @@ function DocumentWebPreview(props: { readonly uri: string }) {
           <PdfPreview key={linkedPdf} uri={linkedPdf} />
           <SafeAreaView edges={["bottom"]} className="border-t border-border px-4 py-2">
             <ControlPill
-              label="Back to document"
+              label={uiText("Back to document")}
               variant="pill"
               onPress={() => setLinkedPdf(null)}
             />
@@ -95,7 +97,9 @@ function DocumentWebPreview(props: { readonly uri: string }) {
           {loadProgress > 0 && loadProgress < 1 ? <LoadingStrip progress={loadProgress} /> : null}
           {loadError ? (
             <View className="border-b border-border bg-card px-4 py-2">
-              <Text className="text-xs font-t3-bold text-foreground">Preview failed</Text>
+              <Text className="text-xs font-t3-bold text-foreground">
+                {uiText("Preview failed")}
+              </Text>
               <Text className="mt-0.5 text-xs leading-snug text-foreground-muted">{loadError}</Text>
             </View>
           ) : null}

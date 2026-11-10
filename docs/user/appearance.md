@@ -28,6 +28,10 @@ On desktop and web, choose **Follow system**, **English**, or **简体中文** i
 and is saved for this device or browser. **Follow system** uses Simplified Chinese for
 Simplified Chinese system locales and English for other locales.
 
+On mobile, the same choices are under **Settings → Appearance → Interface language**.
+The language is saved on the phone independently of desktop and connected environments.
+Agent messages, project names, code, and remote error details keep their original content.
+
 ## Composer context
 
 Git-backed projects show branch and worktree controls below the composer while you create a thread.

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { resolveFilesystemReadAccess } from "@t3tools/client-runtime/state/filesystem";
 import { environmentSession } from "../../state/session";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -20,6 +21,7 @@ export function ThreadFileNavigatorPane(props: {
   readonly selectedPath: string | null;
   readonly onSelectFile: (path: string) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const { themeAppearance: highlightTheme } = useAppearancePreferences();
   const fileAccessSession = useEnvironmentQuery(
@@ -80,7 +82,7 @@ export function ThreadFileNavigatorPane(props: {
   return (
     <View className="flex-1 ios:bg-sheet android:bg-header">
       <AppBar
-        title="Files"
+        title={uiText("Files")}
         subtitle={props.projectName}
         search={{
           value: searchQuery,

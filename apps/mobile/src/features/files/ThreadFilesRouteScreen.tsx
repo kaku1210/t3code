@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { formatFilePathForClipboard } from "@t3tools/client-runtime/media-actions";
 import { resolvePathLinkTarget } from "@t3tools/shared/fileLinks";
 import { resolveFilesystemReadAccess } from "@t3tools/client-runtime/state/filesystem";
@@ -72,9 +73,10 @@ function FilesBrowserHeader(props: {
   readonly onRefresh: () => void;
   readonly onBack: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <AppBar
-      title="Files"
+      title={uiText("Files")}
       subtitle={props.projectName}
       onBack={props.onBack}
       hideBottomBorder
@@ -215,6 +217,7 @@ function FileContent(props: {
   readonly truncated: boolean;
   readonly onRefresh?: () => Promise<void> | void;
 }) {
+  const { text: uiText } = useUiLanguage();
   // Reopening a mutable host file must not reuse a poster from an earlier visit.
   const thumbnailInstanceId = useId();
   const barOverlap = useContentTopInset();
@@ -280,7 +283,7 @@ function FileContent(props: {
   if (props.fileError && props.fileContents === null) {
     return (
       <View className="flex-1 items-center justify-center bg-sheet px-6">
-        <EmptyState title="File unavailable" detail={props.fileError} />
+        <EmptyState title={uiText("File unavailable")} detail={props.fileError} />
       </View>
     );
   }
@@ -292,7 +295,7 @@ function FileContent(props: {
   return (
     <View className="flex-1 bg-sheet" style={{ paddingTop: reservedHeaderInset }}>
       {props.truncated ? (
-        <FilePreviewNotice title="Partial file">
+        <FilePreviewNotice title={uiText("Partial file")}>
           Preview limited to the first 1 MB of a truncated file.
         </FilePreviewNotice>
       ) : null}
@@ -378,9 +381,10 @@ function FilesUnavailable({
   detail?: string;
   onBack: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <View className="flex-1 bg-sheet">
-      <AppBar title="Files" onBack={onBack} onBackToList={onBack} hideBottomBorder />
+      <AppBar title={uiText("Files")} onBack={onBack} onBackToList={onBack} hideBottomBorder />
       <ScreenContent>
         <View className="flex-1 items-center justify-center px-6">
           <EmptyState title={title} detail={detail} />
@@ -575,6 +579,7 @@ export function ThreadFilesTreeScreen(props: ThreadFilesRouteScreenProps) {
 }
 
 export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const { fileInspector } = useAdaptiveWorkspaceLayout();
   const { appearance, setCodeWordBreak } = useAppearancePreferences();
@@ -917,7 +922,7 @@ export function ThreadFileScreen(props: ThreadFileRouteScreenProps) {
   if (relativePath === null) {
     return withInspector(
       <FilesUnavailable
-        title="File unavailable"
+        title={uiText("File unavailable")}
         detail="This file path is invalid."
         onBack={handleBack}
       />,

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -50,6 +51,7 @@ export function WorkspaceToolbar(props: {
   readonly sidebar?: boolean;
   readonly onNewTask: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const workspace = useWorkspaceTabs();
   const input = useRef<TextInputInstance>(null);
   const [focusRequest, setFocusRequest] = useState(0);
@@ -130,7 +132,12 @@ export function WorkspaceToolbar(props: {
                 focusSearch();
               }}
             />
-            <ToolbarButton label="Cancel search" icon="xmark" size={48} onPress={cancelSearch} />
+            <ToolbarButton
+              label={uiText("Cancel search")}
+              icon="xmark"
+              size={48}
+              onPress={cancelSearch}
+            />
           </View>
         ) : null}
         {showNavigation ? <WorkspaceDock onNewTask={props.onNewTask} /> : null}

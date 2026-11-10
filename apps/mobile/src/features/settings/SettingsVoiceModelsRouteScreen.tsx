@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import type { StaticScreenProps } from "@react-navigation/native";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -17,6 +18,7 @@ import { useVoiceModels, VoiceModelRow } from "./VoiceModelSection";
 export function SettingsVoiceModelsRouteScreen({
   route,
 }: StaticScreenProps<{ readonly environmentId: EnvironmentId }>) {
+  const { text: uiText } = useUiLanguage();
   const { environments } = useEnvironments();
   const label =
     environments.find((environment) => environment.environmentId === route.params.environmentId)
@@ -46,8 +48,8 @@ export function SettingsVoiceModelsRouteScreen({
     );
   return (
     <PullRequestSearchSheet
-      title="Transcription models"
-      placeholder="Search models or languages"
+      title={uiText("Transcription models")}
+      placeholder={uiText("Search models or languages")}
       closeAccessibilityLabel="Close transcription models"
       clearAccessibilityLabel="Clear model search"
       query={query}
@@ -67,7 +69,7 @@ export function SettingsVoiceModelsRouteScreen({
           ListHeaderComponent={
             voice.canManage ? undefined : (
               <Text className="pb-3 text-xs text-foreground-muted">
-                This connection can’t change settings on {label}.
+                {uiText("This connection can’t change settings on")} {label}.
               </Text>
             )
           }
@@ -87,7 +89,7 @@ export function SettingsVoiceModelsRouteScreen({
               <AppActivityIndicator className="my-8" />
             ) : (
               <EmptyState
-                title={needle ? "No models match" : "No transcription models"}
+                title={needle ? uiText("No models match") : uiText("No transcription models")}
                 detail={
                   needle ? "Try another name or language." : `${label} has no models to list.`
                 }

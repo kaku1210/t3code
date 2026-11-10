@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppText as Text } from "../../components/ui/AppText";
@@ -62,6 +63,7 @@ export function PullRequestCompletionSuggestions({
 }: {
   readonly completions: ReturnType<typeof usePullRequestCompletions>;
 }) {
+  const { text: uiText } = useUiLanguage();
   if (completions.kind === null) return null;
   const copy = COPY[completions.kind];
   return (
@@ -96,7 +98,9 @@ export function PullRequestCompletionSuggestions({
       ) : (
         <View className="px-3.5 py-2.5">
           <Text className="text-xs text-foreground-tertiary">
-            {copy[completions.isLoading ? "pending" : completions.failed ? "failed" : "none"]}
+            {uiText(
+              copy[completions.isLoading ? "pending" : completions.failed ? "failed" : "none"],
+            )}
           </Text>
         </View>
       )}

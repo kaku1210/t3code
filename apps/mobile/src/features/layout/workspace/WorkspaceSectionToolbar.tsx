@@ -1,10 +1,11 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { selectedNavigationTab, visibleNavigationTabs } from "./navigation-tab-order";
 import { Toolbar } from "../../../components/ui/Toolbar";
 import { useControlTheme } from "../../../components/ui/useControlTheme";
 import { useDeviceType } from "../../../native/native-layout-metrics";
 import {
   NAVIGATION_TAB_ICONS,
-  WORKSPACE_TAB_LABELS,
+  useWorkspaceTabLabels,
   useNavigationTabOrder,
   useHiddenNavigationTabs,
 } from "./navigation-tabs";
@@ -15,6 +16,8 @@ import { useCompactWorkspaceTabs, useSidebarWorkspaceTabs } from "./useSystemWor
 const PULL_REQUEST_ICON = require("../../../../assets/icons/pull-request.png");
 
 export function WorkspaceTabToolbarButtons() {
+  const tabLabels = useWorkspaceTabLabels();
+  const { text: uiText } = useUiLanguage();
   const order = useNavigationTabOrder();
   const hidden = useHiddenNavigationTabs();
   const workspace = useWorkspaceTabs()!;
@@ -32,7 +35,7 @@ export function WorkspaceTabToolbarButtons() {
         <Toolbar.Button
           key={tab}
           identifier={`workspace-tab-${tab}`}
-          accessibilityLabel={WORKSPACE_TAB_LABELS[tab]}
+          accessibilityLabel={tabLabels[tab]}
           icon={
             tab === "pullRequests"
               ? { type: "image", source: PULL_REQUEST_ICON, tinted: true }
@@ -44,7 +47,7 @@ export function WorkspaceTabToolbarButtons() {
       ))}
       <Toolbar.Button
         identifier="workspace-tab-settings"
-        accessibilityLabel="Settings"
+        accessibilityLabel={uiText("Settings")}
         icon="gearshape"
         tintColor={selected === "settings" ? selectedTint : undefined}
         onPress={() => selectTab("settings")}
@@ -60,6 +63,7 @@ export function WorkspaceSectionToolbar({
   readonly onNewTask: () => void;
   readonly showCompose?: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const sidebarTabs = useSidebarWorkspaceTabs();
   const compactTabs = useCompactWorkspaceTabs();
   const deviceType = useDeviceType();
@@ -68,7 +72,7 @@ export function WorkspaceSectionToolbar({
       {showCompose && sidebarTabs !== "picker" && deviceType !== "duo-unfolded" && !compactTabs ? (
         <Toolbar placement="right">
           <Toolbar.Button
-            accessibilityLabel="New chat"
+            accessibilityLabel={uiText("New chat")}
             icon="square.and.pencil"
             onPress={onNewTask}
           />

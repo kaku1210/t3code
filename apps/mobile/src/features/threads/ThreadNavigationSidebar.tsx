@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useActiveNewTask } from "../../state/active-new-task";
 import { ThreadUndoNotice } from "../home/ThreadUndoNotice";
 import { useAndroidControlSizing } from "../../components/ui/useAndroidControlSizing";
@@ -110,6 +111,7 @@ export function ThreadNavigationSidebar(props: ThreadNavigationSidebarProps) {
 }
 
 function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
+  const { text: uiText } = useUiLanguage();
   const floatingTabsEnabled = useAndroidFloatingTabs();
   const { themeVariables: materialTheme } = useAppearancePreferences();
   const drawerColor = materialTheme["--color-drawer"];
@@ -525,7 +527,7 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
   };
   const header = (
     <WorkspaceListHeader
-      accessibilityLabel="T3 Code, Threads"
+      accessibilityLabel={uiText("T3 Code, Threads")}
       onOpenEnvironments={props.onOpenEnvironmentSettings}
       onOpenSettings={props.onOpenSettings}
       search={{
@@ -561,16 +563,16 @@ function ThreadNavigationSidebarPane(props: ThreadNavigationSidebarProps) {
       }
     >
       {catalogState.isLoadingConnections
-        ? "Loading threads…"
+        ? uiText("Loading threads…")
         : Platform.OS === "android" && !catalogState.hasConnections
-          ? "No environments connected"
+          ? uiText("No environments connected")
           : props.searchQuery.trim().length > 0
             ? threadSearch.isPending
-              ? "Searching thread messages…"
-              : "No matching threads"
+              ? uiText("Searching thread messages…")
+              : uiText("No matching threads")
             : selectedProjectScope !== null
               ? `No threads in ${selectedProjectScope.title}`
-              : "No threads yet"}
+              : uiText("No threads yet")}
     </Text>
   );
 

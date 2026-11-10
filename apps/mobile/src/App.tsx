@@ -1,5 +1,7 @@
 import { installPermissionUpdateNotice } from "./features/connection/permissionUpdateNotice";
 import { installComposerAttachmentUploads } from "./state/composer-attachment-uploads";
+import { installThreadPrefetcher } from "./state/thread-prefetch";
+import { UiLanguageProvider } from "./i18n/UiLanguageProvider";
 import { installThreadOutboxDelivery } from "./state/threadOutboxDelivery";
 import * as Linking from "expo-linking";
 import * as SplashScreen from "expo-splash-screen";
@@ -192,6 +194,7 @@ const appServiceDisposers = [
   installPermissionUpdateNotice(),
   installThreadOutboxDelivery(),
   installComposerAttachmentUploads(),
+  installThreadPrefetcher(),
   startIncomingShareInbox(),
   installAgentNotificationNavigation(linkToAppPath),
   installAppShortcuts(linkToAppPath),
@@ -216,11 +219,13 @@ function SplashScreenCoordinator() {
 export default function App() {
   return (
     <RegistryContext.Provider value={appAtomRegistry}>
-      <CloudAuthProvider>
-        <AppearancePreferencesProvider>
-          <AppContent />
-        </AppearancePreferencesProvider>
-      </CloudAuthProvider>
+      <UiLanguageProvider>
+        <CloudAuthProvider>
+          <AppearancePreferencesProvider>
+            <AppContent />
+          </AppearancePreferencesProvider>
+        </CloudAuthProvider>
+      </UiLanguageProvider>
     </RegistryContext.Provider>
   );
 }

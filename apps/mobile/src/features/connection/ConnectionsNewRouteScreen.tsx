@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ListRow } from "../../components/ui/ListRow";
 import * as Dialog from "../../components/ui/Dialog";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -62,6 +63,7 @@ function PairingForm({
   readonly routePairingUrl: string;
   readonly routeFor: EnvironmentId | undefined;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { connectionPairingUrl, onChangeConnectionPairingUrl, onConnectPress } =
     useRemoteConnections();
   const navigation = useNavigation();
@@ -176,7 +178,7 @@ function PairingForm({
 
   return (
     <SettingsScreen
-      title="Add environment"
+      title={uiText("Add environment")}
       actions={[
         {
           accessibilityLabel: connecting ? "Connecting" : "Add environment",
@@ -212,7 +214,9 @@ function PairingForm({
           />
 
           <View collapsable={false} className="gap-2">
-            <Text className="px-4 text-sm font-t3-medium text-foreground-muted">Or enter it</Text>
+            <Text className="px-4 text-sm font-t3-medium text-foreground-muted">
+              {uiText("Or enter it")}
+            </Text>
             <View
               collapsable={false}
               className={cn(
@@ -221,7 +225,7 @@ function PairingForm({
               )}
             >
               <PairingInputRow
-                label="Address"
+                label={uiText("Address")}
                 keyboardType="url"
                 placeholder="192.168.1.100:3773"
                 value={hostInput}
@@ -229,8 +233,8 @@ function PairingForm({
               />
               <View className="ml-4 border-t border-border-subtle" />
               <PairingInputRow
-                label="Code"
-                placeholder="Pairing code"
+                label={uiText("Code")}
+                placeholder={uiText("Pairing code")}
                 returnKeyType="go"
                 value={codeInput}
                 onChangeText={handleCodeChange}
@@ -247,7 +251,9 @@ function PairingForm({
               )}
             >
               {pairingConnectionError ??
-                "For machines on your local network or tailnet. The machine keeps its own provider credentials."}
+                uiText(
+                  "For machines on your local network or tailnet. The machine keeps its own provider credentials.",
+                )}
             </Text>
           </View>
 
@@ -268,11 +274,12 @@ function PairingScanCard(props: {
   readonly onScan: (result: { readonly data: string }) => void;
   readonly onScanPress: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const light = useAppearancePreferences().themeAppearance === "light";
   return (
     <Pressable
       accessibilityRole={props.cameraActive ? undefined : "button"}
-      accessibilityLabel={props.cameraActive ? undefined : "Scan QR code"}
+      accessibilityLabel={props.cameraActive ? undefined : uiText("Scan QR code")}
       disabled={props.cameraActive}
       onPress={props.onScanPress}
       className={cn(
@@ -337,13 +344,13 @@ function PairingScanCard(props: {
               <Text
                 className={cn("font-t3-medium text-sm", light ? "text-black/70" : "text-white/80")}
               >
-                Tap to scan
+                {uiText("Tap to scan")}
               </Text>
             </>
           )}
         </View>
         <Text className={cn("text-center text-sm", light ? "text-black/70" : "text-white/80")}>
-          Scan the code from t3 pair or desktop Connections settings
+          {uiText("Scan the code from t3 pair or desktop Connections settings")}
         </Text>
       </View>
     </Pressable>
@@ -351,6 +358,7 @@ function PairingScanCard(props: {
 }
 
 function T3ConnectSection() {
+  const { text: uiText } = useUiLanguage();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const navigation = useNavigation();
   const { connectedEnvironments, onSetEnvironmentEnabled, onRemoveEnvironmentPress } =
@@ -363,7 +371,7 @@ function T3ConnectSection() {
   return (
     <View collapsable={false} className="gap-2">
       <Text className="px-4 text-sm font-t3-medium text-foreground-muted">
-        Or use the managed relay
+        {uiText("Or use the managed relay")}
       </Text>
       {isSignedIn ? (
         <CloudEnvironmentRows
@@ -374,8 +382,8 @@ function T3ConnectSection() {
         />
       ) : (
         <ListRow
-          label="Sign in to T3 Connect"
-          description="Reach your machines from anywhere, no network setup."
+          label={uiText("Sign in to T3 Connect")}
+          description={uiText("Reach your machines from anywhere, no network setup.")}
           disabled={!isLoaded}
           onPress={() => navigation.navigate("SettingsAuth")}
         />

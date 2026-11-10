@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Pressable, View } from "react-native";
 
 import { NativeStackScreenOptions } from "../../native/StackHeader";
@@ -11,10 +12,13 @@ import { useControlTheme } from "./useControlTheme";
 import type { SheetCloseButtonProps, SheetHeaderProps } from "./SheetHeader.types";
 
 export function SheetCloseButton(props: SheetCloseButtonProps) {
+  const { text: uiText } = useUiLanguage();
   return (
     <IconButton
       icon="xmark"
-      accessibilityLabel={props.accessibilityLabel ?? (props.onCancel ? "Cancel" : "Close")}
+      accessibilityLabel={
+        props.accessibilityLabel ?? (props.onCancel ? uiText("Cancel") : uiText("Close"))
+      }
       disabled={props.disabled}
       onPress={props.onCancel ?? props.onClose}
     />

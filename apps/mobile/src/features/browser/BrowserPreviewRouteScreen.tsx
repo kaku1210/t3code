@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { SheetHeader } from "../../components/ui/SheetHeader";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import * as Dialog from "../../components/ui/Dialog";
@@ -55,6 +56,7 @@ function BrowserPreviewScreen({
   readonly initialTabId: string | null;
   readonly onClose: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const { themeVariables } = useAppearancePreferences();
   const prepared = usePreparedConnection(environmentId);
@@ -92,9 +94,9 @@ function BrowserPreviewScreen({
   return (
     <View className="flex-1 bg-sheet" style={{ paddingBottom: insets.bottom }}>
       <SheetHeader
-        title={tab ? browserTabTitle(tab) : "Browser"}
+        title={tab ? browserTabTitle(tab) : uiText("Browser")}
         onClose={onClose}
-        accessibilityLabel="Close browser"
+        accessibilityLabel={uiText("Close browser")}
         actions={
           // Android WebView cannot play video in picture in picture.
           Platform.OS === "ios" &&
@@ -188,6 +190,7 @@ function BrowserAddressBar({
   readonly onCommand: PreviewStreamRef["command"];
   readonly onPaste: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const url = browserTabUrl(tab);
   const [draft, setDraft] = useState<string | null>(null);
   const submit = () => {
@@ -203,24 +206,24 @@ function BrowserAddressBar({
     <View className="flex-row items-center gap-1 px-2 pb-2">
       <ControlPill
         icon="chevron.left"
-        accessibilityLabel="Back"
+        accessibilityLabel={uiText("Back")}
         disabled={!ready || !tab.canGoBack}
         onPress={() => onCommand({ type: "history", delta: -1 })}
       />
       <ControlPill
         icon="chevron.right"
-        accessibilityLabel="Forward"
+        accessibilityLabel={uiText("Forward")}
         disabled={!ready || !tab.canGoForward}
         onPress={() => onCommand({ type: "history", delta: 1 })}
       />
       <TextInput
-        accessibilityLabel="Address"
+        accessibilityLabel={uiText("Address")}
         editable={ready}
         value={draft ?? url}
         onChangeText={setDraft}
         onBlur={() => setDraft(null)}
         onSubmitEditing={submit}
-        placeholder="Enter a URL"
+        placeholder={uiText("Enter a URL")}
         placeholderTextColorClassName="accent-placeholder"
         autoCapitalize="none"
         autoCorrect={false}
@@ -232,7 +235,7 @@ function BrowserAddressBar({
       />
       <ControlPill
         icon="arrow.clockwise"
-        accessibilityLabel="Reload page"
+        accessibilityLabel={uiText("Reload page")}
         disabled={!ready}
         onPress={() => onCommand({ type: "reload" })}
       />

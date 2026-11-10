@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { View } from "react-native";
 
@@ -38,12 +39,13 @@ export function AttachmentDocumentBody(props: {
   readonly nativeError: string | null;
   readonly onOpenNative: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { document } = props;
   if (document.error) {
     return (
       <View className="flex-1 items-center justify-center bg-sheet px-6">
         <EmptyState
-          title="File unavailable"
+          title={uiText("File unavailable")}
           detail={document.error}
           actionLabel="Try again"
           onAction={document.retry}
@@ -63,7 +65,7 @@ export function AttachmentDocumentBody(props: {
     return (
       <View className="flex-1 bg-sheet">
         {content.truncated ? (
-          <FilePreviewNotice title="Partial file">
+          <FilePreviewNotice title={uiText("Partial file")}>
             Preview limited to the first 1 MB. Save or share the file to read it in full.
           </FilePreviewNotice>
         ) : null}
@@ -98,7 +100,7 @@ export function AttachmentDocumentBody(props: {
   return (
     <View className="flex-1 items-center justify-center bg-sheet px-6">
       <EmptyState
-        title="No preview for this file"
+        title={uiText("No preview for this file")}
         detail={
           props.nativeError ??
           "No app on this device can show this format. Save or share it to open it elsewhere."

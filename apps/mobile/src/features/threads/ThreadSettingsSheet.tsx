@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import {
   getPromptControlledTraits,
   getTraitSelectChange,
@@ -818,6 +819,7 @@ function ThreadSettingsOptionsItem(props: {
   readonly bottomInset: number;
   readonly onOpenSubmenu: (submenu: ThreadSettingsSubmenuPage) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const session = useThreadSettingsSession();
   const configs = useAtomValue(environmentServerConfigsAtom);
@@ -830,7 +832,9 @@ function ThreadSettingsOptionsItem(props: {
   return (
     <View style={{ paddingBottom: insets.bottom + props.bottomInset + 12 }}>
       <ChatGptSharingStatus provider={selectedProvider} />
-      <Text className="px-5 pb-2 pt-2 text-sm font-t3-medium text-foreground-muted">Options</Text>
+      <Text className="px-5 pb-2 pt-2 text-sm font-t3-medium text-foreground-muted">
+        {uiText("Options")}
+      </Text>
       <Animated.View
         className="mx-4 overflow-hidden rounded-2xl bg-grouped-card"
         layout={THREAD_SETTINGS_OPTIONS_LAYOUT_TRANSITION}
@@ -881,7 +885,7 @@ function ThreadSettingsOptionsItem(props: {
         <Animated.View layout={THREAD_SETTINGS_OPTIONS_LAYOUT_TRANSITION}>
           <DisclosureRow
             isLast
-            label="Runtime"
+            label={uiText("Runtime")}
             value={
               session.runtimeModeChoices.find((choice) => choice.mode === session.runtimeMode)
                 ?.label
@@ -891,10 +895,12 @@ function ThreadSettingsOptionsItem(props: {
         </Animated.View>
       </Animated.View>
 
-      <Text className="px-5 pb-2 pt-7 text-sm font-t3-medium text-foreground-muted">Catalog</Text>
+      <Text className="px-5 pb-2 pt-7 text-sm font-t3-medium text-foreground-muted">
+        {uiText("Catalog")}
+      </Text>
       <View className="mx-4 overflow-hidden rounded-2xl bg-grouped-card">
         <SwitchRow
-          label="Manage hidden models"
+          label={uiText("Manage hidden models")}
           value={session.manageHidden}
           onValueChange={session.setManageHidden}
           isLast
@@ -908,6 +914,7 @@ function ThreadSettingsMainContent(props: {
   readonly bottomInset: number;
   readonly onOpenSubmenu: (submenu: ThreadSettingsSubmenuPage) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const session = useThreadSettingsSession();
   const refreshProvidersCommand = useAtomCommand(serverEnvironment.refreshProviders, {
     reportFailure: false,
@@ -957,10 +964,10 @@ function ThreadSettingsMainContent(props: {
           <Text className="text-center text-sm text-foreground-muted">
             {session.providerFilter === FAVORITES_PROVIDER_FILTER &&
             session.searchQuery.trim().length === 0
-              ? "No favorite models"
+              ? uiText("No favorite models")
               : hasActiveCatalogFilter
-                ? "No matching models"
-                : "No available models"}
+                ? uiText("No matching models")
+                : uiText("No available models")}
           </Text>
         </View>
       );
@@ -1148,6 +1155,7 @@ function useThreadSettingsPickerPresentation() {
 }
 
 function ThreadSettingsModelsScreen() {
+  const { text: uiText } = useUiLanguage();
   const session = useThreadSettingsSession();
   const presentation = useThreadSettingsPickerPresentation();
   const navigation = useNavigation<NativeStackNavigationProp<ThreadSettingsPickerStackParams>>();
@@ -1178,7 +1186,7 @@ function ThreadSettingsModelsScreen() {
   return (
     <>
       <AppBar
-        title="Thread settings"
+        title={uiText("Thread settings")}
         onClose={presentation.onClose}
         closeAccessibilityLabel="Cancel thread settings"
         search={search}

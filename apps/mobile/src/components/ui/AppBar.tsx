@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Toolbar } from "./Toolbar";
 import { AppActivityIndicator } from "./AppActivityIndicator";
 import type { HeaderBarButtonMailSearchToolbarItem } from "react-native-screens";
@@ -43,6 +44,7 @@ function mailMenuItems(items: ReadonlyArray<AppBarMenuItem>): MailMenu["items"] 
 }
 
 export function AppBar(props: AppBarProps) {
+  const { text: uiText } = useUiLanguage();
   const usesNativeWorkspaceColumns = useNativeWorkspaceColumnsSupported();
   const deviceType = useDeviceType();
   const headerId = useId();
@@ -157,7 +159,7 @@ export function AppBar(props: AppBarProps) {
         <Toolbar placement="left">
           <Toolbar.Button
             icon="xmark"
-            accessibilityLabel={props.closeAccessibilityLabel ?? "Close"}
+            accessibilityLabel={props.closeAccessibilityLabel ?? uiText("Close")}
             onPress={props.onClose}
           />
         </Toolbar>
@@ -165,7 +167,7 @@ export function AppBar(props: AppBarProps) {
         <Toolbar placement="left">
           {rootBack ? (
             <ScreenHeaderButton
-              accessibilityLabel="Back"
+              accessibilityLabel={uiText("Back")}
               icon="chevron.left"
               onPress={rootBack}
               separateBackground
@@ -183,8 +185,8 @@ export function AppBar(props: AppBarProps) {
           ) : null}
           {compose ? (
             <ScreenHeaderButton
-              accessibilityLabel="New task"
-              label="New task"
+              accessibilityLabel={uiText("New task")}
+              label={uiText("New task")}
               icon="square.and.pencil"
               onPress={compose}
               separateBackground
@@ -243,7 +245,7 @@ export function AppBar(props: AppBarProps) {
           ) : null}
           {closeInspector ? (
             <ScreenHeaderButton
-              accessibilityLabel="Close inspector"
+              accessibilityLabel={uiText("Close inspector")}
               icon="xmark"
               onPress={closeInspector}
               separateBackground

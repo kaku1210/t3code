@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useNavigation } from "@react-navigation/native";
 import { SettingsRow } from "./components/SettingsRow";
 import { AuthSettingsWriteScope } from "@t3tools/contracts";
@@ -25,7 +26,7 @@ import { SettingsScreen } from "./components/SettingsScreen";
 import { useSettingsEnvironmentMenu } from "./components/SettingsEnvironmentFilterHeader";
 import { BranchNamingSettings } from "./components/BranchNamingSettings";
 import { DatabaseStorageNotice } from "./components/DatabaseStorageNotice";
-import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
+import { SettingsChoiceRow } from "./components/SettingsChoiceRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsSwitchRow } from "./components/SettingsSwitchRow";
 import { SourceControlSignInSection } from "./components/SourceControlSignInSection";
@@ -174,6 +175,7 @@ export function SettingsEnvironmentMaintenanceRouteScreen() {
 }
 
 function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
+  const { text: uiText } = useUiLanguage();
   const environmentMenu = useSettingsEnvironmentMenu();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
@@ -292,8 +294,8 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
         {!hasConnectedSelection || reference === null ? (
           <Text className="px-2 text-base text-foreground-muted">
             {projectSelected
-              ? "Select a project with a checkout on a connected environment."
-              : "Use the filter above to select a connected environment."}
+              ? uiText("Select a project with a checkout on a connected environment.")
+              : uiText("Use the filter above to select a connected environment.")}
           </Text>
         ) : (
           <>
@@ -312,7 +314,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
             {props.page === "threads" ? (
               <>
                 <SettingsSection
-                  title="Default workspace"
+                  title={uiText("Default workspace")}
                   footer={managed("defaultThreadEnvMode")}
                   trailing={
                     pendingWrites === 0 && isMixed("defaultThreadEnvMode") ? (
@@ -338,7 +340,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   ))}
                 </SettingsSection>
                 <SettingsSection
-                  title="Default permissions"
+                  title={uiText("Default permissions")}
                   footer={managed("defaultRuntimeMode")}
                   trailing={
                     pendingWrites === 0 && uniform("defaultRuntimeMode") === null ? (
@@ -361,7 +363,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   ))}
                 </SettingsSection>
                 <SettingsSection
-                  title="Response streaming"
+                  title={uiText("Response streaming")}
                   footer={managed("responseStreamingMode")}
                   trailing={
                     pendingWrites === 0 && uniform("responseStreamingMode") === null ? (
@@ -381,10 +383,10 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     />
                   ))}
                 </SettingsSection>
-                <SettingsSection title="Preview browser">
+                <SettingsSection title={uiText("Preview browser")}>
                   <SettingsSwitchRow
                     icon="globe"
-                    label="Agent browser access"
+                    label={uiText("Agent browser access")}
                     subtitle={managedSubtitle(
                       "enableAgentBrowserAccess",
                       "Allow agents to use the in-app preview browser.",
@@ -406,10 +408,10 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     canWrite={(environmentId) => writableEnvironments.has(environmentId)}
                   />
                 )}
-                <SettingsSection title="Pull requests">
+                <SettingsSection title={uiText("Pull requests")}>
                   <SettingsSwitchRow
                     icon={PullRequestGlyph.merged}
-                    label="Remove agent credits when merging"
+                    label={uiText("Remove agent credits when merging")}
                     subtitle={managedSubtitle(
                       "removeAgentCreditsOnMerge",
                       "Remove recognized agent credits from merge and squash messages on hosts that support it, keeping human co-authors. Includes auto-merge. Excludes merge queues, stack merges, and existing commits.",
@@ -419,10 +421,10 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     onValueChange={(value) => write({ removeAgentCreditsOnMerge: value })}
                   />
                 </SettingsSection>
-                <SettingsSection title="Default branch">
+                <SettingsSection title={uiText("Default branch")}>
                   <SettingsSwitchRow
                     icon="arrow.down.circle"
-                    label="Automatically pull"
+                    label={uiText("Automatically pull")}
                     subtitle={managedSubtitle(
                       "defaultAutoPull",
                       "Keep the default branch current when there are no local changes.",
@@ -432,11 +434,13 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     onValueChange={(value) => write({ defaultAutoPull: value })}
                   />
                 </SettingsSection>
-                <SettingsSection title="Clones">
+                <SettingsSection title={uiText("Clones")}>
                   <SettingsSwitchRow
                     icon="folder"
-                    label="Clone into host folders"
-                    subtitle="Clones go to github.com/owner/repo under the Add project folder, like ghq."
+                    label={uiText("Clone into host folders")}
+                    subtitle={uiText(
+                      "Clones go to github.com/owner/repo under the Add project folder, like ghq.",
+                    )}
                     value={uniform("ghqCloneLayout")}
                     disabled={disabledFor("ghqCloneLayout")}
                     onValueChange={(value) => write({ ghqCloneLayout: value })}
@@ -447,10 +451,10 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
 
             {props.page === "worktrees" ? (
               <>
-                <SettingsSection title="New worktrees">
+                <SettingsSection title={uiText("New worktrees")}>
                   <SettingsSwitchRow
                     icon="arrow.triangle.branch"
-                    label="Start from remote"
+                    label={uiText("Start from remote")}
                     subtitle={managedSubtitle(
                       "newWorktreesStartFromOrigin",
                       "Uses the latest commit of the base branch’s tracked remote branch, even if its name differs. Otherwise uses the same-named branch on origin. Uses your local branch if that remote branch is missing.",
@@ -461,7 +465,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   />
                 </SettingsSection>
                 <SettingsSection
-                  title="Worktree submodules"
+                  title={uiText("Worktree submodules")}
                   footer={managed("worktreeSubmodules")}
                   trailing={
                     pendingWrites === 0 && isMixed("worktreeSubmodules") ? (
@@ -512,7 +516,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   />
                 ) : null}
                 {!projectSelected ? (
-                  <SettingsSection title="Manage environments">
+                  <SettingsSection title={uiText("Manage environments")}>
                     {selectedTargets.map((target) => (
                       <SettingsRow
                         key={target.environmentId}
@@ -528,10 +532,10 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                     ))}
                   </SettingsSection>
                 ) : null}
-                <SettingsSection title="Updates">
+                <SettingsSection title={uiText("Updates")}>
                   <SettingsSwitchRow
                     icon="arrow.clockwise"
-                    label="Check provider updates"
+                    label={uiText("Check provider updates")}
                     subtitle={managedSubtitle(
                       "enableProviderUpdateChecks",
                       projectSelected
@@ -545,7 +549,7 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
                   <View className="border-t border-border-subtle">
                     <SettingsSwitchRow
                       icon="arrow.uturn.forward"
-                      label="Continue after restart"
+                      label={uiText("Continue after restart")}
                       subtitle={managedSubtitle(
                         "continueThreadsAfterServerUpdate",
                         "Resume interrupted threads after an update or restart.",
@@ -566,22 +570,24 @@ function ServerSettingsDetail(props: { readonly page: SettingsPage }) {
 }
 
 function MixedValuesLabel(props: { readonly projectSelected: boolean }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <Text
       accessibilityLabel={
         props.projectSelected
-          ? "Selected project checkouts use different values"
-          : "Selected environments use different values"
+          ? uiText("Selected project checkouts use different values")
+          : uiText("Selected environments use different values")
       }
       className="px-2 text-sm text-foreground-muted android:px-4"
     >
-      Mixed
+      {uiText("Mixed")}
     </Text>
   );
 }
 
 /** Locked settings are refused when saved; say so before the user tries. */
 function ManagedPolicyNotice(props: { readonly targets: readonly ScopedMobileSettingsTarget[] }) {
+  const { text: uiText } = useUiLanguage();
   const organizations = [
     ...new Set(
       props.targets.flatMap((target) => {
@@ -595,7 +601,8 @@ function ManagedPolicyNotice(props: { readonly targets: readonly ScopedMobileSet
   if (organizations.length === 0) return null;
   return (
     <Text className="px-2 text-sm text-foreground-muted android:px-4">
-      Some settings are managed by {organizations.join(", ")} and cannot be changed here.
+      {uiText("Some settings are managed by")} {organizations.join(", ")}{" "}
+      {uiText("and cannot be changed here.")}
     </Text>
   );
 }

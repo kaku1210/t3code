@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import {
   createNavigatorFactory,
   NavigationContext,
@@ -203,6 +204,7 @@ function EmptyDetailHeader(props: { readonly onCompose: (() => void) | undefined
 function WorkspaceColumns(
   props: ViewProps & { readonly primary: Route; readonly detail: Route[] },
 ) {
+  const { text: uiText } = useUiLanguage();
   const {
     layout,
     panes,
@@ -476,7 +478,7 @@ function WorkspaceColumns(
                     pointerEvents="box-none"
                   >
                     <WorkspacePaneDivider
-                      accessibilityLabel="Resize inspector"
+                      accessibilityLabel={uiText("Resize inspector")}
                       currentWidth={inspectorWidth}
                       resizeDirection={-1}
                       onResizeStart={() => {

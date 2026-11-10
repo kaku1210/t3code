@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../i18n/useUiLanguage";
 import type {
   NativeStackHeaderItem,
   NativeStackHeaderItemMenu,
@@ -157,6 +158,7 @@ export function V5StackHeader(props: {
   /** The workspace's compose action, shown as its own group in this column's bar. */
   readonly onCompose?: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { options } = props;
   const theme = useMobileNavigationTheme();
   const nativeMetrics = useNativeLayoutMetrics();
@@ -345,7 +347,9 @@ export function V5StackHeader(props: {
                 hideWhenScrolling={false}
                 allowToolbarIntegration={searchOptions?.allowToolbarIntegration ?? true}
                 placement={bottomSearch ? "integrated" : (searchOptions?.placement ?? "automatic")}
-                placeholder={mailSearch?.placeholder ?? searchOptions?.placeholder ?? "Search"}
+                placeholder={
+                  mailSearch?.placeholder ?? searchOptions?.placeholder ?? uiText("Search")
+                }
                 onFocus={(event) => {
                   searchOptions?.onFocus?.(event);
                 }}

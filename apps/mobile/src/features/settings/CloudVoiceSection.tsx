@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { cloudSpeechDisclosure } from "@t3tools/shared/speech";
 import { setCloudSpeechKey } from "@t3tools/client-runtime/voice-input";
@@ -49,15 +50,16 @@ const isModelId = Schema.is(CloudSpeechModelId);
 const MODEL_ROWS = 6;
 
 export function CloudVoiceSection({ environment, active }: Props) {
+  const { text: uiText } = useUiLanguage();
   const [open, setOpen] = useState(false);
   return (
     <SettingsSection title={`Cloud via ${environment.label}`}>
       <ListActionRow
-        label="Cloud providers"
+        label={uiText("Cloud providers")}
         description={
           active
             ? `Using ${CLOUD_SPEECH_LABELS[active.provider]}`
-            : "Optional · use your own API key"
+            : uiText("Optional · use your own API key")
         }
         onPress={() => setOpen(true)}
       />
@@ -82,6 +84,7 @@ function ModelPicker({
   disabled: boolean;
   onChange: (model: CloudSpeechModelId) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [query, setQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
   const needle = query.trim().toLowerCase();
@@ -94,8 +97,8 @@ function ModelPicker({
   return (
     <>
       <TextInput
-        accessibilityLabel="Search OpenRouter models"
-        placeholder="Search transcription models"
+        accessibilityLabel={uiText("Search OpenRouter models")}
+        placeholder={uiText("Search transcription models")}
         autoCapitalize="none"
         autoCorrect={false}
         editable={!disabled}
@@ -105,7 +108,8 @@ function ModelPicker({
       />
       {delisted ? (
         <Text className="mx-4 text-sm text-destructive">
-          OpenRouter no longer lists {current}. Dictation stays off until you choose another model.
+          {uiText("OpenRouter no longer lists")} {current}
+          {uiText(". Dictation stays off until you choose another model.")}
         </Text>
       ) : null}
       {selected && !shown.some((model) => model.id === selected.id) ? (
@@ -129,7 +133,9 @@ function ModelPicker({
         />
       ))}
       {matches.length === 0 ? (
-        <Text className="mx-4 text-sm text-foreground-muted">No transcription model matches.</Text>
+        <Text className="mx-4 text-sm text-foreground-muted">
+          {uiText("No transcription model matches.")}
+        </Text>
       ) : matches.length > shown.length ? (
         <ListActionRow
           label={`Show all ${matches.length} models`}
@@ -141,6 +147,7 @@ function ModelPicker({
 }
 
 function CloudChoices({ environment, active, onClose }: Props & { onClose: () => void }) {
+  const { text: uiText } = useUiLanguage();
   const id = environment.environmentId;
   const connection = useAtomValue(cloudVoiceConnectionAtom(id));
   const keys = useAtomValue(cloudVoiceKeysAtom(id));
@@ -228,10 +235,10 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
       <ListActionRow
         label={
           !connection
-            ? "Environment not connected"
+            ? uiText("Environment not connected")
             : keys._tag === "Failure"
-              ? "Could not load keys · Retry"
-              : "Checking API keys…"
+              ? uiText("Could not load keys · Retry")
+              : uiText("Checking API keys…")
         }
         disabled={!connection || keys._tag !== "Failure"}
         onPress={reload}
@@ -288,18 +295,18 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                 disabled={saved === undefined || (!saved && !canManage) || saving}
                 description={
                   saved === undefined
-                    ? "Update the environment to use this provider"
+                    ? uiText("Update the environment to use this provider")
                     : isActive && routed
-                      ? `${activeModel} · Tap to change model${canManage ? " or key" : ""}`
+                      ? `${activeModel} · Tap to change model${canManage ? uiText(" or key") : ""}`
                       : isActive && saved && canManage
-                        ? "Tap to manage key"
+                        ? uiText("Tap to manage key")
                         : saved
                           ? routed
-                            ? "API key saved · choose a model to use it"
-                            : "API key saved on this environment"
+                            ? uiText("API key saved · choose a model to use it")
+                            : uiText("API key saved on this environment")
                           : canManage
-                            ? "Add an API key to use this provider"
-                            : "Ask an environment administrator to add an API key"
+                            ? uiText("Add an API key to use this provider")
+                            : uiText("Ask an environment administrator to add an API key")
                 }
                 onPress={() => {
                   if (routed) return edit(provider, !isActive);
@@ -332,8 +339,8 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                   <ListActionRow
                     label={
                       AsyncResult.isFailure(models)
-                        ? "Could not load models · Retry"
-                        : "Loading transcription models…"
+                        ? uiText("Could not load models · Retry")
+                        : uiText("Loading transcription models…")
                     }
                     disabled={!AsyncResult.isFailure(models)}
                     onPress={reloadModels}
@@ -346,7 +353,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                 {canManage && sources.length > 0 && (
                   <View className="mx-4 flex-row flex-wrap gap-2">
                     <Chip
-                      label="Value"
+                      label={uiText("Value")}
                       size="small"
                       selected={sourceId === null}
                       disabled={saving}
@@ -378,7 +385,9 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                     }
                     placeholder={
                       source?.referencePlaceholder ??
-                      (routed && saved ? "Saved key · enter a new one to replace" : "API key")
+                      (routed && saved
+                        ? uiText("Saved key · enter a new one to replace")
+                        : uiText("API key"))
                     }
                     secureTextEntry={sourceId === null}
                     autoCapitalize="none"
@@ -399,7 +408,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                 )}
                 {routed && !saved && !canManage ? (
                   <ListActionRow
-                    label="Ask an administrator to add an OpenRouter key"
+                    label={uiText("Ask an administrator to add an OpenRouter key")}
                     disabled
                     onPress={() => {}}
                   />
@@ -408,18 +417,20 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                     label={
                       routed
                         ? isActive
-                          ? "Save"
-                          : "Save and enable"
+                          ? uiText("Save")
+                          : uiText("Save and enable")
                         : editing.enable
-                          ? "Save and enable"
-                          : "Save key"
+                          ? uiText("Save and enable")
+                          : uiText("Save key")
                     }
                     description={
                       draft && !credential
-                        ? (source?.invalidReferenceMessage ?? "Enter a valid API key.")
+                        ? (source?.invalidReferenceMessage ?? uiText("Enter a valid API key."))
                         : routed
                           ? saved && !credential
-                            ? "Uses the API key saved on this environment. The model choice applies only to this device."
+                            ? uiText(
+                                "Uses the API key saved on this environment. The model choice applies only to this device.",
+                              )
                             : `Anyone with dictation access to ${environment.label} can bill this key.`
                           : editing.enable
                             ? `${disclosure} Anyone with dictation access to ${environment.label} can bill this key.`
@@ -435,7 +446,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                 {saved && canManage && (
                   <ListActionRow
                     tone="danger"
-                    label="Remove key from environment"
+                    label={uiText("Remove key from environment")}
                     disabled={saving}
                     onPress={() =>
                       Dialog.confirm({
@@ -448,7 +459,11 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
                     }
                   />
                 )}
-                <ListActionRow label="Back to providers" disabled={saving} onPress={reset} />
+                <ListActionRow
+                  label={uiText("Back to providers")}
+                  disabled={saving}
+                  onPress={reset}
+                />
               </>
             )}
           </View>
@@ -457,7 +472,7 @@ function CloudChoices({ environment, active, onClose }: Props & { onClose: () =>
     );
   return (
     <Sheet
-      title={editing ? CLOUD_SPEECH_LABELS[editing.provider] : "Cloud providers"}
+      title={editing ? CLOUD_SPEECH_LABELS[editing.provider] : uiText("Cloud providers")}
       onClose={onClose}
       dismissDisabled={saving}
     >

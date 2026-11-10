@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useEffect, useRef, useState } from "react";
 import Animated, {
   cubicBezier,
@@ -28,6 +29,7 @@ export function WorkspaceInspectorPane(props: {
   readonly content: InspectorContent | undefined;
   readonly setAuxiliaryPaneWidth: (width: number) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { panes, setAuxiliaryPaneWidth } = props;
   const inspectorWidth = panes.auxiliaryPaneWidth;
   const inspectorSupported = props.content !== undefined && inspectorWidth !== null;
@@ -99,7 +101,7 @@ export function WorkspaceInspectorPane(props: {
     <>
       {inspectorVisible ? (
         <WorkspacePaneDivider
-          accessibilityLabel="Resize detail pane"
+          accessibilityLabel={uiText("Resize detail pane")}
           currentWidth={inspectorWidth ?? 0}
           resizeDirection={-1}
           onResizeStart={beginResize}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import {
   worktreeSetupStageLabel,
@@ -40,6 +41,7 @@ const icons: Record<WorktreeSetupStage["status"], AppSymbolName> = {
 };
 
 export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
+  const { text: uiText } = useUiLanguage();
   const { snapshot, turnStarted, turnStartedAt, working } = props;
   const handedOff = turnStarted && worktreeSetupAgentStarted(snapshot);
   const running = snapshot.phase === "running";
@@ -65,7 +67,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
               : "Worktree ready";
 
   return (
-    <View accessibilityLabel="Worktree setup" className="py-1">
+    <View accessibilityLabel={uiText("Worktree setup")} className="py-1">
       <View className="min-h-11 flex-row items-center gap-2 border-b border-border px-1">
         <HeaderLabel
           label={label}
@@ -85,7 +87,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
           accessibilityLabel={
             backgroundSetup
               ? `Background setup is still running: ${scriptName}. Show setup progress.`
-              : "Worktree setup details"
+              : uiText("Worktree setup details")
           }
           accessibilityState={{ expanded: detailsOpen }}
           onPress={() => setDetailsOpen(true)}
@@ -116,7 +118,7 @@ export function WorktreeSetupCard(props: WorktreeSetupCardProps) {
               />
             ) : null}
             <Text numberOfLines={1} className="shrink text-2xs text-foreground-secondary">
-              {backgroundSetup ? "Background setup" : "Details"}
+              {backgroundSetup ? uiText("Background setup") : uiText("Details")}
             </Text>
             {!backgroundSetup ? (
               <SymbolView name="chevron.right" size={10} tintColorClassName="accent-icon-muted" />
@@ -197,10 +199,11 @@ function SetupDetailsSheet({
   onClose,
   now,
 }: WorktreeSetupCardProps & { onClose: () => void; now: number }) {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const canCancel = snapshot.phase === "running" && !turnStarted;
   return (
-    <Sheet title="Worktree setup" onClose={onClose}>
+    <Sheet title={uiText("Worktree setup")} onClose={onClose}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         bounces={false}
@@ -229,9 +232,9 @@ function SetupDetailsSheet({
         {canCancel ? (
           <View className="mt-3 flex-row items-center justify-end gap-4 border-t border-border pt-1">
             <Button
-              label="Cancel setup"
+              label={uiText("Cancel setup")}
               tone="danger"
-              accessibilityLabel="Cancel worktree setup"
+              accessibilityLabel={uiText("Cancel worktree setup")}
               onPress={() => {
                 onClose();
                 onCancel();
@@ -239,7 +242,7 @@ function SetupDetailsSheet({
             />
             {onWorkLocally ? (
               <Button
-                label="Work locally"
+                label={uiText("Work locally")}
                 tone="secondary"
                 onPress={() => {
                   onClose();
@@ -345,9 +348,10 @@ function StageRow({
 const OUTPUT_TAIL_SLOTS = [0, 1, 2, 3] as const;
 
 function OutputTail({ lines, failed }: { lines: ReadonlyArray<string>; failed: boolean }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <View
-      accessibilityLabel="Setup script output"
+      accessibilityLabel={uiText("Setup script output")}
       className={
         failed
           ? "mb-2 ml-8 rounded-md border border-danger-border bg-danger px-3 py-2"

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import {
   isAtomCommandInterrupted,
@@ -36,13 +37,14 @@ import { CLAUDE_DRIVER } from "./claude-accounts";
 import { useSettingsEnvironmentFilter, type SettingsTarget } from "./settings-environment-filter";
 
 export function SettingsProviderAccountsRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const environmentMenu = useSettingsEnvironmentMenu();
   const { selectedTargets } = useSettingsEnvironmentFilter();
   const permittedEnvironments = useEnvironmentsWithScope(selectedTargets, AuthProvidersManageScope);
   const providersByEnvironment = useAtomValue(environmentPresentations.providersByEnvironmentAtom);
   const insets = useSafeAreaInsets();
   return (
-    <SettingsScreen title="Providers" menus={[environmentMenu]}>
+    <SettingsScreen title={uiText("Providers")} menus={[environmentMenu]}>
       <ScreenScrollView
         className="flex-1"
         contentInsetAdjustmentBehavior="automatic"
@@ -50,13 +52,13 @@ export function SettingsProviderAccountsRouteScreen() {
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
         {selectedTargets.length === 0 ? (
-          <Text className="text-foreground-muted">Select a connected environment.</Text>
+          <Text className="text-foreground-muted">{uiText("Select a connected environment.")}</Text>
         ) : (
           selectedTargets.map((environment) => (
             <SettingsSection key={environment.environmentId} title={environment.label}>
               {!permittedEnvironments.has(environment.environmentId) ? (
                 <View className="gap-1 p-4">
-                  <Text className="text-base text-foreground">Limited permissions</Text>
+                  <Text className="text-base text-foreground">{uiText("Limited permissions")}</Text>
                   <Text className="text-sm text-foreground-muted">
                     {`This session can view ${environment.label}'s providers but can't change their settings.`}
                   </Text>
@@ -82,6 +84,7 @@ function EnvironmentProviders({
   readonly environment: SettingsTarget;
   readonly providers: ReadonlyArray<ServerProvider>;
 }) {
+  const { text: uiText } = useUiLanguage();
   const accounts = providers.filter(canManageProvider);
   // Claude has no in-app sign-in; each account is its own instance on a signed-in config folder.
   const claudeAccounts = providers.filter(
@@ -103,7 +106,7 @@ function EnvironmentProviders({
       ))}
       {accounts.length === 0 ? (
         <Text className="p-4 text-foreground-muted">
-          Configure a provider with in-app sign-in in web or desktop Settings.
+          {uiText("Configure a provider with in-app sign-in in web or desktop Settings.")}
         </Text>
       ) : null}
       {claudeAccounts.map((provider) => (
@@ -139,6 +142,7 @@ function ProviderAccount({
   readonly provider: ServerProvider;
   readonly divider: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const environmentId = environment.environmentId;
   const instanceId = provider.instanceId;
   const target = { environmentId, input: { instanceId } };
@@ -323,7 +327,7 @@ function ProviderAccount({
   ) : needsExternalSetup && provider.setup?.documentationUrl ? (
     <ControlPill
       variant="pill"
-      label="Docs"
+      label={uiText("Docs")}
       onPress={() => {
         void Linking.openURL(provider.setup!.documentationUrl!).catch(() =>
           setError("Could not open the provider docs."),
@@ -333,7 +337,7 @@ function ProviderAccount({
   ) : active && state?.flowId ? (
     <ControlPill
       variant="pill"
-      label="Cancel"
+      label={uiText("Cancel")}
       accessibilityLabel={`Cancel ${name} sign-in`}
       disabled={disabled}
       onPress={() => {
@@ -356,16 +360,20 @@ function ProviderAccount({
       accessible
       accessibilityRole="button"
       accessibilityLabel={`Sign in to ${name}`}
-      title="Sign in with"
+      title={uiText("Sign in with")}
       actions={methodActions}
       onPressAction={({ nativeEvent }) => onMenuAction(nativeEvent.event)}
     >
-      <ControlPill variant="primary" label="Sign in" accessibilityLabel={`Sign in to ${name}`} />
+      <ControlPill
+        variant="primary"
+        label={uiText("Sign in")}
+        accessibilityLabel={`Sign in to ${name}`}
+      />
     </Menu>
   ) : canSignIn && !signedIn ? (
     <ControlPill
       variant="primary"
-      label={usesCredentials ? "Connect" : "Sign in"}
+      label={usesCredentials ? uiText("Connect") : uiText("Sign in")}
       accessibilityLabel={usesCredentials ? `Connect to ${name}` : `Sign in to ${name}`}
       disabled={signInDisabled}
       onPress={() => startSignIn()}
@@ -392,7 +400,7 @@ function ProviderAccount({
         <View className="gap-2 px-4 pb-3">
           {interaction?.type === "deviceCode" ? (
             <Text selectable className="text-foreground">
-              Enter code {interaction.userCode} on the sign-in page.
+              {uiText("Enter code")} {interaction.userCode} {uiText("on the sign-in page.")}
             </Text>
           ) : null}
           {interaction?.type === "terminal" ? (
@@ -405,7 +413,7 @@ function ProviderAccount({
               {field("input", "Terminal response", true)}
               <SettingsActionRow
                 icon="arrow.up"
-                label="Send response"
+                label={uiText("Send response")}
                 disabled={disabled}
                 onPress={() => {
                   void send({ type: "terminal", data: `${values.input ?? ""}\r` }).then((sent) => {
@@ -422,7 +430,7 @@ function ProviderAccount({
               ))}
               <SettingsActionRow
                 icon="person.crop.circle"
-                label="Connect"
+                label={uiText("Connect")}
                 disabled={disabled}
                 onPress={() => {
                   void send({ type: "credentials", values }).then((sent) => {
@@ -437,7 +445,7 @@ function ProviderAccount({
               {field("callback", "Final localhost URL", false)}
               <SettingsActionRow
                 icon="arrow.right"
-                label="Continue"
+                label={uiText("Continue")}
                 disabled={disabled || !values.callback?.trim()}
                 onPress={() => {
                   if (!state?.flowId) return;
@@ -463,7 +471,7 @@ function ProviderAccount({
       {url ? (
         <SettingsActionRow
           icon="globe"
-          label="Open sign-in page"
+          label={uiText("Open sign-in page")}
           disabled={disabled}
           onPress={() => {
             void (async () => {
@@ -491,6 +499,7 @@ function ProviderAccountSummary({
   readonly status: string | null | undefined;
   readonly email: string | undefined;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [revealed, setRevealed] = useState(false);
   const content = (
     <>
@@ -517,7 +526,9 @@ function ProviderAccountSummary({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={[name, status, revealed ? email : null].filter(Boolean).join(", ")}
-      accessibilityHint={revealed ? "Hides the account email" : "Reveals the account email"}
+      accessibilityHint={
+        revealed ? uiText("Hides the account email") : uiText("Reveals the account email")
+      }
       onPress={() => setRevealed((value) => !value)}
       className="min-w-0 shrink grow gap-0.5"
     >

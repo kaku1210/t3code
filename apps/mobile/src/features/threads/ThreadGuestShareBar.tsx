@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import {
   type AtomCommandResult,
@@ -61,6 +62,7 @@ export function ThreadGuestShareBar(props: {
   readonly threadRef: ScopedThreadRef | null;
   readonly canOperateThread: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { threadRef } = props;
   const share = useThreadGuestShare(threadRef);
   const closeGuestShare = useAtomCommand(threadEnvironment.closeGuestShare, "stop guest sharing");
@@ -106,12 +108,17 @@ export function ThreadGuestShareBar(props: {
       <SymbolView name="person.2" size={12} tintColorClassName="accent-foreground-muted" />
       <Text className="min-w-0 flex-1 text-xs text-foreground-muted" numberOfLines={1}>
         {expiredAt === share.expiresAt
-          ? "Guest link expired"
+          ? uiText("Guest link expired")
           : share.guestName === null
-            ? "Guest link active"
+            ? uiText("Guest link active")
             : `${share.guestName} is a guest`}
       </Text>
-      <Button label="Stop sharing" tone="text" disabled={disabled} onPress={stopSharing} />
+      <Button
+        label={uiText("Stop sharing")}
+        tone="text"
+        disabled={disabled}
+        onPress={stopSharing}
+      />
     </View>
   );
 }
@@ -128,6 +135,7 @@ export function ThreadGuestPendingMessage(props: {
   /** The feed's own attachment rendering, so the owner sees the files before Send. */
   readonly renderAttachments: (attachments: ReadonlyArray<ChatAttachment>) => ReactNode;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { threadRef, guestName, message } = props;
   const canOperate = useEnvironmentScope(threadRef.environmentId, AuthOrchestrationOperateScope);
   const resolveGuestMessage = useAtomCommand(
@@ -170,14 +178,14 @@ export function ThreadGuestPendingMessage(props: {
       {canOperate ? (
         <View className="mt-1.5 flex-row gap-2">
           <Button
-            label="Dismiss"
+            label={uiText("Dismiss")}
             tone="secondary"
             accessibilityLabel={`Dismiss message from ${guestName}`}
             disabled={busy}
             onPress={() => void resolve("dismiss")}
           />
           <Button
-            label="Send"
+            label={uiText("Send")}
             tone="primary"
             accessibilityLabel={`Send message from ${guestName}`}
             disabled={busy}

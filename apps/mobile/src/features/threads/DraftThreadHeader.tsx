@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { uuidv4 } from "../../lib/uuid";
 import * as Dialog from "../../components/ui/Dialog";
 import { useNavigation } from "@react-navigation/native";
@@ -20,6 +21,7 @@ export function DraftThreadHeader(props: {
   readonly project: EnvironmentProject;
   readonly cwd: string | null;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const environmentId = props.thread.environmentId;
   const canReadFiles = useEnvironmentScope(environmentId, AuthFilesystemReadScope);
@@ -46,7 +48,7 @@ export function DraftThreadHeader(props: {
   return (
     <ThreadHeader
       draft
-      title="New thread"
+      title={uiText("New thread")}
       subtitle=""
       hasThreadCwd={props.cwd !== null}
       fileInspectorSupported={false}

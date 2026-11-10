@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../../i18n/useUiLanguage";
 import { Platform, ScrollView, type StyleProp, type TextStyle, View } from "react-native";
 
 import { AppText as Text } from "../../../../components/ui/AppText";
@@ -19,6 +20,7 @@ export function AppearancePreviewSeparator() {
 }
 
 export function TextAppearancePreview(props: { readonly fontSize: number }) {
+  const { text: uiText } = useUiLanguage();
   const sizes = resolveMarkdownFontSizes(props.fontSize);
 
   return (
@@ -33,13 +35,14 @@ export function TextAppearancePreview(props: { readonly fontSize: number }) {
         className="text-foreground-muted"
         style={{ fontSize: sizes.s, lineHeight: Math.round(sizes.s * 1.4) }}
       >
-        Messages, labels, and headings scale with this size.
+        {uiText("Messages, labels, and headings scale with this size.")}
       </Text>
     </View>
   );
 }
 
 export function TerminalAppearancePreview(props: { readonly fontSize: number }) {
+  const { text: uiText } = useUiLanguage();
   const { themeAppearance: scheme, themeId } = useAppearancePreferences();
   const theme = getMobileTerminalTheme(themeId, scheme);
   const lineHeight = Math.round(props.fontSize * 1.6);
@@ -66,12 +69,12 @@ export function TerminalAppearancePreview(props: { readonly fontSize: number }) 
       </Text>
       <Text style={span(theme.foreground)}>
         <Text style={span(theme.palette[2])}>VITE v7.1.1</Text>
-        <Text style={span(theme.mutedForeground)}> ready in</Text>
+        <Text style={span(theme.mutedForeground)}> {uiText("ready in")}</Text>
         <Text style={span(theme.foreground)}> 1.24s</Text>
       </Text>
       <Text style={span(theme.foreground)}>
         <Text style={span(theme.palette[2])}>→ </Text>
-        <Text style={span(theme.mutedForeground)}>Local: </Text>
+        <Text style={span(theme.mutedForeground)}>{uiText("Local:")} </Text>
         <Text style={span(theme.palette[6], { textDecorationLine: "underline" })}>
           http://127.0.0.1:5173/
         </Text>
@@ -85,7 +88,7 @@ export function TerminalAppearancePreview(props: { readonly fontSize: number }) 
         <Text style={span(theme.background, { backgroundColor: theme.palette[2] })}>
           {" READY "}
         </Text>
-        <Text style={span(theme.mutedForeground)}> watching for changes</Text>{" "}
+        <Text style={span(theme.mutedForeground)}> {uiText("watching for changes")}</Text>{" "}
         <Text style={span(theme.cursorForeground)}>▏</Text>
       </Text>
     </View>

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { pipe } from "effect/Function";
 import {
   SECRET_REQUEST_DEFAULT_PLACEHOLDER,
@@ -72,6 +73,7 @@ function PendingSecretRequestForm(props: {
   readonly item: SecretRequestItem;
   readonly iconColor: ColorValue;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { item } = props;
   const answer = useAtomCommand(serverEnvironment.answerSecretRequest, {
     label: "answer secret request",
@@ -133,7 +135,7 @@ function PendingSecretRequestForm(props: {
       {sources.length > 0 ? (
         <View className="flex-row flex-wrap gap-2">
           <Chip
-            label="Value"
+            label={uiText("Value")}
             size="small"
             selected={source === null}
             disabled={submitting}
@@ -197,7 +199,7 @@ function PendingSecretRequestForm(props: {
         </Text>
       ) : null}
       <Button
-        label="Save securely"
+        label={uiText("Save securely")}
         tone="primary"
         fullWidth
         disabled={submitting || draft.trim().length === 0}
@@ -216,7 +218,7 @@ function PendingSecretRequestForm(props: {
           </Text>
         </View>
         <Button
-          label="Decline"
+          label={uiText("Decline")}
           tone="text"
           disabled={submitting}
           onPress={() => void send({ type: "decline" })}

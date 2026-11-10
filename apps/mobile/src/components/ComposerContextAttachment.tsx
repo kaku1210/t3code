@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../i18n/useUiLanguage";
 import { Button } from "./ui/Button";
 import { settlePromise, squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
@@ -24,6 +25,7 @@ export function ComposerContextAttachment(props: {
   environmentId?: EnvironmentId;
   attachment?: DraftComposerAttachment;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { record, attachment } = props;
   const shareSourceIdentifier = useId();
   const resource = {
@@ -100,12 +102,12 @@ export function ComposerContextAttachment(props: {
       ) : null}
       {error || (!local && asset._tag === "Failure") ? (
         <Text className="text-foreground-muted">
-          {error ?? "Attachment unavailable. Reconnect and try again."}
+          {error ?? uiText("Attachment unavailable. Reconnect and try again.")}
         </Text>
       ) : null}
       <PresentationSource identifier={shareSourceIdentifier}>
         <Button
-          label={sharing ? "Opening attachment…" : "Open or share attachment"}
+          label={sharing ? uiText("Opening attachment…") : uiText("Open or share attachment")}
           tone="secondary"
           disabled={sharing}
           onPress={() => void share()}

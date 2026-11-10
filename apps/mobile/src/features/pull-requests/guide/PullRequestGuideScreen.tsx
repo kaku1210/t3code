@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
 import { parsePatchFiles } from "@pierre/diffs/utils/parsePatchFiles";
 import type { FileDiffMetadata } from "@pierre/diffs";
@@ -51,13 +52,14 @@ export function PullRequestGuideContent({
   readonly params: PullRequestParams;
   readonly visible?: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const state = useReviewGuide(params, visible);
   const { guide, stale } = reviewGuideState(state.data);
   return (
     <Animated.View layout={PR_ROW_LAYOUT} className="w-full max-w-[760px] self-center">
       {!state.enabled ? (
-        <Text>Review guides are disabled for this server.</Text>
+        <Text>{uiText("Review guides are disabled for this server.")}</Text>
       ) : (
         <>
           <GuideNotice state={state} />
@@ -95,6 +97,7 @@ export function PullRequestGuideContent({
 }
 
 export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideStopParams>) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const state = useReviewGuide(route.params);
   const detail = useEnvironmentQuery(composerPullRequests.detail(pullRequestTarget(route.params)));
@@ -154,11 +157,11 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
         >
           <View className="w-full max-w-[760px] self-center gap-5">
             {!state.enabled ? (
-              <Text>Review guides are disabled for this server.</Text>
+              <Text>{uiText("Review guides are disabled for this server.")}</Text>
             ) : changedGuide ? (
-              <Text>This guide was rewritten. Go back to start the new tour.</Text>
+              <Text>{uiText("This guide was rewritten. Go back to start the new tour.")}</Text>
             ) : !stop ? (
-              <Text>{state.error ?? "Loading stop…"}</Text>
+              <Text>{state.error ?? uiText("Loading stop…")}</Text>
             ) : (
               <>
                 <GuideNotice state={state} />
@@ -177,7 +180,9 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 ) : null}
                 {stale ? (
                   <Text className="text-sm text-foreground-muted">
-                    Excerpts are hidden until the guide is rewritten for the current head.
+                    {uiText(
+                      "Excerpts are hidden until the guide is rewritten for the current head.",
+                    )}
                   </Text>
                 ) : (
                   stop.excerpts.map((excerpt) => (
@@ -201,7 +206,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 {diff.error ? <Text className="text-danger-foreground">{diff.error}</Text> : null}
                 {notes.length ? (
                   <View className="gap-4">
-                    <Text className="font-t3-semibold">Notes on this stop</Text>
+                    <Text className="font-t3-semibold">{uiText("Notes on this stop")}</Text>
                     {notes.map(({ marker, note }) => (
                       <View key={marker} className="flex-row gap-3">
                         <View className="h-7 w-7 items-center justify-center rounded-lg bg-grouped-card">
@@ -239,7 +244,7 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                 ) : null}
                 {stop.questions.length ? (
                   <View className="gap-3">
-                    <Text className="font-t3-semibold">Questions to consider</Text>
+                    <Text className="font-t3-semibold">{uiText("Questions to consider")}</Text>
                     {stop.questions.map((question) => (
                       <PullRequestMarkdown key={question} lineBreaks={false} markdown={question} />
                     ))}
@@ -249,10 +254,10 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                   accessibilityRole="button"
                   accessibilityLabel={
                     guide && position < guide.stops.length - 1
-                      ? "Next stop"
+                      ? uiText("Next stop")
                       : canReview
-                        ? "Finish review"
-                        : "Finish tour"
+                        ? uiText("Finish review")
+                        : uiText("Finish tour")
                   }
                   className="mt-2 flex-row items-center gap-4 border-t border-border-subtle pt-5 pb-2 active:opacity-60"
                   onPress={() =>
@@ -275,14 +280,14 @@ export function PullRequestGuideStopScreen({ route }: StaticScreenProps<GuideSto
                     <Text className="text-xs text-foreground-muted">
                       {guide && position < guide.stops.length - 1
                         ? `Next · ${position + 2} of ${guide.stops.length}`
-                        : "End of guide"}
+                        : uiText("End of guide")}
                     </Text>
                     <Text className="text-base font-t3-semibold">
                       {guide && position < guide.stops.length - 1
                         ? guide.stops[position + 1]?.title
                         : canReview
-                          ? "Finish review"
-                          : "Finish tour"}
+                          ? uiText("Finish review")
+                          : uiText("Finish tour")}
                     </Text>
                   </View>
                   <View className="h-11 w-11 items-center justify-center rounded-full bg-foreground">

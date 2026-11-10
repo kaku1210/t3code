@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { Chip } from "../../components/ui/Chip";
 import { pullRequestTabOffset } from "./pullRequestTabScroll";
@@ -126,6 +127,7 @@ import {
 const EMPTY_IDS: readonly string[] = [];
 
 function usePullRequestActivityRows(params: PullRequestParams, filter: ActivityFilter) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const result = useEnvironmentQuery(composerPullRequests.activity(requestTarget(params)));
   const detail = useEnvironmentQuery(composerPullRequests.detail(requestTarget(params)));
@@ -148,7 +150,7 @@ function usePullRequestActivityRows(params: PullRequestParams, filter: ActivityF
         date: "",
         content: (
           <Text className="py-6 text-sm text-foreground-muted">
-            No activity matches these filters.
+            {uiText("No activity matches these filters.")}
           </Text>
         ),
       });
@@ -166,6 +168,7 @@ function PullRequestIdentity(props: {
   readonly pr: PullRequestDetail | PullRequestListEntry | PullRequestSummary;
   readonly params: PullRequestParams;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { pr } = props;
   const status = pullRequestStatus({ state: pr.state, isDraft: pr.isDraft === true });
   return (
@@ -182,7 +185,7 @@ function PullRequestIdentity(props: {
         <PullRequestDiffStats additions={pr.additions ?? 0} deletions={pr.deletions ?? 0} compact />
         {"changedFiles" in pr && pr.changedFiles !== undefined ? (
           <Text className="text-2xs text-foreground-muted">
-            {pr.changedFiles} {pr.changedFiles === 1 ? "file" : "files"}
+            {pr.changedFiles} {pr.changedFiles === 1 ? uiText("file") : uiText("files")}
           </Text>
         ) : (
           <View className="h-3 w-12 rounded bg-subtle-strong" />
@@ -194,10 +197,10 @@ function PullRequestIdentity(props: {
       <View className="flex-row items-center gap-2">
         <PullRequestAvatar actor={pr.author ?? null} size={20} />
         <Text className="min-w-0 flex-1 text-xs font-t3-medium" numberOfLines={1}>
-          {pr.author?.login ?? "Unknown author"}
+          {pr.author?.login ?? uiText("Unknown author")}
         </Text>
         <Text className="shrink text-right text-2xs text-foreground-muted" numberOfLines={1}>
-          Updated <RelativeTime timestamp={pr.updatedAt} /> ago
+          {uiText("Updated")} <RelativeTime timestamp={pr.updatedAt} /> {uiText("ago")}
         </Text>
       </View>
       <View className="flex-row items-start gap-1.5">
@@ -231,6 +234,7 @@ function PullRequestLabels(props: {
   readonly pr: PullRequestDetail;
   readonly params: PullRequestParams;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const connected = usePullRequestConnected(props.params.environmentId);
   const canWrite = useAtomValue(
@@ -264,10 +268,10 @@ function PullRequestLabels(props: {
       })}
       {editable ? (
         <Chip
-          label={props.pr.labels.length ? "Edit" : "Add labels"}
+          label={props.pr.labels.length ? uiText("Edit") : uiText("Add labels")}
           icon="tag"
           size="small"
-          accessibilityLabel="Edit labels"
+          accessibilityLabel={uiText("Edit labels")}
           onPress={() => navigation.navigate("PullRequestLabels", props.params)}
         />
       ) : null}
@@ -819,6 +823,7 @@ type PullRequestFileRouteProps = StaticScreenProps<
 >;
 
 export function PullRequestFileRouteScreen(props: PullRequestFileRouteProps) {
+  const { text: uiText } = useUiLanguage();
   const navigation =
     useNavigation<NativeStackNavigationProp<ReactNavigation.RootParamList, "PullRequestFile">>();
   const ready = usePullRequestDiffEntry(navigation);
@@ -828,13 +833,14 @@ export function PullRequestFileRouteScreen(props: PullRequestFileRouteProps) {
     <View className="flex-1 bg-screen">
       <AppBar title={title} onBack={() => navigation.goBack()} />
       <View className="flex-1 items-center justify-center">
-        <AppActivityIndicator accessibilityLabel="Loading changes" />
+        <AppActivityIndicator accessibilityLabel={uiText("Loading changes")} />
       </View>
     </View>
   );
 }
 
 function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const contentTopInset = useContentTopInset();
@@ -1016,7 +1022,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
     <View className="flex-1 android:bg-header ios:bg-screen">
       <AppBar
         title={title}
-        subtitle={`${commit ? commit.slice(0, 7) : `#${route.params.number}`} · ${data.files.length} ${data.files.length === 1 ? "file" : "files"}${filter.hideTestFiles && filter.hiddenCount ? ` · ${filter.hiddenCount} ${filter.hiddenCount === 1 ? "test" : "tests"} hidden` : ""}`}
+        subtitle={`${commit ? commit.slice(0, 7) : `#${route.params.number}`} · ${data.files.length} ${data.files.length === 1 ? uiText("file") : uiText("files")}${filter.hideTestFiles && filter.hiddenCount ? ` · ${filter.hiddenCount} ${filter.hiddenCount === 1 ? uiText("test") : uiText("tests")} hidden` : ""}`}
         onBack={() => navigation.goBack()}
         menus={[
           {
@@ -1093,7 +1099,7 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
       />
       {route.params.replacingDraftId ? (
         <Text className="px-4 py-2 text-xs text-foreground-muted">
-          Select a current line, then choose “Move draft to this line” from its menu.
+          {uiText("Select a current line, then choose “Move draft to this line” from its menu.")}
         </Text>
       ) : null}
       {viewed.error ? (
@@ -1105,10 +1111,10 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
           style={{ paddingTop: contentTopInset + 8 }}
         >
           <Text className="min-w-0 flex-1 text-xs text-foreground-muted">
-            The branch changed. Reload before adding line comments.
+            {uiText("The branch changed. Reload before adding line comments.")}
           </Text>
           <Button
-            label="Reload changes"
+            label={uiText("Reload changes")}
             onPress={() => {
               result.refresh();
               setDiffHead({ scopeKey, sha: detail.data?.headSha ?? null });
@@ -1210,15 +1216,21 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
             !seekingFile ? (
             <View style={{ paddingTop: contentTopInset }}>
               <EmptyState
-                title="Only test files changed"
+                title={uiText("Only test files changed")}
                 detail="Test files are hidden from this review."
-                action={<Button label="Show test files" tone="contrast" onPress={filter.showAll} />}
+                action={
+                  <Button
+                    label={uiText("Show test files")}
+                    tone="contrast"
+                    onPress={filter.showAll}
+                  />
+                }
                 variant="plain"
               />
             </View>
           ) : !result.isPending && !result.error && !seekingFile ? (
             <EmptyState
-              title="Diff unavailable"
+              title={uiText("Diff unavailable")}
               detail={`Open this ${terminology.singular} on its provider to view the changes.`}
               variant="plain"
             />
@@ -1226,12 +1238,16 @@ function PullRequestFileRouteContent({ route }: PullRequestFileRouteProps) {
           {result.nextCursor && result.isPending && data.rows.length && !seekingFile ? (
             <View className="flex-row items-center justify-center gap-2 py-2">
               <AppActivityIndicator size="small" />
-              <Text className="text-xs text-foreground-muted">Loading more files…</Text>
+              <Text className="text-xs text-foreground-muted">{uiText("Loading more files…")}</Text>
             </View>
           ) : null}
           {result.error && result.nextCursor ? (
             <View className="self-center">
-              <Button label="Retry loading remaining files" tone="text" onPress={result.refresh} />
+              <Button
+                label={uiText("Retry loading remaining files")}
+                tone="text"
+                onPress={result.refresh}
+              />
             </View>
           ) : null}
           {parsed.kind === "files" && parsed.notice ? (

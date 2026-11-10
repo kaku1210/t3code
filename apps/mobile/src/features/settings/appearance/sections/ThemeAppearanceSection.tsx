@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../../i18n/useUiLanguage";
 import { memo, useId } from "react";
 import { Pressable, View } from "react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
@@ -122,6 +123,7 @@ function ThemeCard(props: {
   readonly onSelect: (appearance: MobileThemeAppearance) => void;
   readonly themeId: MobileThemeId;
 }) {
+  const { text: uiText } = useUiLanguage();
   const choice = (appearance: MobileThemeAppearance, selected: boolean) => (
     <Pressable
       accessibilityHint={`Sets the ${appearance} appearance only`}
@@ -153,7 +155,7 @@ function ThemeCard(props: {
   return (
     <View className="min-w-36 flex-1 basis-[47%] gap-3 rounded-[24px] border border-border bg-grouped-card px-2 py-4">
       <Pressable
-        accessibilityHint="Sets both light and dark appearances"
+        accessibilityHint={uiText("Sets both light and dark appearances")}
         accessibilityLabel={`${props.label} theme`}
         accessibilityRole="button"
         accessibilityState={{

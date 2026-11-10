@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 
 import { useNavigation } from "@react-navigation/native";
@@ -13,6 +14,7 @@ import { PullRequestRoutingSettings } from "./PullRequestRoutingSettings";
 import { LinkedEnvironmentsSection } from "./LinkedEnvironmentsSection";
 
 export function ConnectionsRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const {
     connectedEnvironments,
     onReconnectEnvironment,
@@ -30,7 +32,7 @@ export function ConnectionsRouteScreen() {
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
       <AppBar
-        title="Environments"
+        title={uiText("Environments")}
         onClose={() => navigation.goBack()}
         closeAccessibilityLabel="Close environments"
         actions={[

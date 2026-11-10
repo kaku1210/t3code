@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import deviceStreamScript from "@t3tools/mobile-device-stream";
 import {
@@ -94,6 +95,7 @@ function DeviceStreamDocumentView({
   readonly onStreaming: () => void;
   readonly onRecoverProcess: () => boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const webView = useRef<WebView<object>>(null);
   const active = useRef(false);
   const failed = useRef(false);
@@ -199,11 +201,11 @@ function DeviceStreamDocumentView({
             accessibilityLiveRegion="polite"
             className="text-center text-sm text-foreground-muted"
           >
-            {status === "error" ? error : "Connecting to device..."}
+            {status === "error" ? error : uiText("Connecting to device...")}
           </AppText>
           {status === "error" ? (
             <View className="items-center">
-              <Button label="Reconnect" tone="secondary" onPress={onRetry} />
+              <Button label={uiText("Reconnect")} tone="secondary" onPress={onRetry} />
             </View>
           ) : null}
         </View>

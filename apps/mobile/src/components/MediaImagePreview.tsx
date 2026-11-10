@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../i18n/useUiLanguage";
 import { createContext, useContext } from "react";
 import { View } from "react-native";
 import ImageViewing from "react-native-image-viewing";
@@ -15,6 +16,7 @@ type MediaImagePreviewProps = {
 const ImagePreviewContext = createContext<MediaImagePreviewProps | null>(null);
 
 function ImagePreviewHeader(header: { readonly imageIndex: number }) {
+  const { text: uiText } = useUiLanguage();
   const props = useContext(ImagePreviewContext)!;
   const source = props.source.images[header.imageIndex];
   const insets = useSafeAreaInsets();
@@ -22,7 +24,7 @@ function ImagePreviewHeader(header: { readonly imageIndex: number }) {
   return (
     <View className="bg-black/70" style={{ paddingTop: insets.top }}>
       <MediaPreviewHeader
-        title={source?.name ?? "Image"}
+        title={source?.name ?? uiText("Image")}
         media={mediaActions}
         closeAccessibilityLabel="Close image"
         onClose={props.onRequestClose}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { PullRequestEntryRow } from "./PullRequestEntryRow";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useAppearancePreferences } from "../settings/appearance/AppearancePreferencesProvider";
@@ -74,6 +75,7 @@ function TimelineComment({
   params: PullRequestParams;
   actions: CommentActions;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [expanded, setExpanded] = useState(false);
   const { themeVariables: colors } = useAppearancePreferences();
   const long = comment.body.length > 450 || comment.body.split("\n").length > 8;
@@ -94,9 +96,15 @@ function TimelineComment({
         <PullRequestAvatar actor={comment.author} size={22} />
         <View className="min-w-0 flex-1">
           <Text className="text-sm">
-            <Text className="font-t3-medium">{comment.author?.login ?? "Unknown author"}</Text>
+            <Text className="font-t3-medium">
+              {comment.author?.login ?? uiText("Unknown author")}
+            </Text>
             <Text className="text-foreground-muted">
-              {approved ? " approved" : changes ? " requested changes" : " commented"}
+              {approved
+                ? uiText(" approved")
+                : changes
+                  ? uiText(" requested changes")
+                  : uiText(" commented")}
             </Text>
           </Text>
         </View>
@@ -175,7 +183,7 @@ function TimelineComment({
               className="flex-row items-center justify-center gap-1 py-2 active:opacity-70"
             >
               <Text className="text-xs font-t3-medium text-foreground">
-                {expanded ? "Show less" : "Show more"}
+                {expanded ? uiText("Show less") : uiText("Show more")}
               </Text>
               <SymbolView
                 name={expanded ? "chevron.up" : "chevron.down"}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import type {
   EnvironmentId,
   OrchestrationV2GetNativeChildWorkResult,
@@ -24,6 +25,7 @@ export function NativeChildWorkSheet(props: {
   readonly threadId: ThreadId;
   readonly onClose: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const query = useEnvironmentQuery<OrchestrationV2GetNativeChildWorkResult, unknown>(
     orchestrationEnvironment.nativeChildWork({
@@ -33,7 +35,7 @@ export function NativeChildWorkSheet(props: {
   );
   const children = query.data?.children;
   return (
-    <Sheet title="Subagent work" onClose={props.onClose}>
+    <Sheet title={uiText("Subagent work")} onClose={props.onClose}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{
@@ -44,24 +46,24 @@ export function NativeChildWorkSheet(props: {
         }}
       >
         <Text className="font-sans text-xs text-foreground-secondary">
-          Read only. These subagents cannot take messages.
+          {uiText("Read only. These subagents cannot take messages.")}
         </Text>
         {query.error !== null ? (
           <Text selectable className="font-sans text-sm text-danger-foreground">
             {query.error}
           </Text>
         ) : children === undefined ? (
-          <Text className="font-sans text-sm text-foreground-secondary">Loading…</Text>
+          <Text className="font-sans text-sm text-foreground-secondary">{uiText("Loading…")}</Text>
         ) : children.length === 0 ? (
           <Text className="font-sans text-sm text-foreground-secondary">
-            The provider has no record of which subagents this call started.
+            {uiText("The provider has no record of which subagents this call started.")}
           </Text>
         ) : (
           children.map((child) => <NativeChild key={child.conversationId} child={child} />)
         )}
         <View className="flex-row justify-end">
           <Button
-            label="Refresh"
+            label={uiText("Refresh")}
             tone="secondary"
             disabled={query.isPending}
             onPress={query.refresh}
@@ -73,20 +75,25 @@ export function NativeChildWorkSheet(props: {
 }
 
 function NativeChild(props: { readonly child: OrchestrationV2NativeChildWork }) {
+  const { text: uiText } = useUiLanguage();
   const { child } = props;
   return (
     <View className="gap-2">
-      <Text className="font-t3-bold text-sm text-foreground">{child.role || "Subagent"}</Text>
+      <Text className="font-t3-bold text-sm text-foreground">
+        {child.role || uiText("Subagent")}
+      </Text>
       <Text selectable className="font-sans text-sm text-foreground-secondary">
         {child.prompt}
       </Text>
       {child.truncated ? (
         <Text className="font-sans text-xs text-foreground-secondary">
-          Earlier steps are not shown.
+          {uiText("Earlier steps are not shown.")}
         </Text>
       ) : null}
       {child.steps === null ? (
-        <Text className="font-sans text-xs text-foreground-secondary">No transcript yet.</Text>
+        <Text className="font-sans text-xs text-foreground-secondary">
+          {uiText("No transcript yet.")}
+        </Text>
       ) : (
         <View className="gap-2 border-l border-border ps-3">
           {child.steps.map((step) => (

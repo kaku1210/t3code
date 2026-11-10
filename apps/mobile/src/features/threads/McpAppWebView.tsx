@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import * as Dialog from "../../components/ui/Dialog";
@@ -116,6 +117,7 @@ export function ThreadMcpApp(props: {
   readonly onExitFullscreen?: () => void;
   readonly height?: number;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [height, setHeight] = useState(MCP_APP_INLINE_MAX_HEIGHT);
   const [documentKey, setDocumentKeyState] = useState(0);
   // The view keeps its first URL: a re-minted one would reload the app.
@@ -491,7 +493,7 @@ export function ThreadMcpApp(props: {
         className="items-center justify-center rounded-lg border border-border"
       >
         <Text className="text-sm text-foreground-muted">
-          The {app.server} app is open full screen
+          The {app.server} {uiText("app is open full screen")}
         </Text>
       </View>
     );
@@ -503,10 +505,12 @@ export function ThreadMcpApp(props: {
         style={{ height, marginBottom: ROW_BOTTOM_MARGIN }}
         className="items-center justify-center gap-2 rounded-lg border border-border"
       >
-        <Text className="text-sm text-foreground-muted">The {app.server} app was closed</Text>
+        <Text className="text-sm text-foreground-muted">
+          The {app.server} {uiText("app was closed")}
+        </Text>
         <View className="items-center">
           <Button
-            label="Show app"
+            label={uiText("Show app")}
             tone="secondary"
             onPress={() => {
               reopenDocument();
@@ -523,7 +527,7 @@ export function ThreadMcpApp(props: {
       {navigatedAway ? (
         <View className="flex-1 items-center justify-center">
           <Text className="text-sm text-foreground-muted">
-            The {app.server} app left its page and was stopped
+            The {app.server} {uiText("app left its page and was stopped")}
           </Text>
         </View>
       ) : uri !== null && !crashed ? (
@@ -568,7 +572,9 @@ export function ThreadMcpApp(props: {
         />
       ) : asset._tag === "Failure" || crashed ? (
         <View className="flex-1 items-center justify-center">
-          <Text className="text-sm text-foreground-muted">Unable to load the {app.server} app</Text>
+          <Text className="text-sm text-foreground-muted">
+            {uiText("Unable to load the")} {app.server} {uiText("app")}
+          </Text>
         </View>
       ) : null}
       {uri !== null && !loaded && !crashed && !navigatedAway ? (

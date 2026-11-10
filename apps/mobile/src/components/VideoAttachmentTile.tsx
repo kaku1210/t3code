@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../i18n/useUiLanguage";
 import { Platform, Pressable, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { cn } from "../lib/cn";
@@ -21,6 +22,7 @@ export function VideoAttachmentTile(props: {
   readonly className?: string;
   readonly style?: StyleProp<ViewStyle>;
 }) {
+  const { text: uiText } = useUiLanguage();
   const mediaActions = useMediaActions(props.disabled ? undefined : props.actionsSource);
   const hasActions = mediaActions.actions.length > 0;
   return (
@@ -46,7 +48,7 @@ export function VideoAttachmentTile(props: {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Play ${props.name}`}
-          accessibilityHint={hasActions ? "Touch and hold for media actions" : undefined}
+          accessibilityHint={hasActions ? uiText("Touch and hold for media actions") : undefined}
           accessibilityState={{ disabled: props.disabled ?? false }}
           disabled={props.disabled}
           onPress={() => props.onPress(props.sourceIdentifier)}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { Button } from "../../../components/ui/Button";
 import { View } from "react-native";
 import Animated, { FadeIn, ReduceMotion } from "react-native-reanimated";
@@ -10,6 +11,7 @@ import type { useReviewGuide } from "./useReviewGuide";
 const NOTICE_ENTER = FadeIn.delay(180).duration(120).reduceMotion(ReduceMotion.System);
 
 export function GuideNotice({ state }: { readonly state: ReturnType<typeof useReviewGuide> }) {
+  const { text: uiText } = useUiLanguage();
   const notice = guideNoticeState(state);
   if (notice.kind === "ready") return null;
   const compact = state.data?.guide != null;
@@ -33,7 +35,7 @@ export function GuideNotice({ state }: { readonly state: ReturnType<typeof useRe
           tintColorClassName={failed ? "accent-danger-foreground" : "accent-icon-muted"}
         />
         <Text className="text-base font-t3-semibold">
-          {compact ? notice.title : "Review guide"}
+          {compact ? notice.title : uiText("Review guide")}
         </Text>
       </View>
       <View style={compact ? undefined : { minHeight: 100 }} className="pt-3 pb-4">
@@ -51,13 +53,13 @@ export function GuideNotice({ state }: { readonly state: ReturnType<typeof useRe
         ) : (
           <Text className="text-xs text-foreground-muted">
             {notice.kind === "failed"
-              ? "Reconnect or ask someone with write access to retry."
-              : "Writing a guide requires a connection and write access."}
+              ? uiText("Reconnect or ask someone with write access to retry.")
+              : uiText("Writing a guide requires a connection and write access.")}
           </Text>
         )}
         {notice.kind === "writing" && state.data?.run?._tag === "Running" ? (
           <Text className="shrink text-xs text-foreground-muted">
-            Started{" "}
+            {uiText("Started")}{" "}
             {new Date(state.data.run.startedAt).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",

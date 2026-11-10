@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
 import { AsyncResult } from "effect/reactivity";
 import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
@@ -25,6 +26,7 @@ export function UsageLimitRecoveryCard({
   thread: EnvironmentThreadShell;
   environmentId: EnvironmentId;
 }) {
+  const { text: uiText } = useUiLanguage();
   const updateMetadata = useAtomCommand(threadEnvironment.updateMetadata);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +139,7 @@ export function UsageLimitRecoveryCard({
       <View className="min-w-0 flex-1 gap-1">
         {chatGptLimit ? (
           <Text className="text-sm font-t3-medium text-foreground">
-            ChatGPT usage limit reached
+            {uiText("ChatGPT usage limit reached")}
           </Text>
         ) : null}
         <Text
@@ -147,13 +149,17 @@ export function UsageLimitRecoveryCard({
         >
           {workspaceLimit
             ? copied
-              ? "Request copied. Send it to your workspace admin."
-              : "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits."
+              ? uiText("Request copied. Send it to your workspace admin.")
+              : uiText(
+                  "You've reached your workspace's limit for using your ChatGPT plan in other apps. Copy a request to ask your workspace admin for increased usage limits.",
+                )
             : chatGptLimit
-              ? (resetText ?? "Review your usage settings in ChatGPT.")
+              ? (resetText ?? uiText("Review your usage settings in ChatGPT."))
               : resetText
                 ? `Usage limit reached. ${resetText}`
-                : "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available."}
+                : uiText(
+                    "Usage limit reached. The provider did not report a reset time. Retry manually when your limit is available.",
+                  )}
         </Text>
         {chatGptLimit || canSchedule ? (
           // The margins cancel the 44pt touch height so the links sit 8pt under the text.
@@ -169,12 +175,12 @@ export function UsageLimitRecoveryCard({
             {canSchedule ? (
               <>
                 <RecoveryAction
-                  label={scheduled ? "Cancel auto-resume" : "Resume at reset"}
+                  label={scheduled ? uiText("Cancel auto-resume") : uiText("Resume at reset")}
                   disabled={pending}
                   onPress={() => void toggle("resume")}
                 />
                 <RecoveryAction
-                  label={snoozed ? "Wake now" : "Snooze until reset"}
+                  label={snoozed ? uiText("Wake now") : uiText("Snooze until reset")}
                   disabled={pending || (!snoozed && resetPassed)}
                   onPress={() => void toggle("snooze")}
                 />

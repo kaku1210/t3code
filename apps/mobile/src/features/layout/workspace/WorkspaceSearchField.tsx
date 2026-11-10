@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import type { Ref } from "react";
 import { Keyboard, Pressable, TextInput, View, type TextInputInstance } from "react-native";
 import { useResolveClassNames } from "uniwind";
@@ -18,6 +19,7 @@ export function WorkspaceSearchField({
   readonly onBlur?: () => void;
   readonly onClear: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const inputStyle = useResolveClassNames("text-foreground font-sans text-base");
   const placeholderStyle = useResolveClassNames("text-foreground-muted");
   const label = props.tab === "pullRequests" ? "Search pull requests" : "Search threads";
@@ -47,7 +49,7 @@ export function WorkspaceSearchField({
         {props.query ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Clear search"
+            accessibilityLabel={uiText("Clear search")}
             onPress={props.onClear}
             className="h-11 w-11 items-center justify-center"
           >

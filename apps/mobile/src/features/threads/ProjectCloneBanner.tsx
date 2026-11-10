@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import {
   projectCloneDisplayName,
@@ -16,6 +17,7 @@ export function ProjectCloneBanner(props: {
   readonly onRetry: () => void;
   readonly onRemove: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { clone } = props;
   const name = projectCloneDisplayName(clone);
   if (clone.phase === "running") {
@@ -24,13 +26,13 @@ export function ProjectCloneBanner(props: {
         <AppActivityIndicator size="small" />
         <View className="min-w-0 flex-1">
           <Text className="font-t3-medium text-sm" numberOfLines={1}>
-            Cloning {name}
+            {uiText("Cloning")} {name}
           </Text>
           <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {projectCloneProgressSummary(clone)}
           </Text>
         </View>
-        <BannerAction label="Cancel" onPress={props.onCancel} />
+        <BannerAction label={uiText("Cancel")} onPress={props.onCancel} />
       </View>
     );
   }
@@ -57,8 +59,8 @@ export function ProjectCloneBanner(props: {
         </Text>
       ) : null}
       <View className="mt-2 flex-row justify-end gap-2">
-        <BannerAction label="Remove project" onPress={props.onRemove} />
-        <BannerAction label="Retry" onPress={props.onRetry} />
+        <BannerAction label={uiText("Remove project")} onPress={props.onRemove} />
+        <BannerAction label={uiText("Retry")} onPress={props.onRetry} />
       </View>
     </View>
   );

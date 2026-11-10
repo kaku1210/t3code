@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -131,6 +132,7 @@ function EnvironmentChoice({
   environment: EnvironmentPresentation;
   selected: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const usable = useAtomValue(voiceConnectionAtom(environment.environmentId)) !== null;
   const status = AsyncResult.getOrElse(
     useAtomValue(voiceSpeechStatusAtom(environment.environmentId)),
@@ -144,13 +146,13 @@ function EnvironmentChoice({
       description={
         !usable
           ? environment.connection.phase !== "connected"
-            ? "Not connected"
-            : "Transcription unavailable"
+            ? uiText("Not connected")
+            : uiText("Transcription unavailable")
           : status?.supported === false
             ? status.reason
             : status?.state === "missing-model"
-              ? "No transcription model installed"
-              : (environment.displayUrl ?? "Send finished recordings to this environment.")
+              ? uiText("No transcription model installed")
+              : (environment.displayUrl ?? uiText("Send finished recordings to this environment."))
       }
       separated
       onPress={() => {
@@ -167,6 +169,7 @@ function EnvironmentChoice({
 }
 
 export function SettingsVoiceRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const transcriber = useAtomValue(localVoiceTranscriberAtom);
   const grant = useAtomValue(voiceGrantAtom);
   const { environments, isReady } = useEnvironments();
@@ -222,7 +225,7 @@ export function SettingsVoiceRouteScreen() {
   const dragTo = drag === null ? -1 : dragFrom + dropSteps(dragFrom, drag.translation);
 
   return (
-    <SettingsScreen title="Voice">
+    <SettingsScreen title={uiText("Voice")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -230,10 +233,10 @@ export function SettingsVoiceRouteScreen() {
         contentContainerClassName="gap-3 px-5 pt-4"
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
-        <SettingsSection title="Transcribe on">
+        <SettingsSection title={uiText("Transcribe on")}>
           <ListChoiceRow
-            label="This device"
-            description="Audio stays on this device and is transcribed here."
+            label={uiText("This device")}
+            description={uiText("Audio stays on this device and is transcribed here.")}
             selected={!grant}
             onPress={() => saveDestination(null)}
           />
@@ -250,8 +253,8 @@ export function SettingsVoiceRouteScreen() {
             ))}
           {isReady && grant && !grantEnvironment ? (
             <ListChoiceRow
-              label="Previously selected environment"
-              description="No longer paired"
+              label={uiText("Previously selected environment")}
+              description={uiText("No longer paired")}
               separated
               selected
               disabled
@@ -290,10 +293,12 @@ export function SettingsVoiceRouteScreen() {
         ) : null}
         {permission === "ask" || permission === "denied" ? (
           <>
-            <SettingsSection title="Microphone access">
+            <SettingsSection title={uiText("Microphone access")}>
               <SettingsActionRow
                 icon="mic"
-                label={permission === "ask" ? "Allow microphone access" : "Open Settings"}
+                label={
+                  permission === "ask" ? uiText("Allow microphone access") : uiText("Open Settings")
+                }
                 onPress={
                   permission === "ask" ? requestPermission : () => void Linking.openSettings()
                 }
@@ -301,12 +306,12 @@ export function SettingsVoiceRouteScreen() {
             </SettingsSection>
             <Text className="px-2 text-sm text-foreground-muted">
               {permission === "ask"
-                ? "Allow microphone access to record and to see your microphones."
-                : "Turn on microphone access for T3 Code in Settings to use voice input."}
+                ? uiText("Allow microphone access to record and to see your microphones.")
+                : uiText("Turn on microphone access for T3 Code in Settings to use voice input.")}
             </Text>
           </>
         ) : null}
-        <SettingsSection title="Preferred order">
+        <SettingsSection title={uiText("Preferred order")}>
           {entries.map((entry, index) => {
             const key = microphoneEntryKey(entry);
             const shift =
@@ -341,11 +346,13 @@ export function SettingsVoiceRouteScreen() {
           })}
         </SettingsSection>
         <Text className="px-2 text-sm text-foreground-muted">
-          Voice input uses the first connected microphone in this list. A wired or Bluetooth
-          microphone is added by name the first time you dictate with it connected; until then it
-          falls under Other. Swipe left on a named microphone to forget it.
+          {uiText(
+            "Voice input uses the first connected microphone in this list. A wired or Bluetooth microphone is added by name the first time you dictate with it connected; until then it falls under Other. Swipe left on a named microphone to forget it.",
+          )}
           {Platform.OS === "android"
-            ? " Android may still use a different microphone if the preferred one can’t be routed."
+            ? uiText(
+                " Android may still use a different microphone if the preferred one can’t be routed.",
+              )
             : null}
         </Text>
       </ScrollView>

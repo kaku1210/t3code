@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { Button } from "../../components/ui/Button";
 import type {
@@ -47,12 +48,13 @@ function ArchivedThreadsHeader(props: {
   readonly onSearchQueryChange: (query: string) => void;
   readonly onSortOrderChange: (sortOrder: ArchivedThreadSortOrder) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const { width } = useWindowDimensions();
   const hasCustomFilter = props.selectedEnvironmentId !== null || props.sortOrder !== "newest";
   return (
     <AppBar
-      title="Archived threads"
+      title={uiText("Archived threads")}
       onBack={() => navigation.goBack()}
       search={{
         value: props.searchQuery,
@@ -269,14 +271,15 @@ function ArchivedThreadRow(props: {
 }
 
 function ArchiveError(props: { readonly message: string; readonly onRetry: () => void }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <View className="rounded-[20px] border border-danger-border bg-danger p-4">
       <Text className="text-base font-t3-bold text-danger-foreground">
-        Could not load every archive
+        {uiText("Could not load every archive")}
       </Text>
       <Text className="mt-1 text-sm text-foreground-muted">{props.message}</Text>
       <View className="mt-3">
-        <Button label="Try again" tone="secondary" onPress={props.onRetry} />
+        <Button label={uiText("Try again")} tone="secondary" onPress={props.onRetry} />
       </View>
     </View>
   );
@@ -297,6 +300,7 @@ export function ArchivedThreadsScreen(props: {
   readonly onSortOrderChange: (sortOrder: ArchivedThreadSortOrder) => void;
   readonly onUnarchiveThread: (thread: EnvironmentThreadShell) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { onDeleteThread, onUnarchiveThread } = props;
   const openSwipeableRef = useRef<SwipeableMethods | null>(null);
   const archiveScrollGesture = useNativeGesture();
@@ -380,7 +384,7 @@ export function ArchivedThreadsScreen(props: {
       return (
         <View className="items-center py-16">
           <AppActivityIndicator colorClassName="accent-icon" />
-          <Text className="mt-3 text-sm text-foreground-muted">Loading archive...</Text>
+          <Text className="mt-3 text-sm text-foreground-muted">{uiText("Loading archive...")}</Text>
         </View>
       );
     }
@@ -392,10 +396,10 @@ export function ArchivedThreadsScreen(props: {
             ? "Try another search or environment."
             : "Threads you archive will appear here."
         }
-        title={isFiltered ? "No matching threads" : "No archived threads"}
+        title={isFiltered ? uiText("No matching threads") : uiText("No archived threads")}
       />
     );
-  }, [isFiltered, isInitialLoad]);
+  }, [isFiltered, isInitialLoad, uiText]);
 
   return (
     // Without this native container, formSheet resizing mistakes the background for a header and collapses the list.

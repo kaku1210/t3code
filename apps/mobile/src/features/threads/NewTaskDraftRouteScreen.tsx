@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import {
   CommonActions,
@@ -89,6 +90,7 @@ const idleBranchCheckoutAtom = Atom.make(AsyncResult.initial<BranchCheckoutResul
 );
 
 export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraftRouteParams>) {
+  const { text: uiText } = useUiLanguage();
   const currentRoute = useRoute();
   const goBack = useWorkspaceBackNavigation("threads");
   const params = route.params ?? {};
@@ -199,9 +201,9 @@ export function NewTaskDraftRouteScreen({ route }: StaticScreenProps<NewTaskDraf
   return (
     <>
       {preparingBranch ? (
-        <ThreadScreenFallback header={<AppBar title="New thread" onBack={goBack} />}>
+        <ThreadScreenFallback header={<AppBar title={uiText("New thread")} onBack={goBack} />}>
           <View className="flex-1 items-center justify-center bg-screen">
-            <Text className="text-foreground">Switching branch...</Text>
+            <Text className="text-foreground">{uiText("Switching branch...")}</Text>
           </View>
         </ThreadScreenFallback>
       ) : (

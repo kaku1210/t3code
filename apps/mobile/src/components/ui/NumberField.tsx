@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button, HStack, Picker, Popover, Spacer, Text, VStack } from "@expo/ui/swift-ui";
 import {
   accessibilityLabel,
@@ -21,6 +22,7 @@ import { useControlTheme } from "./useControlTheme";
 import type { NumberFieldProps } from "./NumberField.types";
 
 export function NumberField(props: NumberFieldProps) {
+  const { text: uiText } = useUiLanguage();
   const { colors, fontSize } = useControlTheme();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(props.value);
@@ -76,7 +78,7 @@ export function NumberField(props: NumberFieldProps) {
             </Picker>
             <HStack>
               <Button
-                label="Cancel"
+                label={uiText("Cancel")}
                 systemImage="xmark"
                 onPress={() => setOpen(false)}
                 modifiers={[
@@ -88,7 +90,7 @@ export function NumberField(props: NumberFieldProps) {
               />
               <Spacer />
               <Button
-                label="Done"
+                label={uiText("Done")}
                 systemImage="checkmark"
                 onPress={() => {
                   setOpen(false);

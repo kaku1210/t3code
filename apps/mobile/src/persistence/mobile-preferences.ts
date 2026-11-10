@@ -1,3 +1,4 @@
+import { UiLanguagePreference } from "@t3tools/contracts/settings";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -89,6 +90,10 @@ const ThreadProject = Schema.Struct({
 const isThreadProject = Schema.is(ThreadProject);
 
 export interface Preferences {
+  /** Interface language belongs to this device, independently of connected servers. */
+  readonly uiLanguage?: UiLanguagePreference;
+  /** Device-local empty-composer copy; unset or empty follows the interface language. */
+  readonly composerPlaceholder?: string;
   readonly navigationTabOrder?: readonly string[];
   readonly hiddenNavigationTabs?: readonly string[];
   readonly pullRequestHideTestFiles?: boolean;
@@ -173,9 +178,12 @@ export class MobilePreferencesStore extends Context.Service<
 >()("@t3tools/mobile/persistence/mobile-preferences/MobilePreferencesStore") {}
 
 const isToolCallVisibility = Schema.is(ToolCallVisibility);
+const isUiLanguagePreference = Schema.is(UiLanguagePreference);
 
 function sanitizePreferences(parsed: Preferences): Preferences {
   const preferences: {
+    uiLanguage?: UiLanguagePreference;
+    composerPlaceholder?: string;
     navigationTabOrder?: readonly string[];
     hiddenNavigationTabs?: readonly string[];
     pullRequestHideTestFiles?: boolean;
@@ -214,6 +222,13 @@ function sanitizePreferences(parsed: Preferences): Preferences {
     pullRequestListFilters?: PullRequestListPreferences;
     workspaceSelections?: WorkspaceSelections;
   } = {};
+
+  if (isUiLanguagePreference(parsed.uiLanguage)) {
+    preferences.uiLanguage = parsed.uiLanguage;
+  }
+  if (typeof parsed.composerPlaceholder === "string") {
+    preferences.composerPlaceholder = parsed.composerPlaceholder;
+  }
 
   if (Array.isArray(parsed.hiddenNavigationTabs)) {
     preferences.hiddenNavigationTabs = parsed.hiddenNavigationTabs.filter(

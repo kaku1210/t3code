@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { sortProjectsByGroupOrder } from "@t3tools/client-runtime/state/project-grouping";
 import type { ScopedProjectRef, SidebarProjectGroupingMode } from "@t3tools/contracts";
@@ -352,6 +353,7 @@ export function PullRequestListFilters(props: {
   readonly sidebar?: boolean;
   readonly filters: ReturnType<typeof usePullRequestListFilters>;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { count, more, reset, select, author, selectedLabelCount } = props.filters;
   return (
     <ScrollView
@@ -368,10 +370,10 @@ export function PullRequestListFilters(props: {
     >
       {Platform.OS === "android" ? null : (
         <ListFilterMenu
-          label={count ? String(count) : "Filters"}
+          label={count ? String(count) : uiText("Filters")}
           icon
           active={count > 0}
-          accessibilityLabel={count ? `Filters, ${count} active` : "More filters"}
+          accessibilityLabel={count ? `Filters, ${count} active` : uiText("More filters")}
           actions={[...more, reset(false)]}
           onSelect={select}
         />
@@ -379,7 +381,7 @@ export function PullRequestListFilters(props: {
       {props.filters.environmentLabel !== null ? (
         <ListFilterMenu
           label={props.filters.environmentLabel}
-          accessibilityLabel="Choose pull request environment"
+          accessibilityLabel={uiText("Choose pull request environment")}
           actions={props.filters.environmentActions}
           onSelect={select}
         />
@@ -387,28 +389,28 @@ export function PullRequestListFilters(props: {
       <ListFilterMenu
         label={STATES[props.filters.state]}
         active={props.filters.state !== "open"}
-        accessibilityLabel="Filter by state"
+        accessibilityLabel={uiText("Filter by state")}
         actions={props.filters.stateActions}
         onSelect={select}
       />
       <ListFilterMenu
         label={INVOLVEMENT[props.filters.involvement]}
         active={props.filters.involvement !== "all"}
-        accessibilityLabel="Filter by involvement"
+        accessibilityLabel={uiText("Filter by involvement")}
         actions={props.filters.involvementActions}
         onSelect={select}
       />
       <ListFilterMenu
-        label={selectedLabelCount ? `Labels ${selectedLabelCount}` : "Labels"}
+        label={selectedLabelCount ? `Labels ${selectedLabelCount}` : uiText("Labels")}
         active={selectedLabelCount > 0}
-        accessibilityLabel="Filter by label"
+        accessibilityLabel={uiText("Filter by label")}
         actions={props.filters.labelActions}
         onSelect={select}
       />
       <ListFilterMenu
-        label={author === "me" ? "By you" : (author ?? "Author")}
+        label={author === "me" ? uiText("By you") : (author ?? uiText("Author"))}
         active={Boolean(author)}
-        accessibilityLabel="Filter by author"
+        accessibilityLabel={uiText("Filter by author")}
         actions={props.filters.authorActions}
         onSelect={select}
       />

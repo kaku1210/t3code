@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useIsFocused } from "@react-navigation/native";
 import { formatAttachmentSize } from "@t3tools/client-runtime/state/attachments";
 import { useAudioPlayerStatus } from "expo-audio";
@@ -29,6 +30,7 @@ type PreviewProps = {
 };
 
 function FileCardHeader(props: PreviewProps) {
+  const { text: uiText } = useUiLanguage();
   return (
     <Pressable
       accessibilityRole="button"
@@ -45,7 +47,7 @@ function FileCardHeader(props: PreviewProps) {
           {props.source.name}
         </Text>
         <Text className="text-xs text-foreground-muted" numberOfLines={1}>
-          Audio
+          {uiText("Audio")}
           {props.sizeBytes !== undefined ? ` · ${formatAttachmentSize(props.sizeBytes)}` : ""}
         </Text>
       </View>
@@ -60,6 +62,7 @@ function timestamp(seconds: number) {
 }
 
 function InlineAudio(props: PreviewProps & { readonly resolveUri: () => Promise<string | null> }) {
+  const { text: uiText } = useUiLanguage();
   // An empty source keeps native buffering off until the user explicitly plays.
   const player = usePlaybackAudioPlayer(null);
   const status = useAudioPlayerStatus(player);
@@ -188,7 +191,11 @@ function InlineAudio(props: PreviewProps & { readonly resolveUri: () => Promise<
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            playing ? "Pause audio" : error || status.error ? "Retry audio" : "Play audio"
+            playing
+              ? uiText("Pause audio")
+              : error || status.error
+                ? uiText("Retry audio")
+                : uiText("Play audio")
           }
           accessibilityState={{ busy }}
           onPress={toggle}
@@ -210,9 +217,9 @@ function InlineAudio(props: PreviewProps & { readonly resolveUri: () => Promise<
           </View>
           <Text className="text-xs text-foreground-muted" numberOfLines={1}>
             {error || status.error
-              ? "Unavailable · tap play to retry"
+              ? uiText("Unavailable · tap play to retry")
               : busy
-                ? "Loading…"
+                ? uiText("Loading…")
                 : `${timestamp(status.currentTime)} / ${status.isLoaded ? timestamp(status.duration) : "--:--"}`}
           </Text>
         </View>

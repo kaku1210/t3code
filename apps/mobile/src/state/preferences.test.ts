@@ -76,10 +76,14 @@ describe("mobile preferences state", () => {
 
       registry.set(state.updatePreferencesAtom, {
         collapsedProjectGroups: ["project:new"],
+        uiLanguage: "zh-CN",
+        composerPlaceholder: "输入你的开发任务",
       });
       pendingLoad.resolve({
         baseFontSize: 18,
         collapsedProjectGroups: ["project:old"],
+        uiLanguage: "en",
+        composerPlaceholder: "Old hint",
       });
 
       const preferences = yield* AtomRegistry.getResult(registry, state.preferencesAtom, {
@@ -88,9 +92,13 @@ describe("mobile preferences state", () => {
       expect(preferences).toEqual({
         baseFontSize: 18,
         collapsedProjectGroups: ["project:new"],
+        uiLanguage: "zh-CN",
+        composerPlaceholder: "输入你的开发任务",
       });
       expect(savePatch).toHaveBeenCalledWith({
         collapsedProjectGroups: ["project:new"],
+        uiLanguage: "zh-CN",
+        composerPlaceholder: "输入你的开发任务",
       });
       expect(AsyncResult.isFailure(registry.get(state.updatePreferencesAtom))).toBe(false);
 

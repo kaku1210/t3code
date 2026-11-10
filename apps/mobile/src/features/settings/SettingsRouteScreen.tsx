@@ -1,10 +1,11 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import {
   navigationCustomizationAvailable,
   overflowNavigationTabs,
 } from "../layout/workspace/navigation-tab-order";
 import {
   NAVIGATION_TAB_ICONS,
-  WORKSPACE_TAB_LABELS,
+  useWorkspaceTabLabels,
   useNavigationTabOrder,
   useHiddenNavigationTabs,
 } from "../layout/workspace/navigation-tabs";
@@ -73,13 +74,14 @@ export function SettingsListScreen(props: {
   readonly sidebar: boolean;
   readonly selected: string | null;
 }) {
+  const { text: uiText } = useUiLanguage();
   const workspace = useWorkspaceTabs();
   const environmentMenu = useSettingsEnvironmentMenu();
   return (
     <SettingsSidebarContext value={props.sidebar ? { selected: props.selected } : null}>
       <View className="flex-1 bg-screen">
         <SettingsScreen
-          title="Settings"
+          title={uiText("Settings")}
           workspaceRoot={props.sidebar}
           menus={[environmentMenu]}
           search={
@@ -108,15 +110,16 @@ interface SettingsListSection {
 }
 
 function ConfiguredSettingsRouteScreen() {
+  const { text } = useUiLanguage();
   const navigation = useNavigation();
   const { isLoaded, isSignedIn } = useAuth({ treatPendingAsSignedOut: false });
   const { user } = useUser();
   const { savedConnectionsById } = useSavedRemoteConnections();
   const accountLabel = !isLoaded
-    ? "Checking"
+    ? text("Checking")
     : !isSignedIn
-      ? "Sign in"
-      : (user?.primaryEmailAddress?.emailAddress ?? "Signed in");
+      ? text("Sign in")
+      : (user?.primaryEmailAddress?.emailAddress ?? text("Signed in"));
 
   return (
     <SettingsList
@@ -158,6 +161,7 @@ function environmentsRow(count: number): SettingsListRow {
 }
 
 function SettingsList(props: { readonly connections: readonly SettingsListRow[] }) {
+  const { text: uiText, language } = useUiLanguage();
   // UIKit's scroll-edge material takes the scroll view's own color; like the chat list, match
   // the sidebar's surface so the bar doesn't darken over content at rest.
   // Grouped cards only lift off the screen surface; the drawer is as dark as they are.
@@ -172,6 +176,7 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
   const sections = filterSettingsSections(
     [{ rows: overflowRows }, { title: "Connections", rows: props.connections }, ...indexSections],
     query,
+    language,
   );
 
   return (
@@ -202,7 +207,7 @@ function SettingsList(props: { readonly connections: readonly SettingsListRow[] 
         ) : (
           <EmptyState
             variant="plain"
-            title="No results"
+            title={uiText("No results")}
             detail={`No settings match “${query.trim()}”.`}
           />
         )}
@@ -283,6 +288,7 @@ function useSettingsIndexSections(): SettingsListSection[] {
 }
 
 function useOverflowRows(): SettingsListRow[] {
+  const tabLabels = useWorkspaceTabLabels();
   const order = useNavigationTabOrder();
   const hidden = useHiddenNavigationTabs();
   const { layout } = useAdaptiveWorkspaceLayout();
@@ -292,7 +298,7 @@ function useOverflowRows(): SettingsListRow[] {
   return tabs.map((tab) => ({
     id: tab,
     icon: NAVIGATION_TAB_ICONS[tab],
-    label: WORKSPACE_TAB_LABELS[tab],
+    label: tabLabels[tab],
     onPress: () => selectTab(tab),
   }));
 }

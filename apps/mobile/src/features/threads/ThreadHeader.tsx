@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { AppBar } from "../../components/ui/AppBar";
 import { ScreenHeaderButton } from "../../components/ui/ScreenHeaderButton";
 import type { AppBarAction, AppBarMenu } from "../../components/ui/AppBar.types";
@@ -22,6 +23,7 @@ export function ThreadHeader(props: {
   readonly onToggleInspector: () => void;
   readonly onOpenFilesInspector: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const goBack = useWorkspaceBackNavigation("threads");
   const { panes, toggleAuxiliaryPane, composerKeyboardActive, startNewTask } =
     useAdaptiveWorkspaceLayout();
@@ -63,7 +65,9 @@ export function ThreadHeader(props: {
       trailing={
         props.fileInspectorSupported && props.hasThreadCwd ? (
           <ScreenHeaderButton
-            accessibilityLabel={inspectorVisible ? "Hide inspector" : "Show inspector"}
+            accessibilityLabel={
+              inspectorVisible ? uiText("Hide inspector") : uiText("Show inspector")
+            }
             icon="sidebar.right"
             selected={inspectorVisible}
             onPress={props.onToggleInspector}

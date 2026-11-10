@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { SheetHeader } from "../../components/ui/SheetHeader";
 import {
   DatePicker,
@@ -49,6 +50,7 @@ export function CustomSnoozeSheet(props: {
   readonly onClose: () => void;
   readonly onSnooze: (snoozedUntil: string) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { width, height } = useWindowDimensions();
   const [mode, setMode] = useState<CustomSnoozeInput["mode"]>("date");
   const [date, setDate] = useState(() => new Date(Date.now() + 3_600_000));
@@ -113,7 +115,7 @@ export function CustomSnoozeSheet(props: {
                 modifiers={[padding({ all: 16 }), foregroundStyle(colors["--color-foreground"])]}
               >
                 <Picker
-                  label="Snooze mode"
+                  label={uiText("Snooze mode")}
                   selection={mode}
                   onSelectionChange={(value: CustomSnoozeInput["mode"]) => {
                     setMode(value);
@@ -129,7 +131,7 @@ export function CustomSnoozeSheet(props: {
                 </Picker>
                 {mode === "date" ? (
                   <DatePicker
-                    title="Snooze until"
+                    title={uiText("Snooze until")}
                     selection={date}
                     displayedComponents={["date", "hourAndMinute"]}
                     onDateChange={updateDate}
@@ -142,7 +144,7 @@ export function CustomSnoozeSheet(props: {
                 ) : (
                   <HStack spacing={0}>
                     <Picker
-                      label="Duration amount"
+                      label={uiText("Duration amount")}
                       selection={amount}
                       onSelectionChange={(value: number) => {
                         setAmount(value);
@@ -165,7 +167,7 @@ export function CustomSnoozeSheet(props: {
                       ))}
                     </Picker>
                     <Picker
-                      label="Duration unit"
+                      label={uiText("Duration unit")}
                       selection={unit}
                       onSelectionChange={(value: typeof unit) => {
                         setUnit(value);
@@ -218,15 +220,16 @@ function SnoozePopoverNavigation(props: {
   readonly onSubmit: () => void;
   readonly children: ReactNode;
 }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <VStack modifiers={[frame({ width: props.width, height: props.height })]}>
       <RNHostView>
         <View style={{ width: props.width, height: props.height }}>
           <StandaloneStack>
             <SheetHeader
-              title="Custom snooze"
+              title={uiText("Custom snooze")}
               onCancel={props.onClose}
-              accessibilityLabel="Cancel custom snooze"
+              accessibilityLabel={uiText("Cancel custom snooze")}
               confirm={{ label: "Snooze", onPress: props.onSubmit }}
             />
             <ScrollView

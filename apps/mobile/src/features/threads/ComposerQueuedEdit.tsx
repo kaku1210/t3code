@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import type { ChatAttachment, EnvironmentId } from "@t3tools/contracts";
 import { Image } from "expo-image";
@@ -12,16 +13,17 @@ export function ComposerQueuedEditBanner(props: {
   readonly saving: boolean;
   readonly onCancel: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <View className="flex-row items-center gap-2 px-4 pb-2">
       <SymbolView name="pencil" size={12} tintColorClassName="accent-foreground-muted" />
       <Text className="min-w-0 flex-1 text-xs text-foreground-muted" numberOfLines={1}>
-        Editing queued message
+        {uiText("Editing queued message")}
       </Text>
       <Button
-        label="Cancel"
+        label={uiText("Cancel")}
         tone="text"
-        accessibilityLabel="Cancel editing queued message"
+        accessibilityLabel={uiText("Cancel editing queued message")}
         disabled={props.saving}
         onPress={props.onCancel}
       />

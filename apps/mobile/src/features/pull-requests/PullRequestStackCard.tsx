@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useState } from "react";
 import { View } from "react-native";
 import { useOpenWorkspaceDetail } from "../layout/useOpenWorkspaceDetail";
@@ -14,6 +15,7 @@ export function PullRequestStackCard(props: {
   readonly params: PullRequestParams;
   readonly state: PullRequestStackState;
 }) {
+  const { text: uiText } = useUiLanguage();
   const openDetail = useOpenWorkspaceDetail();
   const [expanded, setExpanded] = useState(false);
   const stack = props.state.stack;
@@ -26,7 +28,7 @@ export function PullRequestStackCard(props: {
     return (
       <PullRequestCardGroup>
         <PullRequestCardRow
-          title="Stack"
+          title={uiText("Stack")}
           icon={PullRequestGlyph.stack}
           value={`${summary.position} of ${summary.size}`}
           last
@@ -38,10 +40,10 @@ export function PullRequestStackCard(props: {
   return (
     <PullRequestCardGroup>
       <PullRequestCardRow
-        title="Stack"
+        title={uiText("Stack")}
         icon={PullRequestGlyph.stack}
         value={`${position} of ${stack.layers.length}`}
-        accessibilityLabel={`Stack, ${position} of ${stack.layers.length}${props.state.isFresh ? "" : ", showing saved stack"}`}
+        accessibilityLabel={`Stack, ${position} of ${stack.layers.length}${props.state.isFresh ? "" : uiText(", showing saved stack")}`}
         expanded={expanded}
         onPress={() => setExpanded(!expanded)}
         last={!expanded}
@@ -79,7 +81,8 @@ export function PullRequestStackCard(props: {
             );
           })}
           <Text className="px-4 py-3 text-xs text-foreground-muted">
-            Base: {stack.base}. Open a layer to review it or merge the stack through that layer.
+            {uiText("Base:")} {stack.base}
+            {uiText(". Open a layer to review it or merge the stack through that layer.")}
           </Text>
         </View>
       ) : null}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import * as Dialog from "../../components/ui/Dialog";
 import { useAtomValue } from "@effect/atom-react";
 import {
@@ -265,6 +266,7 @@ function WebhookFilterRows(props: {
   readonly disabled: boolean;
   readonly onChange: (filters: ReadonlyArray<WebhookFilterDraft>) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const update = (index: number, patch: Partial<WebhookFilterDraft>) =>
     props.onChange(
       props.filters.map((filter, at) => (at === index ? { ...filter, ...patch } : filter)),
@@ -274,7 +276,9 @@ function WebhookFilterRows(props: {
       {props.filters.map((filter, index) => (
         <View key={filter.id}>
           <View className="flex-row items-center gap-3 border-t border-border-subtle px-4 pt-3">
-            <Text className="min-w-0 flex-1 text-sm text-foreground-muted">Filter {index + 1}</Text>
+            <Text className="min-w-0 flex-1 text-sm text-foreground-muted">
+              {uiText("Filter")} {index + 1}
+            </Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Remove filter ${index + 1}`}
@@ -287,14 +291,14 @@ function WebhookFilterRows(props: {
             </Pressable>
           </View>
           <FormField
-            label="Path"
+            label={uiText("Path")}
             value={filter.path}
             placeholder="body.action"
             disabled={props.disabled}
             onChange={(path) => update(index, { path })}
           />
           <SelectRow
-            label="Test"
+            label={uiText("Test")}
             value={WEBHOOK_FILTER_OPS.find((option) => option.op === filter.op)?.label ?? ""}
             actions={WEBHOOK_FILTER_OPS.map((option) => ({
               id: option.op,
@@ -308,9 +312,9 @@ function WebhookFilterRows(props: {
           />
           {filter.op === "exists" ? null : (
             <FormField
-              label={filter.op === "in" ? "Values, comma-separated" : "Value"}
+              label={filter.op === "in" ? uiText("Values, comma-separated") : uiText("Value")}
               value={filter.value}
-              placeholder={filter.op === "in" ? "opened, reopened" : "opened"}
+              placeholder={filter.op === "in" ? uiText("opened, reopened") : uiText("opened")}
               disabled={props.disabled}
               onChange={(value) => update(index, { value })}
             />
@@ -325,15 +329,16 @@ function WebhookFilterRows(props: {
           className="min-h-14 flex-row items-center gap-3 border-t border-border-subtle px-4 py-3 active:opacity-70"
         >
           <Text textRole="body" className="min-w-0 flex-1 text-foreground">
-            Add filter
+            {uiText("Add filter")}
           </Text>
           <SymbolView name="plus" size={16} tintColorClassName="accent-icon" />
         </Pressable>
       ) : null}
       {props.filters.length > 0 ? (
         <Text className="px-4 pb-3 text-sm text-foreground-muted">
-          Runs only when every filter matches. Other requests are logged as filtered. Separate “is
-          one of” values with commas; a value can't contain a comma.
+          {uiText(
+            "Runs only when every filter matches. Other requests are logged as filtered. Separate “is one of” values with commas; a value can't contain a comma.",
+          )}
         </Text>
       ) : null}
     </>
@@ -381,6 +386,7 @@ function PickerRow(props: {
 }
 
 export function SettingsScheduledTasksRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const [now, setNow] = useState(Date.now);
   useFocusEffect(() => {
     const updateNow = () => setNow(Date.now());
@@ -413,7 +419,7 @@ export function SettingsScheduledTasksRouteScreen() {
 
   return (
     <SettingsScreen
-      title="Scheduled tasks"
+      title={uiText("Scheduled tasks")}
       actions={[
         {
           accessibilityLabel: "New task",
@@ -461,8 +467,8 @@ export function SettingsScheduledTasksRouteScreen() {
         ) : (
           <Text className="px-2 text-base text-foreground-muted">
             {availableTargets.length === 0
-              ? "Connect an environment to view and create scheduled tasks."
-              : "No environments match these filters. Change the filter above."}
+              ? uiText("Connect an environment to view and create scheduled tasks.")
+              : uiText("No environments match these filters. Change the filter above.")}
           </Text>
         )}
       </ScrollView>
@@ -473,14 +479,17 @@ export function SettingsScheduledTasksRouteScreen() {
 // The "New task" action and takeScheduledTaskNewLink clear the editor before
 // this screen opens, so it starts from the default target.
 export function SettingsScheduledTaskNewRouteScreen() {
-  return <SettingsScheduledTaskEditorScreen title="New scheduled task" />;
+  const { text: uiText } = useUiLanguage();
+  return <SettingsScheduledTaskEditorScreen title={uiText("New scheduled task")} />;
 }
 
 export function SettingsScheduledTaskEditRouteScreen() {
-  return <SettingsScheduledTaskEditorScreen title="Edit scheduled task" />;
+  const { text: uiText } = useUiLanguage();
+  return <SettingsScheduledTaskEditorScreen title={uiText("Edit scheduled task")} />;
 }
 
 function SettingsScheduledTaskEditorScreen({ title }: { readonly title: string }) {
+  const { text: uiText } = useUiLanguage();
   const { editor, voiceOwnerKey, readEditor, setEditor, hasChanges, draftForEnvironment } =
     useScheduledTaskEditor();
   const { availableTargets } = useSettingsEnvironmentFilter();
@@ -614,8 +623,10 @@ function SettingsScheduledTaskEditorScreen({ title }: { readonly title: string }
         ) : (
           <Text className="px-2 text-base text-foreground-muted">
             {availableTargets.length === 0
-              ? "Connect an environment to create a scheduled task."
-              : "No environments match the current filters. Change the filters to create a task."}
+              ? uiText("Connect an environment to create a scheduled task.")
+              : uiText(
+                  "No environments match the current filters. Change the filters to create a task.",
+                )}
           </Text>
         )}
       </ScrollView>
@@ -648,6 +659,7 @@ function TaskForm({
   readonly onSaved: () => void;
   readonly onChangeEnvironment: (target: SettingsTarget) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation<NativeStackNavigationProp<ScheduledTaskRoutes>>();
   const tasks = useEnvironmentQuery(
     serverEnvironment.scheduledTasksLive({ environmentId, input: {} }),
@@ -805,17 +817,19 @@ function TaskForm({
         importantForAccessibility={saving ? "no-hide-descendants" : "auto"}
       >
         {taskMissing ? (
-          <Text className="px-1 text-base text-danger-foreground">This task no longer exists.</Text>
+          <Text className="px-1 text-base text-danger-foreground">
+            {uiText("This task no longer exists.")}
+          </Text>
         ) : null}
 
         {environmentUnavailable ? (
           <Text className="px-1 text-base text-danger-foreground">
-            This environment is disconnected. Reconnect before saving.
+            {uiText("This environment is disconnected. Reconnect before saving.")}
           </Text>
         ) : null}
         <SettingsSection>
           <SelectRow
-            label="Runs on"
+            label={uiText("Runs on")}
             value={environmentLabel}
             valueIcon={
               <EnvironmentMachineSymbol
@@ -843,20 +857,20 @@ function TaskForm({
             }}
           />
         </SettingsSection>
-        <SettingsSection title="Task">
+        <SettingsSection title={uiText("Task")}>
           <FormField
-            label="Name"
+            label={uiText("Name")}
             disabled={saving}
             value={draft.title}
-            placeholder="Check for issues"
+            placeholder={uiText("Check for issues")}
             onChange={(title) => setDraft({ ...draft, title })}
           />
           {promptField}
         </SettingsSection>
 
-        <SettingsSection title="Context">
+        <SettingsSection title={uiText("Context")}>
           <SelectRow
-            label="Project"
+            label={uiText("Project")}
             value={
               projects.find((project) => project.id === draft.projectId)?.title ??
               (projects.length ? "Choose project" : "No projects available")
@@ -889,7 +903,7 @@ function TaskForm({
             }}
           />
           <PickerRow
-            label="Model"
+            label={uiText("Model")}
             borderTop
             value={
               modelOptions.find(
@@ -907,19 +921,21 @@ function TaskForm({
 
         {offersThreadModes ? (
           <SettingsSection
-            title="Destination"
+            title={uiText("Destination")}
             footer={
               draft.threadMode === "new_thread"
-                ? "Each run starts a new thread."
+                ? uiText("Each run starts a new thread.")
                 : `${
                     draft.threadMode === "continue"
-                      ? "Runs continue one conversation."
-                      : "Runs share one thread, each in a fresh session without earlier runs' context."
+                      ? uiText("Runs continue one conversation.")
+                      : uiText(
+                          "Runs share one thread, each in a fresh session without earlier runs' context.",
+                        )
                   } The first run starts the thread. Deleting it also deletes this task.`
             }
           >
             <SelectRow
-              label="Runs go to"
+              label={uiText("Runs go to")}
               value={THREAD_MODE_LABELS[draft.threadMode]}
               actions={(Object.keys(THREAD_MODE_LABELS) as ScheduledTaskThreadMode[]).map(
                 (mode) => ({
@@ -936,9 +952,9 @@ function TaskForm({
           </SettingsSection>
         ) : null}
 
-        <SettingsSection title="Workspace">
+        <SettingsSection title={uiText("Workspace")}>
           <SelectRow
-            label="Run in"
+            label={uiText("Run in")}
             value={
               draft.workspace === "worktree"
                 ? "New worktree"
@@ -970,7 +986,7 @@ function TaskForm({
           />
           {draft.workspace === "worktree" ? (
             <PickerRow
-              label="Base branch"
+              label={uiText("Base branch")}
               value={resolveNewTaskBranchLabel({
                 branchName: draft.baseRef,
                 startFromOrigin: draft.startFromOrigin,
@@ -983,7 +999,7 @@ function TaskForm({
           ) : null}
           {draft.workspace === "existing_worktree" ? (
             <FormField
-              label="Checkout path"
+              label={uiText("Checkout path")}
               disabled={saving}
               value={draft.checkoutPath}
               borderTop
@@ -997,7 +1013,7 @@ function TaskForm({
           ) : null}
         </SettingsSection>
 
-        <SettingsSection title="Schedule">
+        <SettingsSection title={uiText("Schedule")}>
           <View className="px-4 py-3">
             <SegmentedControl
               variant="card"
@@ -1043,7 +1059,7 @@ function TaskForm({
                 className="min-h-14 flex-row items-center gap-3 border-t border-border-subtle px-4 py-3 active:opacity-70"
               >
                 <Text textRole="body" className="text-foreground">
-                  Time
+                  {uiText("Time")}
                 </Text>
                 <Text
                   textRole="footnote"
@@ -1071,7 +1087,7 @@ function TaskForm({
                 />
               ) : null}
               <SelectRow
-                label="Repeat"
+                label={uiText("Repeat")}
                 value={repeatLabel(draft.schedule.weekdays)}
                 borderTop
                 actions={[
@@ -1123,12 +1139,12 @@ function TaskForm({
                 <View key={field}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${field === "date" ? "Date" : "Time"}, ${label}`}
+                    accessibilityLabel={`${field === "date" ? uiText("Date") : uiText("Time")}, ${label}`}
                     onPress={() => setRunAtPicker((open) => (open === field ? null : field))}
                     className="min-h-14 flex-row items-center gap-3 border-t border-border-subtle px-4 py-3 active:opacity-70"
                   >
                     <Text textRole="body" className="text-foreground">
-                      {field === "date" ? "Date" : "Time"}
+                      {field === "date" ? uiText("Date") : uiText("Time")}
                     </Text>
                     <Text
                       textRole="footnote"
@@ -1176,9 +1192,9 @@ function TaskForm({
                 disabled={!canOperate || saving || environmentUnavailable}
               />
               <FormField
-                label="Skip requests older than (minutes)"
+                label={uiText("Skip requests older than (minutes)")}
                 value={draft.schedule.maxDeliveryAgeMinutes}
-                placeholder="Run every request"
+                placeholder={uiText("Run every request")}
                 keyboardType="number-pad"
                 disabled={saving}
                 borderTop
@@ -1194,7 +1210,7 @@ function TaskForm({
                 }
               />
               <FormField
-                label="Duplicate request key"
+                label={uiText("Duplicate request key")}
                 value={draft.schedule.replayKey}
                 placeholder="{{headers.delivery-id}}"
                 disabled={saving}
@@ -1204,10 +1220,10 @@ function TaskForm({
                 }
               />
               <Text className="px-4 pb-3 text-sm text-foreground-muted">
-                Requests with the same key run only once within 7 days.
+                {uiText("Requests with the same key run only once within 7 days.")}
               </Text>
               <FormField
-                label="Coalesce key template"
+                label={uiText("Coalesce key template")}
                 value={draft.schedule.coalesceKey}
                 placeholder="{{body.id}}"
                 disabled={saving}
@@ -1217,7 +1233,7 @@ function TaskForm({
                 }
               />
               <FormField
-                label="Coalesce window (seconds, 10–3600)"
+                label={uiText("Coalesce window (seconds, 10–3600)")}
                 value={draft.schedule.coalesceWindowSeconds}
                 placeholder="120"
                 keyboardType="number-pad"
@@ -1228,14 +1244,15 @@ function TaskForm({
                 }
               />
               <Text className="px-4 pb-3 text-sm text-foreground-muted">
-                Coalescing runs the latest payload when the window from the first delivery closes.
-                Empty keys run normally.
+                {uiText(
+                  "Coalescing runs the latest payload when the window from the first delivery closes. Empty keys run normally.",
+                )}
               </Text>
             </>
           ) : (
             <>
               <FormField
-                label="Minutes between runs"
+                label={uiText("Minutes between runs")}
                 value={draft.schedule.intervalMinutes}
                 keyboardType="decimal-pad"
                 disabled={saving}
@@ -1246,23 +1263,26 @@ function TaskForm({
               />
               {!(parseIntervalMinutes(draft.schedule.intervalMinutes) >= 1) ? (
                 <Text className="px-4 pb-3 text-sm text-danger-foreground">
-                  Intervals must be at least 1 minute. Update this interval before saving.
+                  {uiText(
+                    "Intervals must be at least 1 minute. Update this interval before saving.",
+                  )}
                 </Text>
               ) : draft.task?.schedule.type === "interval" &&
                 draft.task.schedule.everyMs < 60_000 ? (
                 <Text className="px-4 pb-3 text-sm text-foreground-muted">
-                  This task previously ran more than once per minute. Saving requires an interval of
-                  at least 1 minute.
+                  {uiText(
+                    "This task previously ran more than once per minute. Saving requires an interval of at least 1 minute.",
+                  )}
                 </Text>
               ) : null}
             </>
           )}
           <View className="min-h-14 flex-row items-center gap-3 border-t border-border-subtle px-4 py-3">
             <Text textRole="body" className="min-w-0 flex-1 text-foreground">
-              Enabled
+              {uiText("Enabled")}
             </Text>
             <ThemedSwitch
-              accessibilityLabel="Task enabled"
+              accessibilityLabel={uiText("Task enabled")}
               value={draft.enabled}
               onValueChange={(enabled) => setDraft({ ...draft, enabled })}
             />
@@ -1270,7 +1290,7 @@ function TaskForm({
         </SettingsSection>
         {draft.schedule.mode === "fixed_time" ? (
           <Text className="px-2 text-sm text-foreground-muted">
-            Time uses the environment's time zone, which may differ from your phone's.
+            {uiText("Time uses the environment's time zone, which may differ from your phone's.")}
           </Text>
         ) : null}
       </View>
@@ -1287,7 +1307,9 @@ function TaskForm({
           (draft.enabled && draft.schedule.mode === "webhook" && webhookDenial !== undefined)
         }
         onPress={() => void save()}
-        label={saving ? "Saving…" : draft.task ? "Save changes" : "Create task"}
+        label={
+          saving ? uiText("Saving…") : draft.task ? uiText("Save changes") : uiText("Create task")
+        }
       />
     </View>
   );
@@ -1304,6 +1326,7 @@ function WebhookScheduleDetails({
   readonly signatureConfigured: boolean;
   readonly disabled: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const [rotating, setRotating] = useState(false);
   const rotate = useAtomCommand(serverEnvironment.rotateScheduledTaskWebhookToken, {
     label: "scheduled task rotate webhook token",
@@ -1317,24 +1340,26 @@ function WebhookScheduleDetails({
   return (
     <View className="gap-2 border-t border-border-subtle px-4 py-3">
       <Text className="text-sm text-foreground-muted">
-        {
-          "The prompt can use {{body.a.b}}, {{headers.name}}, {{query.name}}, {{body}} and {{request}}. The filled-in prompt is all the agent sees."
-        }
+        {uiText(
+          "The prompt can use {{body.a.b}}, {{headers.name}}, {{query.name}}, {{body}} and {{request}}. The filled-in prompt is all the agent sees.",
+        )}
       </Text>
       {task === null || resolved === null ? (
-        <Text className="text-sm text-foreground-muted">Save the task to get its webhook URL.</Text>
+        <Text className="text-sm text-foreground-muted">
+          {uiText("Save the task to get its webhook URL.")}
+        </Text>
       ) : (
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Copy webhook URL"
-            accessibilityHint="Copies the URL to the clipboard"
+            accessibilityLabel={uiText("Copy webhook URL")}
+            accessibilityHint={uiText("Copies the URL to the clipboard")}
             disabled={!resolved.copyable}
             onPress={() => void tryCopyTextWithHaptic(resolved.address)}
             className="gap-1 active:opacity-70"
           >
             <Text textRole="body" className="text-foreground">
-              {resolved.copyable ? "Webhook URL" : "Webhook path"}
+              {resolved.copyable ? uiText("Webhook URL") : uiText("Webhook path")}
             </Text>
             <Text className="text-sm text-foreground-muted" numberOfLines={2} selectable>
               {resolved.address}
@@ -1344,7 +1369,7 @@ function WebhookScheduleDetails({
             <Text className="text-sm text-foreground-muted">{resolved.note}</Text>
           ) : null}
           <Button
-            label={rotating ? "Rotating…" : "Rotate URL"}
+            label={rotating ? uiText("Rotating…") : uiText("Rotate URL")}
             tone="danger"
             disabled={disabled || rotating}
             onPress={() =>
@@ -1374,7 +1399,7 @@ function WebhookScheduleDetails({
       )}
       {signatureConfigured ? (
         <Text className="text-sm text-foreground-muted">
-          Signature check configured on desktop/web.
+          {uiText("Signature check configured on desktop/web.")}
         </Text>
       ) : null}
     </View>
@@ -1392,6 +1417,7 @@ function EnvironmentTasks({
   readonly projectIds: readonly ProjectId[] | null;
   readonly onEdit: (task: ScheduledTask) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const environmentId = environment.environmentId;
   const tasks = useEnvironmentQuery(
     serverEnvironment.scheduledTasksLive({ environmentId, input: {} }),
@@ -1448,10 +1474,12 @@ function EnvironmentTasks({
       {tasks.error ? (
         <Text className="p-4 text-base text-danger-foreground">{tasks.error}</Text>
       ) : !tasks.data ? (
-        <Text className="p-4 text-base text-foreground-muted">Loading tasks…</Text>
+        <Text className="p-4 text-base text-foreground-muted">{uiText("Loading tasks…")}</Text>
       ) : visibleTasks?.length === 0 ? (
         <Text className="p-4 text-base text-foreground-muted">
-          {projectIds === null ? "No scheduled tasks yet." : "No tasks in this project."}
+          {projectIds === null
+            ? uiText("No scheduled tasks yet.")
+            : uiText("No tasks in this project.")}
         </Text>
       ) : (
         visibleTasks?.map((task, index) => (
@@ -1477,7 +1505,7 @@ function EnvironmentTasks({
               <Text className="text-sm text-foreground-muted" numberOfLines={2}>
                 {describeSchedule(task)}
                 {!task.enabled
-                  ? " · Paused"
+                  ? uiText(" · Paused")
                   : task.nextRunAt
                     ? ` · ${formatNextScheduledTaskRun(task.nextRunAt, now)}`
                     : ""}
@@ -1489,7 +1517,7 @@ function EnvironmentTasks({
               ) : null}
               {task.lastRunError ? (
                 <Text className="text-sm text-danger-foreground" numberOfLines={2}>
-                  Last run failed: {task.lastRunError}
+                  {uiText("Last run failed:")} {task.lastRunError}
                 </Text>
               ) : null}
             </Pressable>

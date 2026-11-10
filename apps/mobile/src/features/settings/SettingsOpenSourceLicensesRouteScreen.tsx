@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { NativeScrollView } from "../../native/NativeScrollViewMarker";
 import { useSearchToolbarInset } from "../../components/ui/useBarInset";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
@@ -47,6 +48,7 @@ function LicenseRow(props: {
 }
 
 export function SettingsOpenSourceLicensesRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
@@ -74,10 +76,10 @@ export function SettingsOpenSourceLicensesRouteScreen() {
 
   if (!manifest) {
     return (
-      <SettingsScreen title="Open source licenses">
+      <SettingsScreen title={uiText("Open source licenses")}>
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base text-foreground-muted">
-            License notices are unavailable in this build.
+            {uiText("License notices are unavailable in this build.")}
           </Text>
         </View>
       </SettingsScreen>
@@ -85,7 +87,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
   }
 
   return (
-    <SettingsScreen title="Open source licenses" search={search}>
+    <SettingsScreen title={uiText("Open source licenses")} search={search}>
       <LegendList
         renderScrollComponent={NativeScrollView}
         className="flex-1"
@@ -102,7 +104,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
         ListEmptyComponent={
           <View className="items-center px-6 py-12">
             <Text className="text-center text-base text-foreground-muted">
-              No licenses match that search.
+              {uiText("No licenses match that search.")}
             </Text>
           </View>
         }
@@ -116,6 +118,7 @@ export function SettingsOpenSourceLicensesRouteScreen() {
 type LicenseDetailProps = StaticScreenProps<{ readonly entryKey: string }>;
 
 export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailProps) {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const manifest = useMobileThirdPartyLicenses();
   const entry = manifest
@@ -125,10 +128,10 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
 
   if (!entry) {
     return (
-      <SettingsScreen title="License notice">
+      <SettingsScreen title={uiText("License notice")}>
         <View className="flex-1 items-center justify-center px-6">
           <Text className="text-center text-base text-foreground-muted">
-            This license notice is unavailable.
+            {uiText("This license notice is unavailable.")}
           </Text>
         </View>
       </SettingsScreen>
@@ -136,7 +139,7 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
   }
 
   return (
-    <SettingsScreen title="License notice">
+    <SettingsScreen title={uiText("License notice")}>
       <ScrollView
         className="flex-1"
         contentInsetAdjustmentBehavior="automatic"
@@ -153,12 +156,12 @@ export function SettingsOpenSourceLicenseRouteScreen({ route }: LicenseDetailPro
           </Text>
           {sourceUrl ? (
             <Pressable
-              accessibilityHint="Opens the project website"
+              accessibilityHint={uiText("Opens the project website")}
               accessibilityRole="link"
               onPress={() => void Linking.openURL(sourceUrl)}
               className="min-h-12 flex-row items-center gap-2 self-start py-2 active:opacity-60"
             >
-              <Text className="font-t3-medium text-primary-text">Project source</Text>
+              <Text className="font-t3-medium text-primary-text">{uiText("Project source")}</Text>
               <SymbolView
                 name="arrow.up.right"
                 size={16}

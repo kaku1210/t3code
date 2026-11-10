@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -9,7 +10,7 @@ import {
   type ComposerEnterBehavior,
 } from "../../lib/composerEnterBehavior";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
-import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
+import { SettingsChoiceRow } from "./components/SettingsChoiceRow";
 import { SettingsScreen } from "./components/SettingsScreen";
 import { SettingsSection } from "./components/SettingsSection";
 
@@ -31,6 +32,7 @@ const ENTER_BEHAVIOR_OPTIONS: ReadonlyArray<{
 ];
 
 export function SettingsKeyboardRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const preferencesResult = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
@@ -40,7 +42,7 @@ export function SettingsKeyboardRouteScreen() {
     : null;
 
   return (
-    <SettingsScreen title="Keyboard">
+    <SettingsScreen title={uiText("Keyboard")}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -48,7 +50,7 @@ export function SettingsKeyboardRouteScreen() {
         contentContainerClassName="gap-3 px-5 pt-4"
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
       >
-        <SettingsSection title="Return key">
+        <SettingsSection title={uiText("Return key")}>
           {ENTER_BEHAVIOR_OPTIONS.map((option, index) => (
             <SettingsChoiceRow
               key={option.behavior}
@@ -62,7 +64,7 @@ export function SettingsKeyboardRouteScreen() {
           ))}
         </SettingsSection>
         <Text className="px-2 text-sm text-foreground-muted">
-          Applies to the composer when a hardware keyboard is connected.
+          {uiText("Applies to the composer when a hardware keyboard is connected.")}
         </Text>
       </ScrollView>
     </SettingsScreen>

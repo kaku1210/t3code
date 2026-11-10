@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { useAtomSet, useAtomValue } from "@effect/atom-react";
 import { AsyncResult } from "effect/reactivity";
@@ -6,9 +7,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "../../components/ui/AppText";
 import { DEFAULT_FOLLOW_UP_BEHAVIOR, type FollowUpBehavior } from "../../lib/followUpBehavior";
 import { mobilePreferencesAtom, updateMobilePreferencesAtom } from "../../state/preferences";
-import { ListChoiceRow as SettingsChoiceRow } from "../../components/ui/ListChoiceRow";
+import { SettingsChoiceRow } from "./components/SettingsChoiceRow";
 import { SettingsSection } from "./components/SettingsSection";
 import { SettingsScreen } from "./components/SettingsScreen";
+import { NextPromptSuggestionSettings } from "./NextPromptSuggestionSettings";
+import { ComposerPlaceholderSettings } from "./components/ComposerPlaceholderSettings";
 
 const FOLLOW_UP_OPTIONS: ReadonlyArray<{
   readonly behavior: FollowUpBehavior;
@@ -28,6 +31,7 @@ const FOLLOW_UP_OPTIONS: ReadonlyArray<{
 ];
 
 export function SettingsFollowUpRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const insets = useSafeAreaInsets();
   const preferencesResult = useAtomValue(mobilePreferencesAtom);
   const savePreferences = useAtomSet(updateMobilePreferencesAtom);
@@ -44,7 +48,17 @@ export function SettingsFollowUpRouteScreen() {
       contentContainerClassName="gap-3 px-5 pt-4"
       contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 18) + 18 }}
     >
-      <SettingsSection title="While the agent is running">
+      <ComposerPlaceholderSettings
+        value={
+          AsyncResult.isSuccess(preferencesResult)
+            ? (preferencesResult.value.composerPlaceholder ?? "")
+            : ""
+        }
+        disabled={!preferencesReady}
+        onChange={(composerPlaceholder) => savePreferences({ composerPlaceholder })}
+      />
+      <NextPromptSuggestionSettings />
+      <SettingsSection title={uiText("While the agent is running")}>
         {FOLLOW_UP_OPTIONS.map((option, index) => (
           <SettingsChoiceRow
             key={option.behavior}
@@ -58,11 +72,12 @@ export function SettingsFollowUpRouteScreen() {
         ))}
       </SettingsSection>
       <Text className="px-2 text-sm text-foreground-muted">
-        Long-press the send button to use the other option for a single message. With a hardware
-        keyboard, hold Command while sending.
+        {uiText(
+          "Long-press the send button to use the other option for a single message. With a hardware keyboard, hold Command while sending.",
+        )}
       </Text>
     </ScrollView>
   );
 
-  return <SettingsScreen title="Chat">{content}</SettingsScreen>;
+  return <SettingsScreen title={uiText("Chat")}>{content}</SettingsScreen>;
 }

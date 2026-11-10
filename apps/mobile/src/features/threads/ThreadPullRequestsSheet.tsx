@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { LegendList } from "@legendapp/list/react-native";
 import { useMemo } from "react";
@@ -19,6 +20,7 @@ import { useLinkedPullRequestActions } from "./useLinkedPullRequestActions";
 export function ThreadPullRequestsSheet(
   _props: StaticScreenProps<{ readonly environmentId: string; readonly threadId: string }>,
 ) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { selectedThread, selectedThreadProject, selectedEnvironmentRuntime } =
@@ -72,13 +74,13 @@ export function ThreadPullRequestsSheet(
         ListHeaderComponent={
           lines.length > 0 ? (
             <Text className="px-4 pt-2 pb-1 text-xs text-foreground-muted">
-              {openCount} open · {lines.length} linked
+              {openCount} {uiText("open ·")} {lines.length} {uiText("linked")}
             </Text>
           ) : null
         }
         ListEmptyComponent={
           <Text className="pt-6 text-center text-sm text-foreground-muted">
-            No linked {actions.terminology.plural}.
+            {uiText("No linked")} {actions.terminology.plural}.
           </Text>
         }
       />

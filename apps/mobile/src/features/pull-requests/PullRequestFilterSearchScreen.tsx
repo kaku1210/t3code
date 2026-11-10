@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import {
@@ -51,6 +52,7 @@ const optionsFamily = Atom.family((key: string) => {
 export function PullRequestFilterSearchScreen({
   route,
 }: StaticScreenProps<PullRequestFilterSearchParams>) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const { kind, environmentId, environmentIds, suggestions, labelColors } = route.params;
   const listControls = usePullRequestListControls();
@@ -113,7 +115,7 @@ export function PullRequestFilterSearchScreen({
   const placeholder = kind === "labels" ? "Search labels" : "Search authors";
   return (
     <PullRequestSearchSheet
-      title={kind === "labels" ? "Filter by label" : "Filter by author"}
+      title={kind === "labels" ? uiText("Filter by label") : uiText("Filter by author")}
       placeholder={placeholder}
       closeAccessibilityLabel={kind === "labels" ? "Close label filter" : "Close author filter"}
       clearAccessibilityLabel={kind === "labels" ? "Clear label search" : "Clear author search"}
@@ -153,10 +155,10 @@ export function PullRequestFilterSearchScreen({
               <EmptyState
                 title={
                   hosted.failed
-                    ? "Couldn't search the host"
+                    ? uiText("Couldn't search the host")
                     : kind === "labels"
-                      ? "No matching labels"
-                      : "No matching authors"
+                      ? uiText("No matching labels")
+                      : uiText("No matching authors")
                 }
                 detail={
                   hosted.failed

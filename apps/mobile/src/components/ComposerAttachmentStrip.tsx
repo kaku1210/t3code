@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../i18n/useUiLanguage";
 import { FilePreviewGallery, useFilePreviewGallery } from "./FilePreviewGallery";
 import { composerImageGallery } from "../lib/composerImageGallery";
 import { SymbolView } from "./ui/AppSymbol";
@@ -59,6 +60,7 @@ type ComposerAttachmentThumbnailProps = {
 };
 
 export function ComposerAttachmentThumbnail(props: ComposerAttachmentThumbnailProps) {
+  const { text: uiText } = useUiLanguage();
   const upload = useComposerAttachmentUploadState(props.environmentId, props.attachment.id);
   return (
     <View style={{ width: props.size, height: props.size }}>
@@ -87,7 +89,9 @@ export function ComposerAttachmentThumbnail(props: ComposerAttachmentThumbnailPr
           />
           {!props.compact ? (
             <Text className="text-2xs text-white">
-              {upload.status === "failed" ? "Retry" : `${Math.floor(upload.progress * 100)}%`}
+              {upload.status === "failed"
+                ? uiText("Retry")
+                : `${Math.floor(upload.progress * 100)}%`}
             </Text>
           ) : null}
         </Pressable>

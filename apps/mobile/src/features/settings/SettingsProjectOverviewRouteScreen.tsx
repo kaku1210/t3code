@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { ScreenScrollView as ScrollView } from "../../components/ui/ScreenScrollView";
 import { AppText as Text, AppTextInput } from "../../components/ui/AppText";
 import { Button } from "../../components/ui/Button";
@@ -46,6 +47,7 @@ import { DEFAULT_SETTINGS_PAGE } from "../layout/workspace/workspace-tab-navigat
 import { readUnloadedThreadCount } from "../../state/olderSettledShelf";
 
 export function SettingsProjectOverviewRouteScreen() {
+  const { text: uiText } = useUiLanguage();
   const environmentMenu = useSettingsEnvironmentMenu();
   const insets = useSafeAreaInsets();
   const [isRemoving, setIsRemoving] = useState(false);
@@ -84,7 +86,7 @@ export function SettingsProjectOverviewRouteScreen() {
       .filter((project) => selectedEnvironmentIds.has(project.environmentId)) ?? [];
 
   return (
-    <SettingsScreen title="Projects" menus={[environmentMenu]}>
+    <SettingsScreen title={uiText("Projects")} menus={[environmentMenu]}>
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
@@ -94,12 +96,15 @@ export function SettingsProjectOverviewRouteScreen() {
       >
         {selectedProjectKey === null ? (
           <Text className="px-2 text-base text-foreground-muted">
-            Choose a project with the filter above to manage its name, checkouts and removal.
+            {uiText(
+              "Choose a project with the filter above to manage its name, checkouts and removal.",
+            )}
           </Text>
         ) : !group || members.length === 0 ? (
           <Text className="px-2 text-base text-foreground-muted">
-            This project has no checkout on the selected connected environments. Change the filter
-            above.
+            {uiText(
+              "This project has no checkout on the selected connected environments. Change the filter above.",
+            )}
           </Text>
         ) : (
           <ProjectOverviewContent
@@ -136,6 +141,7 @@ function ProjectOverviewContent(props: {
   readonly projectKey: string | null;
   readonly onProjectRemoved: (projectKey: string | null) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { isRemoving, setIsRemoving, startRemoval, finishRemoval } = props;
   const representative = props.members[0]!;
   const displayName = deriveProjectGroupLabel({ representative, members: props.members });
@@ -314,17 +320,19 @@ function ProjectOverviewContent(props: {
             {displayName}
           </Text>
           <Text className="text-sm text-foreground-muted">
-            {props.members.length === 1 ? "1 checkout" : `${props.members.length} checkouts`}
+            {props.members.length === 1
+              ? uiText("1 checkout")
+              : `${props.members.length} checkouts`}
           </Text>
         </View>
       </View>
 
-      <SettingsSection title="Project">
+      <SettingsSection title={uiText("Project")}>
         <View className="gap-3 p-4">
-          <Text className="text-sm font-t3-medium text-foreground-muted">Name</Text>
+          <Text className="text-sm font-t3-medium text-foreground-muted">{uiText("Name")}</Text>
           <View className="flex-row items-center gap-3">
             <AppTextInput
-              accessibilityLabel="Project name"
+              accessibilityLabel={uiText("Project name")}
               className="min-h-11 min-w-0 flex-1 rounded-xl border-continuous bg-card px-3 text-base text-foreground"
               value={draftName ?? displayName}
               onChangeText={setDraftName}
@@ -334,8 +342,8 @@ function ProjectOverviewContent(props: {
             />
             {canSave ? (
               <Button
-                label="Save"
-                accessibilityHint="Save project name"
+                label={uiText("Save")}
+                accessibilityHint={uiText("Save project name")}
                 tone="secondary"
                 onPress={saveName}
               />
@@ -345,14 +353,14 @@ function ProjectOverviewContent(props: {
       </SettingsSection>
 
       {canOrganize ? (
-        <SettingsSection title="Organize">
+        <SettingsSection title={uiText("Organize")}>
           <SettingsSwitchRow
             icon="pin"
-            label="Pin"
+            label={uiText("Pin")}
             subtitle={
               offline
-                ? "Connect every machine with this project to change this."
-                : "Pinned projects come first in project pickers."
+                ? uiText("Connect every machine with this project to change this.")
+                : uiText("Pinned projects come first in project pickers.")
             }
             value={props.group.pinned}
             disabled={isOrganizing || offline}
@@ -360,11 +368,11 @@ function ProjectOverviewContent(props: {
           />
           <SettingsActionRow
             icon="archivebox"
-            label={props.group.archived ? "Unarchive project" : "Archive project"}
+            label={props.group.archived ? uiText("Unarchive project") : uiText("Archive project")}
             description={
               props.group.archived
-                ? "Hidden from project pickers. Threads and files are kept."
-                : "Hides the project from project pickers. Threads and files are kept."
+                ? uiText("Hidden from project pickers. Threads and files are kept.")
+                : uiText("Hides the project from project pickers. Threads and files are kept.")
             }
             disabled={isOrganizing || offline}
             onPress={() => void organize({ archived: !props.group.archived })}
@@ -372,7 +380,7 @@ function ProjectOverviewContent(props: {
         </SettingsSection>
       ) : null}
 
-      <SettingsSection title="Checkouts">
+      <SettingsSection title={uiText("Checkouts")}>
         {props.members.map((member, index) => {
           const environment = props.environments.find(
             (entry) => entry.environmentId === member.environmentId,
@@ -389,7 +397,7 @@ function ProjectOverviewContent(props: {
                     : "text-lg text-foreground"
                 }
               >
-                {environment?.label ?? "Environment"}
+                {environment?.label ?? uiText("Environment")}
               </Text>
               {environment?.displayUrl ? (
                 <Text className="text-sm leading-normal text-foreground-muted">
@@ -410,22 +418,26 @@ function ProjectOverviewContent(props: {
           );
         })}
       </SettingsSection>
-      <SettingsSection title="Danger">
+      <SettingsSection title={uiText("Danger")}>
         <SettingsActionRow
           icon="trash"
           label={
             props.hasOtherMembers
-              ? "Remove checkout"
+              ? uiText("Remove checkout")
               : props.members.length > 1
-                ? "Remove this project everywhere"
-                : "Remove project"
+                ? uiText("Remove this project everywhere")
+                : uiText("Remove project")
           }
           description={
             props.hasOtherMembers
-              ? "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched."
+              ? uiText(
+                  "Deletes the selected machine's checkout entries and their threads. Other machines and files on disk are not touched.",
+                )
               : props.members.length > 1
                 ? `Deletes all ${props.members.length} checkout entries and their threads on every machine. Files on disk are not touched.`
-                : "Deletes the project entry and its threads. Files on disk are not touched."
+                : uiText(
+                    "Deletes the project entry and its threads. Files on disk are not touched.",
+                  )
           }
           tone="danger"
           disabled={!canRemoveGroup || isRemoving}
@@ -442,6 +454,7 @@ function RemoveCheckoutAction(props: {
   readonly disabled: boolean;
   readonly onPress: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const canRemove = useEnvironmentScope(props.member.environmentId, AuthOrchestrationOperateScope);
   return (
     <Pressable
@@ -451,7 +464,9 @@ function RemoveCheckoutAction(props: {
       onPress={props.onPress}
       className="self-start rounded-full border border-border bg-card px-3 py-1.5 disabled:opacity-40"
     >
-      <Text className="font-t3-medium text-xs text-danger-foreground">Remove checkout</Text>
+      <Text className="font-t3-medium text-xs text-danger-foreground">
+        {uiText("Remove checkout")}
+      </Text>
     </Pressable>
   );
 }

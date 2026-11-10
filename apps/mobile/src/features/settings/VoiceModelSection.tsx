@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react";
 import { useNavigation } from "@react-navigation/native";
 import {
@@ -218,6 +219,7 @@ export function VoiceModelRow(props: {
   /** The language whose benchmark score to show, when the model has one. */
   readonly language: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { model, voice, separated } = props;
   const meta = <ModelStats model={model} language={props.language} />;
   if (model.state === "installed")
@@ -242,7 +244,7 @@ export function VoiceModelRow(props: {
           label={model.name}
           description={
             model.state === "verifying"
-              ? "Verifying download…"
+              ? uiText("Verifying download…")
               : `${Math.round((progress ?? 0) * 100)}% downloaded · Tap to cancel`
           }
           disabled={!voice.canManage || voice.busy}
@@ -273,6 +275,7 @@ export function VoiceModelSection(props: {
   readonly environmentId: EnvironmentId;
   readonly label: string;
 }) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const voice = useVoiceModels(props.environmentId, props.label);
   const { status } = voice;
@@ -300,7 +303,7 @@ export function VoiceModelSection(props: {
       }
     >
       <ListRow
-        label={active?.model ?? "No model selected"}
+        label={active?.model ?? uiText("No model selected")}
         description={
           pending
             ? pending.state === "verifying"
@@ -308,7 +311,7 @@ export function VoiceModelSection(props: {
               : `Downloading ${pending.name} · ${Math.round((progress ?? 0) * 100)}%`
             : active
               ? formatBytes(active.size)
-              : "Choose a transcription model to dictate on this environment."
+              : uiText("Choose a transcription model to dictate on this environment.")
         }
         onPress={() =>
           navigation.navigate("SettingsVoiceModels", { environmentId: props.environmentId })

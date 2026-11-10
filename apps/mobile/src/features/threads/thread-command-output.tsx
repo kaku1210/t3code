@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import type { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import { TERMINAL_PALETTES, terminalOutputSpans } from "@t3tools/shared/terminalOutput";
 import type React from "react";
@@ -24,6 +25,7 @@ export function ThreadCommandOutput(props: {
   readonly itemId: TurnItemId;
   readonly themeAppearance: "light" | "dark";
 }) {
+  const { text: uiText } = useUiLanguage();
   const { data, error } = useEnvironmentQuery(
     orchestrationEnvironment.v2.commandOutput({
       environmentId: props.environmentId,
@@ -54,7 +56,9 @@ export function ThreadCommandOutput(props: {
   return (
     <View className="pt-1.5">
       {data?.output.truncated ? (
-        <Text className="pb-0.5 text-3xs text-foreground-subtle">Earlier output not shown</Text>
+        <Text className="pb-0.5 text-3xs text-foreground-subtle">
+          {uiText("Earlier output not shown")}
+        </Text>
       ) : null}
       <ScrollView
         ref={scrollRef}

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { Platform } from "react-native";
 
 import { AppBar } from "../../../components/ui/AppBar";
@@ -15,6 +16,7 @@ export function WorkspaceListEmptyDetail(props: {
   readonly onAddConnection: () => void;
   readonly onStartNewTask: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { panes } = useAdaptiveWorkspaceLayout();
   return (
     <>
@@ -30,12 +32,12 @@ export function WorkspaceListEmptyDetail(props: {
       />
       <Toolbar placement="left">
         <Toolbar.Button
-          accessibilityLabel="New task"
+          accessibilityLabel={uiText("New task")}
           icon="square.and.pencil"
           onPress={props.onStartNewTask}
         />
       </Toolbar>
-      <AppBar embedded title="Threads" />
+      <AppBar embedded title={uiText("Threads")} />
       <WorkspaceEmptyDetail
         onAddConnection={
           Platform.OS === "android" && !props.hasConnections ? props.onAddConnection : undefined

@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { AuthOrchestrationOperateScope, type ScopedThreadRef } from "@t3tools/contracts";
 import type { ChildThreadApproval } from "@t3tools/client-runtime/state/thread-requests";
@@ -15,6 +16,7 @@ import { useAtomCommand } from "../../state/use-atom-command";
 import { PendingApprovalCard } from "./PendingApprovalCard";
 
 function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
+  const { text: uiText } = useUiLanguage();
   const canRespond = useEnvironmentScope(entry.thread.environmentId, AuthOrchestrationOperateScope);
   const respond = useAtomCommand(threadEnvironment.respondToApproval, { reportFailure: false });
   const [responding, setResponding] = useState(false);
@@ -22,7 +24,7 @@ function ChildApproval({ entry }: { entry: ChildThreadApproval }) {
   return (
     <View className="mx-3.5 my-2 gap-2">
       <AppText className="font-t3-bold text-sm text-foreground">
-        Approval from {entry.title}
+        {uiText("Approval from")} {entry.title}
       </AppText>
       <PendingApprovalCard
         canOperateThread={canRespond}

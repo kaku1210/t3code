@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { useActiveNewTask } from "../../../state/active-new-task";
 import { Toolbar } from "../../../components/ui/Toolbar";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
@@ -31,6 +32,7 @@ export function WorkspaceToolbar(props: {
   readonly onNewTask: () => void;
   readonly sidebar?: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const workspace = useWorkspaceTabs()!;
   const activeNewTask = useActiveNewTask();
   const deviceType = useDeviceType();
@@ -122,7 +124,7 @@ export function WorkspaceToolbar(props: {
   const composeButton = nativeToolbarCompose ? (
     <Toolbar.Button
       identifier="workspace-compose"
-      accessibilityLabel="New chat"
+      accessibilityLabel={uiText("New chat")}
       icon="square.and.pencil"
       onPress={props.onNewTask}
       separateBackground
@@ -131,7 +133,7 @@ export function WorkspaceToolbar(props: {
   const searchButton = foldedSearch ? (
     <Toolbar.Button
       identifier="workspace-search"
-      accessibilityLabel={searchVisible ? "Close search" : searchLabel}
+      accessibilityLabel={searchVisible ? uiText("Close search") : searchLabel}
       icon={searchVisible ? "xmark" : "magnifyingglass"}
       onPress={searchVisible ? () => searchRef.current?.cancelSearch() : focusSearch}
       separateBackground
@@ -199,7 +201,7 @@ export function WorkspaceToolbar(props: {
           sidebarTabs === "picker" ||
           floatingTabs ? null : (
             <Toolbar.Button
-              accessibilityLabel="New chat"
+              accessibilityLabel={uiText("New chat")}
               icon="square.and.pencil"
               onPress={props.onNewTask}
             />

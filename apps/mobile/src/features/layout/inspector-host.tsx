@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useSyncExternalStore, type ReactNode } from "react";
 import { Split, Stack } from "react-native-screens";
 
@@ -31,13 +32,14 @@ function PaneScreenContent(props: {
   readonly resetKeys: ReadonlyArray<unknown> | undefined;
   readonly onClose: () => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { store, slot } = useInspectorBarSlot();
   const content = (
     <WorkspaceSlotOptionsContext value={slot}>
       <RenderErrorBoundary
         resetKeys={props.resetKeys}
         renderFallback={(fallback) => (
-          <RenderFailureView {...fallback} title="The inspector couldn't be displayed" />
+          <RenderFailureView {...fallback} title={uiText("The inspector couldn't be displayed")} />
         )}
       >
         {props.pane.render()}

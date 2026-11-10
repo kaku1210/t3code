@@ -1,5 +1,10 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useSidebarWorkspaceTabs } from "../layout/workspace/useSystemWorkspaceTabBar";
 import { Button } from "../../components/ui/Button";
+import { Pressable } from "react-native";
+import { scopeThreadRef } from "@t3tools/client-runtime/environment";
+import { useNextPromptSuggestion } from "./useNextPromptSuggestion";
+import { mobilePreferencesAtom } from "../../state/preferences";
 import * as Dialog from "../../components/ui/Dialog";
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
 import { useDeviceType } from "../../native/native-layout-metrics";
@@ -207,7 +212,8 @@ function useCompactComposerEditor(text: ScaledTextRole, value: string) {
 export interface ThreadComposerProps {
   readonly isDraft?: boolean;
   readonly canOperateThread: boolean;
-  readonly placeholder: string;
+  /** Context-specific instructions override this device's ordinary placeholder. */
+  readonly placeholder?: string;
   readonly contentMaxWidth?: number;
   readonly draftControls?: ReactNode;
   readonly bottomInset?: number;
@@ -313,10 +319,11 @@ function SendActionButton(props: {
   readonly disabled: boolean;
   readonly onSend: (followUp?: ActiveTurnComposerAction) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { presentation } = props;
   const button = (
     <ComposerActionButton
-      accessibilityLabel={props.accessibilityLabel}
+      accessibilityLabel={uiText(props.accessibilityLabel)}
       size={props.size}
       icon={presentation.icon}
       variant="primary"
@@ -332,12 +339,12 @@ function SendActionButton(props: {
   );
   return (
     <Menu
-      accessibilityLabel="Choose how to send this message"
+      accessibilityLabel={uiText("Choose how to send this message")}
       shouldOpenOnLongPress
       actions={actions.map((action) => ({
         id: action,
-        title: FOLLOW_UP_ACTION_LABEL[action],
-        subtitle: FOLLOW_UP_ACTION_SUBTITLE[action],
+        title: uiText(FOLLOW_UP_ACTION_LABEL[action]),
+        subtitle: uiText(FOLLOW_UP_ACTION_SUBTITLE[action]),
         state: action === presentation.action ? ("on" as const) : ("off" as const),
       }))}
       onPressAction={({ nativeEvent }) =>
@@ -414,6 +421,12 @@ function ComposerSurface(props: {
 export const THREAD_COMPOSER_BOTTOM_GUTTER = 6;
 
 export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps) {
+  const { text: uiText } = useUiLanguage();
+  const preferences = useAtomValue(mobilePreferencesAtom);
+  const defaultPlaceholder =
+    (AsyncResult.isSuccess(preferences)
+      ? preferences.value.composerPlaceholder?.trim()
+      : undefined) || uiText("Ask anything");
   const project = useProject(scopeProjectRef(props.environmentId, props.selectedThread.projectId));
   const { themeVariables: materialTheme } = useAppearancePreferences();
   const composerPanel = materialTheme["--color-composer-panel"];
@@ -454,6 +467,21 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   const composerDraftKey = props.draftKey ?? composerOwnerKey;
   const { text: draftMessage, attachments: draftAttachments } = useComposerDraft(composerDraftKey);
   const queuedEdit = props.queuedEdit ?? null;
+  const latestRun = props.selectedThread.latestRun;
+  const promptSuggestion = useNextPromptSuggestion(
+    scopeThreadRef(props.environmentId, props.selectedThread.id),
+    latestRun?.status === "completed" ? latestRun.runId : null,
+    !props.hidden &&
+      !props.isDraft &&
+      !props.activeThreadBusy &&
+      props.connectionState === "connected" &&
+      props.canOperateThread &&
+      !props.interactionLocked &&
+      queuedEdit === null &&
+      draftMessage.length === 0 &&
+      draftAttachments.length === 0 &&
+      props.queueCount === 0,
+  );
   const hasContent =
     draftMessage.trim().length > 0 ||
     draftAttachments.length > 0 ||
@@ -488,7 +516,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
     deliveryDeferred:
       props.connectionState !== "connected" || props.queueCount > 0 || attachmentsUploading,
   });
-  const sendLabel = sendPresentation.label;
+  const sendLabel = uiText(sendPresentation.label);
   const currentModelSelection = props.selectedThread.modelSelection;
   const modelUnavailable =
     props.connectionState === "connected" &&
@@ -521,7 +549,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
   const usageLimitsOffered =
     selectedProviderStatus !== null &&
     hasProviderUsageLimits(
-      selectedProviderStatus.driver,
+      selectedProviderStatus,
       props.serverConfig?.providers ?? [],
       props.serverConfig?.usageLimitSources ?? [],
     );
@@ -530,6 +558,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
       currentModelSelection.instanceId,
       props.serverConfig?.providers ?? [],
       props.serverConfig?.usageLimitSources ?? [],
+      // oxlint-disable-next-line react/purity -- This user-action handler takes a usage snapshot at the time it is opened, not during render.
       Date.now(),
     );
     onShowUsageLimits(report);
@@ -838,6 +867,25 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         style={{ maxWidth: props.contentMaxWidth }}
       >
         {props.draftControls}
+        {promptSuggestion ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${uiText("Use suggestion")}: ${promptSuggestion}`}
+            className="mb-2 min-h-11 rounded-xl border border-border-subtle px-4 py-3 active:opacity-70"
+            onPress={() => {
+              // Re-read at tap time: an asynchronously restored draft must never be overwritten.
+              const draft = getComposerDraftSnapshot(composerDraftKey);
+              if (draft.text.length > 0 || draft.attachments.length > 0) return;
+              props.onChangeDraftMessage(promptSuggestion);
+              inputRef.current?.focus();
+            }}
+          >
+            <Text className="text-xs text-foreground-muted">{uiText("Next step")}</Text>
+            <Text className="text-sm text-foreground" numberOfLines={3}>
+              {promptSuggestion}
+            </Text>
+          </Pressable>
+        ) : null}
         {!isSubmissionLocked &&
         composerMenu.trigger &&
         (composerMenu.items.length > 0 || composerMenu.trigger.kind === "pull-request") ? (
@@ -875,7 +923,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         ) : null}
         {modelUnavailable ? (
           <Button
-            label="Model unavailable. Open model settings."
+            label={uiText("Model unavailable. Open model settings.")}
             tone="text"
             onPress={openSettings}
           />
@@ -1041,7 +1089,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                     }
                     insertPaste();
                   }}
-                  placeholder={props.placeholder}
+                  placeholder={props.placeholder ?? defaultPlaceholder}
                   onFocus={handleFocus}
                   onBlur={handleBlur}
                   onSubmit={(alternate) =>
@@ -1051,11 +1099,11 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                         : undefined,
                     )
                   }
-                  submitTitle={sendPresentation.label}
+                  submitTitle={uiText(sendPresentation.label)}
                   alternateSubmitTitle={
                     sendPresentation.alternate === null
-                      ? sendPresentation.label
-                      : FOLLOW_UP_ACTION_LABEL[sendPresentation.alternate]
+                      ? uiText(sendPresentation.label)
+                      : uiText(FOLLOW_UP_ACTION_LABEL[sendPresentation.alternate])
                   }
                   {...compactEditor.editorProps}
                   textStyle={{
@@ -1105,7 +1153,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 {showStopAction ? (
                   <ComposerActionButton
                     size={usesLargeControls ? "large" : "regular"}
-                    accessibilityLabel="Stop agent"
+                    accessibilityLabel={uiText("Stop agent")}
                     icon="stop.fill"
                     variant="danger"
                     disabled={!props.canOperateThread}
@@ -1114,7 +1162,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                 ) : showResumeAction ? (
                   <ComposerActionButton
                     size={usesLargeControls ? "large" : "regular"}
-                    accessibilityLabel="Resume thread"
+                    accessibilityLabel={uiText("Resume thread")}
                     icon="play"
                     disabled={!props.canOperateThread || resumingQueue}
                     onPress={() => void handleResumeQueue()}
@@ -1173,7 +1221,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   {showStopAction ? (
                     <ComposerActionButton
                       size={usesLargeControls ? "large" : "regular"}
-                      accessibilityLabel="Stop agent"
+                      accessibilityLabel={uiText("Stop agent")}
                       icon="stop.fill"
                       variant="danger"
                       disabled={!props.canOperateThread}
@@ -1182,7 +1230,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
                   ) : showResumeAction && voicePresentation.showsSend ? (
                     <ComposerActionButton
                       size={usesLargeControls ? "large" : "regular"}
-                      accessibilityLabel="Resume thread"
+                      accessibilityLabel={uiText("Resume thread")}
                       icon="play"
                       disabled={!props.canOperateThread || resumingQueue}
                       onPress={() => void handleResumeQueue()}
@@ -1204,7 +1252,7 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
 
         {props.connectionState === "connected" && !props.canOperateThread ? (
           <Text className="pt-2 text-xs text-foreground-muted">
-            This connection cannot control this task. You can still edit your draft.
+            {uiText("This connection cannot control this task. You can still edit your draft.")}
           </Text>
         ) : null}
       </Animated.View>

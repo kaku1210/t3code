@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { usePaneRole } from "../../components/ui/Pane";
 import { Button } from "../../components/ui/Button";
 import {
@@ -92,6 +93,7 @@ export function PullRequestsScreen(
     readonly renderFrame?: (filters: PullRequestFilterMenu | null, list: ReactNode) => ReactNode;
   } = {},
 ) {
+  const { text: uiText } = useUiLanguage();
   const navigation = useNavigation();
   const primaryColumn = use(NativePrimaryColumnContext);
   const workspace = useWorkspaceTabs()!;
@@ -340,15 +342,15 @@ export function PullRequestsScreen(
             <View className="items-center py-5">
               <AppActivityIndicator
                 colorClassName="accent-icon"
-                accessibilityLabel="Loading more pull requests"
+                accessibilityLabel={uiText("Loading more pull requests")}
               />
             </View>
           ) : result.loadMoreError ? (
             <View className="items-center gap-2 px-8 py-4">
               <Text className="text-xs text-foreground-muted">{result.loadMoreError}</Text>
               <Button
-                label="Try again"
-                accessibilityLabel="Retry loading more pull requests"
+                label={uiText("Try again")}
+                accessibilityLabel={uiText("Retry loading more pull requests")}
                 onPress={() => void result.loadMore(true)}
               />
             </View>
@@ -356,8 +358,8 @@ export function PullRequestsScreen(
             // A filtered page can be too short to scroll, which leaves nothing to reach the end of.
             <View className="items-center py-4">
               <Button
-                label="Load more"
-                accessibilityLabel="Load more pull requests"
+                label={uiText("Load more")}
+                accessibilityLabel={uiText("Load more pull requests")}
                 onPress={() => void result.loadMore()}
               />
             </View>
@@ -373,14 +375,14 @@ export function PullRequestsScreen(
               <EmptyState
                 title={
                   result.error
-                    ? "Couldn't load pull requests"
+                    ? uiText("Couldn't load pull requests")
                     : targets.length && connectedTargets.length === 0
-                      ? "Environment offline"
+                      ? uiText("Environment offline")
                       : targets.length
                         ? query
-                          ? "No results"
-                          : "No matching pull requests"
-                        : "Connect an environment"
+                          ? uiText("No results")
+                          : uiText("No matching pull requests")
+                        : uiText("Connect an environment")
                 }
                 detail={
                   result.error ??

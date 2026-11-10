@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Button } from "../../components/ui/Button";
 import { AppActivityIndicator } from "../../components/ui/AppActivityIndicator";
 import { ConnectionTraceId } from "./ConnectionTraceId";
@@ -68,6 +69,7 @@ function ConnectedOnlyCloudEnvironmentRows(props: CloudEnvironmentRowsProps) {
 function CloudEnvironmentRowsContent(
   props: CloudEnvironmentRowsProps & { readonly discoveryAvailable?: boolean },
 ) {
+  const { text: uiText } = useUiLanguage();
   const controller = useConnectionController();
   const discoveryAvailable = props.discoveryAvailable ?? true;
   const availableCloudEnvironments = discoveryAvailable
@@ -137,13 +139,13 @@ function CloudEnvironmentRowsContent(
         <View collapsable={false} className="items-center gap-3 rounded-[24px] bg-grouped-card p-6">
           <AppActivityIndicator colorClassName={"accent-icon"} />
           <Text className="text-center text-sm leading-normal text-foreground-muted">
-            Loading linked cloud environments.
+            {uiText("Loading linked cloud environments.")}
           </Text>
         </View>
       ) : controller.relayDiscovery.error ? null : (
         <View collapsable={false} className="rounded-[24px] bg-grouped-card p-5">
           <Text className="text-sm leading-normal text-foreground-muted">
-            No additional linked cloud environments.
+            {uiText("No additional linked cloud environments.")}
           </Text>
         </View>
       )}
@@ -153,14 +155,14 @@ function CloudEnvironmentRowsContent(
       !controller.relayDiscovery.isRefreshing ? (
         <View collapsable={false} className="gap-3 rounded-[24px] bg-grouped-card p-5">
           <Text className="text-base font-t3-bold text-foreground">
-            Could not load T3 Connect environments
+            {uiText("Could not load T3 Connect environments")}
           </Text>
           <Text className="text-sm text-foreground-muted">{controller.relayDiscovery.error}</Text>
           {controller.relayDiscovery.errorTraceId ? (
             <CopyTraceIdButton traceId={controller.relayDiscovery.errorTraceId} />
           ) : null}
           <Button
-            label="Try again"
+            label={uiText("Try again")}
             tone="secondary"
             onPress={() => {
               void controller.refreshRelayEnvironments();
@@ -278,6 +280,7 @@ function CloudEnvironmentRowShell(props: {
   readonly statusText?: string;
   readonly value: boolean;
 }) {
+  const { text: uiText } = useUiLanguage();
   const isRetrying =
     props.connectionState === "connecting" || props.connectionState === "reconnecting";
   const shouldPulse = isRetrying;
@@ -321,7 +324,9 @@ function CloudEnvironmentRowShell(props: {
     <View collapsable={false} className="flex-row items-center gap-3 bg-grouped-card px-4 py-3.5">
       <ContentContainer
         className="min-w-0 flex-1 gap-0.5"
-        accessibilityHint={props.onRemove ? "Long press to remove from this device" : undefined}
+        accessibilityHint={
+          props.onRemove ? uiText("Long press to remove from this device") : undefined
+        }
         accessibilityRole={props.onOpen ? "button" : undefined}
         accessibilityLabel={
           props.onOpen
@@ -410,7 +415,9 @@ function CloudEnvironmentRowShell(props: {
                 ? `Remove ${props.label} from this device`
                 : undefined
           }
-          accessibilityHint={props.onRemove ? "Long press to remove from this device" : undefined}
+          accessibilityHint={
+            props.onRemove ? uiText("Long press to remove from this device") : undefined
+          }
           onPress={props.onOpen}
           onLongPress={props.onRemove}
           style={{
@@ -429,9 +436,10 @@ function CloudEnvironmentRowShell(props: {
 }
 
 function CopyTraceIdButton(props: { readonly traceId: string }) {
+  const { text: uiText } = useUiLanguage();
   return (
     <Button
-      label="Copy trace ID"
+      label={uiText("Copy trace ID")}
       tone="secondary"
       onPress={() => {
         copyTextWithHaptic(props.traceId, { target: "connection-trace-id" });

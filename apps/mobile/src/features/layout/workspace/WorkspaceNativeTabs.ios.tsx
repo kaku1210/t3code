@@ -1,8 +1,9 @@
 import {
-  WORKSPACE_TAB_LABELS,
+  useWorkspaceTabLabels,
   NAVIGATION_TAB_ICONS,
   useEnabledNavigationTabs,
 } from "./navigation-tabs";
+import { useUiLanguage } from "../../../i18n/useUiLanguage";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { View, useWindowDimensions, type NativeSyntheticEvent } from "react-native";
 import { Tabs, type TabSelectedEvent, type TabSelectionRejectedEvent } from "react-native-screens";
@@ -76,6 +77,8 @@ export function WorkspaceNativeTabs(props: {
   /** The sidebar column draws the tabs itself, so they leave with it. */
   readonly tabsInSidebarColumn?: boolean;
 }) {
+  const tabLabels = useWorkspaceTabLabels();
+  const { text } = useUiLanguage();
   const workspace = useWorkspaceTabs()!;
   const order = useEnabledNavigationTabs();
   const primaryTabs = order.slice(0, 4);
@@ -133,7 +136,7 @@ export function WorkspaceNativeTabs(props: {
               key={slot}
               screenKey={slot}
               title=""
-              tabBarItemAccessibilityLabel={settings ? "Settings" : WORKSPACE_TAB_LABELS[tab]}
+              tabBarItemAccessibilityLabel={settings ? text("Settings") : tabLabels[tab]}
               ios={{
                 icon: settings
                   ? { type: "sfSymbol", name: "gearshape" }

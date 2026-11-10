@@ -1,3 +1,4 @@
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import {
   deriveWorkflowGroups,
@@ -47,6 +48,7 @@ export function useThreadTurnSubagents(target: AgentsTarget | null): ThreadTurnS
 }
 
 export function ThreadAgentsSheet({ route }: StaticScreenProps<AgentsTarget>) {
+  const { text: uiText } = useUiLanguage();
   const target = route.params;
   const navigation = useNavigation();
   const openInspector = useOpenThreadInspector();
@@ -95,7 +97,7 @@ export function ThreadAgentsSheet({ route }: StaticScreenProps<AgentsTarget>) {
     >
       {subagents.length === 0 ? (
         <Text className="pt-6 text-center text-sm text-foreground-muted">
-          No agents in this turn.
+          {uiText("No agents in this turn.")}
         </Text>
       ) : (
         subagents.map((subagent) => {
@@ -127,7 +129,7 @@ export function ThreadAgentsSheet({ route }: StaticScreenProps<AgentsTarget>) {
 
   return (
     <View collapsable={false} className="flex-1 bg-sheet">
-      <SheetHeader title="Agents" onClose={() => navigation.goBack()} />
+      <SheetHeader title={uiText("Agents")} onClose={() => navigation.goBack()} />
       <ScreenContent>{content}</ScreenContent>
     </View>
   );
@@ -139,6 +141,7 @@ function AgentRow(props: {
   readonly tickSeconds: boolean;
   readonly onOpen: (child: { environmentId: EnvironmentId; threadId: ThreadId }) => void;
 }) {
+  const { text: uiText } = useUiLanguage();
   const { subagent } = props;
   const { presentationById } = useEnvironments();
   const target = subagentThreadTarget(subagent, props.environmentId, (id) =>
@@ -163,7 +166,7 @@ function AgentRow(props: {
         className="min-w-0 flex-1"
         accessibilityHint={
           subagent.remoteChild === undefined
-            ? "Provider-managed agent. Its work appears in the transcript."
+            ? uiText("Provider-managed agent. Its work appears in the transcript.")
             : `Runs on ${subagent.remoteChild.label}. Connect to it to open its thread.`
         }
       >
@@ -172,7 +175,7 @@ function AgentRow(props: {
     ) : (
       <Pressable
         accessibilityRole="link"
-        accessibilityHint="Opens this agent's thread"
+        accessibilityHint={uiText("Opens this agent's thread")}
         onPress={() => props.onOpen(target)}
         className="min-w-0 flex-1 active:opacity-70"
       >
