@@ -21,6 +21,10 @@ import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
+import * as HttpClient from "effect/http/HttpClient";
+import * as FileSystem from "effect/FileSystem";
+import * as Path from "effect/Path";
+import { readDevinAccount } from "./devinUsageLimits.ts";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { AcpRegistryAdapterV2Driver, type AcpRegistryAdapterV2DriverEnv } from "./adapter.ts";
@@ -469,6 +473,7 @@ export const checkAcpRegistryProviderReadiness = Effect.fn(
 export type AcpRegistryDriverEnv =
   | AcpRegistryAdapterV2DriverEnv
   | Digest.Digest
+  | HttpClient.HttpClient
   | ProviderHost.ProviderHost;
 
 export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryDriverEnv> = {
@@ -505,6 +510,10 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
     const hostEnvironment = yield* HostProcess.Environment;
     const host = yield* ProviderHost.ProviderHost;
+    const httpClient = yield* HttpClient.HttpClient;
+    const fileSystem = yield* FileSystem.FileSystem;
+    const path = yield* Path.Path;
+    const crypto = yield* Digest.Digest;
     const continuationIdentity = defaultProviderContinuationIdentity({
       driverKind: DRIVER_KIND,
       instanceId,
@@ -584,9 +593,34 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
             }),
           );
     });
-    const checkProvider = checkAcpRegistryProviderReadiness(readinessInput).pipe(
+    const checkReadiness = checkAcpRegistryProviderReadiness(readinessInput).pipe(
       Effect.provideService(AcpRegistrySupport.AcpRegistryCatalog, catalog),
       Effect.flatMap(withLiveRuntimeState),
+    );
+    const hasDevinQuota =
+      effectiveConfig.source === "registry" && effectiveConfig.agentId === "devin";
+    const checkProvider = checkReadiness.pipe(
+      Effect.filterOrElse(
+        (provider) =>
+          !hasDevinQuota || !provider.enabled || !provider.installed || !provider.version,
+        (provider) =>
+          readDevinAccount(processEnvironment, provider.version!).pipe(
+            Effect.map(({ usageLimits, email, plan }) => ({
+              ...provider,
+              auth: {
+                ...provider.auth,
+                ...(email ? { email } : {}),
+                ...(plan ? { label: plan } : {}),
+              },
+              usageLimits,
+            })),
+            Effect.provideService(HttpClient.HttpClient, httpClient),
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.provideService(Path.Path, path),
+            Effect.provideService(Digest.Digest, crypto),
+            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
+          ),
+      ),
     );
     const enrichProvider = checkAcpRegistryProviderStatus(
       {
@@ -651,8 +685,11 @@ export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryD
       getSettings: snapshotSettings.getSettings,
       streamSettings: snapshotSettings.streamSettings,
       haveSettingsChanged: haveProviderSnapshotSettingsChanged,
-      initialSnapshot: () => checkProvider,
+      initialSnapshot: () => checkReadiness,
       checkProvider,
+      ...(hasDevinQuota
+        ? { checkUsageLimits: checkProvider.pipe(Effect.map((provider) => provider.usageLimits)) }
+        : {}),
       enrichSnapshot: Effect.fn("enrichSnapshot")(function ({
         snapshot,
         getSnapshot,

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vite-plus/test";
 import {
   type LimitAccount,
   collectProviderUsageLimits,
+  hasProviderUsageLimits,
   sameUsageLimitCommandCoverage,
   withUsageLimitsCommands,
   collectLimitAccounts,
@@ -52,6 +53,83 @@ function provider(overrides: Partial<ServerProvider>): ServerProvider {
     ...overrides,
   };
 }
+
+describe("ACP quota isolation", () => {
+  const devin = provider({
+    instanceId: ProviderInstanceId.make("acp_devin"),
+    driver: ProviderDriverKind.make("acpRegistry"),
+    displayName: "Devin",
+    usageLimits: {
+      checkedAt: "2026-09-03T11:00:00.000Z",
+      provider: { id: "devin", label: "Devin" },
+      credentialFingerprint: "same-account",
+      windows: [{ ...window, id: "daily", label: "Daily", usedPercent: 100 }],
+    },
+  });
+  const other = provider({
+    instanceId: ProviderInstanceId.make("acp_other"),
+    driver: ProviderDriverKind.make("acpRegistry"),
+  });
+
+  it("offers and collects Devin limits only for the matching quota provider", () => {
+    expect(hasProviderUsageLimits(devin, [devin, other], [])).toBe(true);
+    expect(hasProviderUsageLimits(other, [devin, other], [])).toBe(false);
+    const advertised = withUsageLimitsCommands([devin, other], []);
+    expect(advertised[0]?.slashCommands).toContainEqual(
+      expect.objectContaining({ name: "usage-limits" }),
+    );
+    expect(advertised[1]?.slashCommands).toEqual([]);
+    expect(collectProviderUsageLimits(other.instanceId, [devin, other], [], now)).toBeNull();
+    expect(
+      collectProviderUsageLimits(devin.instanceId, [devin, other], [], now)?.accounts,
+    ).toHaveLength(1);
+  });
+
+  it("deduplicates a Devin account across environments and keeps other ACP quota pools separate", () => {
+    const another = {
+      ...other,
+      usageLimits: {
+        ...devin.usageLimits!,
+        provider: { id: "different-agent", label: "Different agent" },
+      },
+    };
+    const presentations = new Map([
+      [
+        EnvironmentId.make("one"),
+        { entry: { target: { label: "One" } }, serverConfig: { providers: [devin, another] } },
+      ],
+      [
+        EnvironmentId.make("two"),
+        {
+          entry: { target: { label: "Two" } },
+          serverConfig: {
+            providers: [{ ...devin, instanceId: ProviderInstanceId.make("second_devin") }],
+          },
+        },
+      ],
+    ]);
+    const accounts = collectLimitAccounts(presentations);
+    expect(accounts).toHaveLength(2);
+    expect(
+      accounts.find((account) => account.limits.provider?.id === "devin")?.environments,
+    ).toHaveLength(2);
+    expect(collectLimitPools(accounts, now)).toHaveLength(2);
+  });
+
+  it("does not change model selection when a display-only Devin quota is exhausted", () => {
+    expect(exhaustedUsageWindow(devin, now, "swe-2-high")).toBeUndefined();
+    const selection = { instanceId: devin.instanceId, model: "swe-2-high" };
+    const fallback = provider({ instanceId: ProviderInstanceId.make("fallback") });
+    expect(
+      resolveNewThreadModelSelection({
+        defaultSelection: selection,
+        fallbackSelection: { instanceId: fallback.instanceId, model: "default" },
+        providers: [devin, fallback],
+        now,
+      }).selection,
+    ).toEqual(selection);
+  });
+});
 
 describe("new thread model fallback", () => {
   const selection = { instanceId: ProviderInstanceId.make("codex"), model: "gpt-6.1-sol" };

@@ -180,7 +180,8 @@ export function fromRunner(name: string, run: Runner): ProviderTextGeneration {
       operation: "generatePromptSuggestion",
       cwd: input.cwd,
       prompt: input.prompt,
-      outputSchema: ThreadPromptSuggestionResult,
+      // The server determines the reason; the model only returns the suggestion.
+      outputSchema: Schema.Struct({ suggestion: ThreadPromptSuggestionResult.fields.suggestion }),
       modelSelection: input.modelSelection,
     });
   });

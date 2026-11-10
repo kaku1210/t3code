@@ -32,6 +32,10 @@ export type ServerProviderResetCredits = typeof ServerProviderResetCredits.Type;
 export const ServerProviderUsageLimits = Schema.Struct({
   checkedAt: IsoDateTime,
   windows: ForwardCompatibleArray(ServerProviderUsageWindow),
+  /** Identifies the subscription vendor when several agents share one driver. */
+  provider: Schema.optional(
+    Schema.Struct({ id: TrimmedNonEmptyString, label: TrimmedNonEmptyString }),
+  ),
   credentialFingerprint: Schema.optional(TrimmedNonEmptyString),
   resetCredits: Schema.optional(ServerProviderResetCredits),
   externalUsage: Schema.optional(

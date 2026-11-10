@@ -114,6 +114,20 @@ setting removes it from `settings.json`.
 
 ## Track subscription limits
 
+Devin Registry providers report daily and weekly remaining quota using the existing Devin CLI
+sign-in on the server. Open **Usage → Limits**, the thread's usage details, or `/usage-limits`
+to see the reported percentages and reset times. Accounts without a reported daily allowance
+show only their weekly allowance. Devin's account quota is displayed without changing model
+selection, since free models and linked billing plans can have different limits.
+
+Quota checks use the account server configured by Devin's CLI credentials. This client API can
+change; failed checks show a notice instead of a guessed balance. Check your Devin sign-in or
+open [Devin Usage & limits](https://app.devin.ai/settings/usage) if a refresh fails.
+
+When using a proxy, Devin quota checks honor the server environment's `HTTPS_PROXY`, `HTTP_PROXY`
+and `NO_PROXY` settings. Keep the configured proxy running; a connection timeout shows a network
+notice so you can restore the connection and refresh.
+
 **Usage → Limits** pools every subscription account it can see per provider, so with several Codex
 or Claude accounts across your enabled environments and hubs you read one number per window rather than a
 list. Each window card shows how much of the pool is left and a bar with one segment per account,

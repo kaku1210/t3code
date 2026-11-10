@@ -118,5 +118,7 @@ describe("resolveUsageLimitsAfterProbe", () => {
     expect(resolveUsageLimitsAfterProbe({ published, probed: failed })).toBe(published);
     expect(resolveUsageLimitsAfterProbe({ published, probed: unsupported })).toBe(unsupported);
     expect(resolveUsageLimitsAfterProbe({ published: undefined, probed: failed })).toBe(failed);
+    const devinFailure = { ...failed, provider: { id: "devin", label: "Devin" } };
+    expect(resolveUsageLimitsAfterProbe({ published, probed: devinFailure })).toBe(devinFailure);
   });
 });
