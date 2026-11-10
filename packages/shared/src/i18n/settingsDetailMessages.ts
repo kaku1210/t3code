@@ -1,4 +1,9 @@
 export const settingsDetailMessages = {
+  "settings.chat.placeholder": ["Input placeholder", "输入框提示文案"],
+  "settings.chat.placeholderHelp": [
+    "Text shown in an empty composer. Saved on this device; leave blank to follow the interface language.",
+    "输入框为空时显示的提示。仅保存在当前设备；留空时使用对应界面语言的默认文案。",
+  ],
   "settings.promptSuggestion.title": ["Next prompt suggestions", "推荐下一条指令"],
   "settings.promptSuggestion.enabled": [
     "Automatically suggest a next prompt",

@@ -72,7 +72,7 @@ import { vcsEnvironment } from "../../state/vcs";
 import { useEnvironmentQuery } from "../../state/query";
 import { readEnvironmentScope, useEnvironmentScope } from "../../state/session";
 import { formatRelativeTime, parseTimestampDate } from "../../timestampFormat";
-import { translate } from "../../i18n/messages";
+import { translate } from "@t3tools/shared/i18n/messages";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import type { SidebarThreadSummary } from "../../types";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/shell";

@@ -5,7 +5,7 @@ import {
 } from "@t3tools/contracts";
 import { type LucideIcon, LockIcon, PenLineIcon, ShieldOffIcon, SparklesIcon } from "lucide-react";
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
-import { translate, type MessageKey } from "../../i18n/messages";
+import { translate, type MessageKey } from "@t3tools/shared/i18n/messages";
 
 const runtimeModeMessages = {
   "approval-required": ["permission.supervised", "permission.supervisedDescription"],

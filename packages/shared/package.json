@@ -546,6 +546,18 @@
     "./speech": {
       "types": "./src/speech.ts",
       "import": "./src/speech.ts"
+    },
+    "./i18n/messages": {
+      "types": "./src/i18n/messages.ts",
+      "default": "./src/i18n/messages.ts"
+    },
+    "./i18n/settingsCopy": {
+      "types": "./src/i18n/settingsCopy.ts",
+      "default": "./src/i18n/settingsCopy.ts"
+    },
+    "./composerPlaceholder": {
+      "types": "./src/composerPlaceholder.ts",
+      "default": "./src/composerPlaceholder.ts"
     }
   },
   "scripts": {

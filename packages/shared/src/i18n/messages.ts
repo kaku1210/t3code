@@ -1,13 +1,15 @@
-import type { UiLanguage } from "@t3tools/shared/uiLanguage";
-import { COMPOSER_SHORTCUT_HINTS, DEFAULT_COMPOSER_PLACEHOLDER } from "../composerPlaceholder";
-import { threadMessages } from "./threadMessages";
-import { settingsDetailMessages } from "./settingsDetailMessages";
+import type { UiLanguage } from "../uiLanguage.ts";
+import { COMPOSER_SHORTCUT_HINTS, DEFAULT_COMPOSER_PLACEHOLDER } from "../composerPlaceholder.ts";
+import { threadMessages } from "./threadMessages.ts";
+import { settingsDetailMessages } from "./settingsDetailMessages.ts";
+import { updateCenterMessages } from "./updateCenterMessages.ts";
 
 const chineseComposerShortcutHints = "@ 引用文件，$ 选择技能，/ 打开命令，↑ 上一句";
 
 const messages = {
   ...threadMessages,
   ...settingsDetailMessages,
+  ...updateCenterMessages,
   "common.search": ["Search", "搜索"],
   "common.close": ["Close", "关闭"],
   "common.cancel": ["Cancel", "取消"],
@@ -236,6 +238,45 @@ const messages = {
   ],
   "composer.shortcutHints": [COMPOSER_SHORTCUT_HINTS, chineseComposerShortcutHints],
   "composer.acceptSuggestion": ["Tab or click to fill the draft", "按 Tab 或点击填入草稿"],
+  "composer.promptSuggestionEmpty": ["No suggestion", "暂无建议"],
+  "composer.promptSuggestionEmpty.not-configured": [
+    "No suggestion · Check the suggestion settings and select a model",
+    "暂无建议 · 请检查推荐设置并选择模型",
+  ],
+  "composer.promptSuggestionEmpty.turn-not-ready": [
+    "No suggestion · This turn isn't ready",
+    "暂无建议 · 本轮回复尚不可用于推荐",
+  ],
+  "composer.promptSuggestionEmpty.provider-disabled": [
+    "No suggestion · The selected provider is disabled for this project",
+    "暂无建议 · 当前项目未启用推荐模型的服务商",
+  ],
+  "composer.promptSuggestionEmpty.provider-unavailable": [
+    "No suggestion · The selected provider is unavailable. Check its status or switch models.",
+    "暂无建议 · 推荐服务商不可用，请检查服务商状态或切换模型",
+  ],
+  "composer.promptSuggestionEmpty.missing-context": [
+    "No suggestion · This turn doesn't have enough conversation text",
+    "暂无建议 · 本轮缺少可用于推荐的对话文字",
+  ],
+  "composer.promptSuggestionEmpty.quota-exhausted": [
+    "No suggestion · The selected model has reached its usage limit. You can switch models.",
+    "暂无建议 · 所选模型额度已用尽，可切换推荐模型",
+  ],
+  "composer.promptSuggestionEmpty.no-next-step": [
+    "No suggestion · The model didn't find a useful next step",
+    "暂无建议 · 模型未找到合适的下一步",
+  ],
+  "composer.promptSuggestionEmpty.invalid-suggestion": [
+    "No suggestion · The model returned an empty or too-long prompt",
+    "暂无建议 · 模型返回的指令为空或过长",
+  ],
+  "composer.promptSuggestionFailed": [
+    "Couldn't generate a suggestion · Check the model or connection",
+    "建议生成失败 · 请检查推荐模型或连接",
+  ],
+  "composer.promptSuggestionRetry": ["Retry", "重试"],
+  "composer.promptSuggestionRetrying": ["Retrying suggestion…", "正在重试推荐…"],
   "composer.attach": ["Attach files", "添加附件"],
   "composer.send": ["Submit message", "发送消息"],
   "composer.expand": ["Expand composer", "展开输入区"],
@@ -321,6 +362,18 @@ const messages = {
 
 export type MessageKey = keyof typeof messages;
 export type MessageValues = Readonly<Record<string, string | number>>;
+
+const chineseUiText = new Map<string, string>(Object.values(messages).map(([en, zh]) => [en, zh]));
+
+/**
+ * Translates app-owned copy shared by clients; user content must never pass through this lookup.
+ * @param language Resolved interface language for the current client.
+ * @param source Original interface copy, retained when no Chinese entry exists.
+ * @returns Translated copy or the unchanged source; never modifies identifiers or message data.
+ */
+export function translateUiText(language: UiLanguage, source: string): string {
+  return language === "zh-CN" ? (chineseUiText.get(source) ?? source) : source;
+}
 
 export function translate(language: UiLanguage, key: MessageKey, values?: MessageValues): string {
   const message = messages[key][language === "zh-CN" ? 1 : 0];

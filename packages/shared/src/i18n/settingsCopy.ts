@@ -1,6 +1,6 @@
-import type { UiLanguage } from "@t3tools/shared/uiLanguage";
+import type { UiLanguage } from "../uiLanguage.ts";
 
-import { settingsDetailMessages } from "./settingsDetailMessages";
+import { settingsDetailMessages } from "./settingsDetailMessages.ts";
 
 type CopyPair = readonly [source: string, simplifiedChinese: string];
 type SettingCopy = Readonly<Partial<Record<"title" | "description", CopyPair>>>;
@@ -67,6 +67,7 @@ const groupCopy: Readonly<Partial<Record<string, CopyPair>>> = {
 };
 
 const settingCopy: Readonly<Partial<Record<string, SettingCopy>>> = {
+  "composer-placeholder": { title: settingsDetailMessages["settings.chat.placeholder"] },
   "next-prompt-suggestions-enabled": {
     title: settingsDetailMessages["settings.promptSuggestion.enabled"],
   },

@@ -18,7 +18,7 @@ import {
   usePrimarySettingsAvailable,
 } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
-import { settingsRowText, settingsSectionTitle } from "../../i18n/settingsCopy";
+import { settingsRowText, settingsSectionTitle } from "@t3tools/shared/i18n/settingsCopy";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { WorkspacePageContainer, type WorkspacePageWidth } from "../WorkspacePageContainer";
 import { Button } from "../ui/button";

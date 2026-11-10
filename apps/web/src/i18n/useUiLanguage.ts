@@ -1,7 +1,7 @@
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
 import { createContext, useContext } from "react";
 
-import { translate, type MessageKey, type MessageValues } from "./messages";
+import { translate, type MessageKey, type MessageValues } from "@t3tools/shared/i18n/messages";
 
 export const UiLanguageContext = createContext<UiLanguage>("en");
 

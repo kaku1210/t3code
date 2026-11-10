@@ -4,7 +4,7 @@ import {
   WorkspaceBreadcrumbSeparator,
 } from "../WorkspaceBreadcrumb";
 import { SETTINGS_SECTION_LABELS } from "./settingsSearch";
-import { settingsPageLabel } from "../../i18n/settingsCopy";
+import { settingsPageLabel } from "@t3tools/shared/i18n/settingsCopy";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 
 const SETTINGS_BREADCRUMB_LABELS: Readonly<Record<string, string>> = {

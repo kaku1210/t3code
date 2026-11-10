@@ -1,7 +1,7 @@
 import type { ContextMenuItem } from "@t3tools/contracts";
 import type { SnoozePreset } from "@t3tools/client-runtime/state/thread-settled";
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
-import { translate } from "../i18n/messages";
+import { translate } from "@t3tools/shared/i18n/messages";
 
 export type ThreadActionMenuId =
   | "find"

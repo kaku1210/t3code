@@ -1,5 +1,5 @@
 import type { UiLanguage } from "@t3tools/shared/uiLanguage";
-import { translate } from "./i18n/messages";
+import { translate } from "@t3tools/shared/i18n/messages";
 import { type TimestampFormat } from "@t3tools/contracts/settings";
 
 function getTimestampFormatOptions(

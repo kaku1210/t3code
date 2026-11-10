@@ -1,5 +1,5 @@
 import { useUiLanguage } from "../../i18n/useUiLanguage";
-import type { MessageKey } from "../../i18n/messages";
+import type { MessageKey } from "@t3tools/shared/i18n/messages";
 import {
   cancelEnvironmentSpeechModelDownload,
   downloadEnvironmentSpeechModel,

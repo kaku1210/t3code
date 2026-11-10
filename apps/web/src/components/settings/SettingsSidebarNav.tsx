@@ -58,7 +58,11 @@ import {
 } from "./settingsSearch";
 import { useAvailableSettingsSearchItems } from "./useAvailableSettingsSearchItems";
 import { validateSettingsScopeSearch } from "./settingsScope";
-import { settingsGroupLabel, settingsPageLabel, settingsRowText } from "../../i18n/settingsCopy";
+import {
+  settingsGroupLabel,
+  settingsPageLabel,
+  settingsRowText,
+} from "@t3tools/shared/i18n/settingsCopy";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useSettingsSectionNavigation } from "./useSettingsSectionNavigation";
 import { workspaceAreaProps } from "../../lib/workspaceFocus";

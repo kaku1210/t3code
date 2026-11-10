@@ -36,7 +36,7 @@ function recordEffect(action: string) {
 
 vi.mock("../components/CustomSnoozeDialog", () => ({ requestCustomSnooze: vi.fn() }));
 vi.mock("../i18n/useUiLanguage", async () => {
-  const { translate } = await import("../i18n/messages");
+  const { translate } = await import("@t3tools/shared/i18n/messages");
   return { useUiLanguage: () => ({ language: "en", t: translate.bind(null, "en") }) };
 });
 vi.mock("react", () => ({

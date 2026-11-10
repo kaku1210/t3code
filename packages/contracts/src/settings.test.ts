@@ -312,16 +312,25 @@ describe("ClientSettings notifications", () => {
   });
 });
 
-describe("ClientSettings interface language", () => {
+describe("ClientSettings interface language and composer copy", () => {
   it("follows the system when loading settings from an older installation", () => {
     expect(decodeClientSettings({}).uiLanguage).toBe("system");
     expect(decodeClientSettingsPatch({})).not.toHaveProperty("uiLanguage");
+    expect(decodeClientSettings({}).composerPlaceholder).toBe("");
+    expect(decodeClientSettingsPatch({})).not.toHaveProperty("composerPlaceholder");
   });
 
   it.each(["en", "zh-CN", "system"])("round-trips the %s preference", (uiLanguage) => {
-    const settings = decodeClientSettings({ uiLanguage });
+    const composerPlaceholder = "Tell me what to build / 输入任务";
+    const settings = decodeClientSettings({ uiLanguage, composerPlaceholder });
     expect(decodeClientSettings(encodeClientSettings(settings)).uiLanguage).toBe(uiLanguage);
-    expect(decodeClientSettingsPatch({ uiLanguage })).toEqual({ uiLanguage });
+    expect(decodeClientSettings(encodeClientSettings(settings)).composerPlaceholder).toBe(
+      composerPlaceholder,
+    );
+    expect(decodeClientSettingsPatch({ uiLanguage, composerPlaceholder })).toEqual({
+      uiLanguage,
+      composerPlaceholder,
+    });
   });
 });
 

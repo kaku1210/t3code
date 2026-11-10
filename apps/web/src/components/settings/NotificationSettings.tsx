@@ -6,7 +6,7 @@ import {
   hasNotificationSound,
   unlockNotificationAudio,
 } from "../../threadNotifications";
-import type { MessageKey } from "../../i18n/messages";
+import type { MessageKey } from "@t3tools/shared/i18n/messages";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "../ui/select";
 import { SettingsRow } from "./settingsLayout";
