@@ -1,11 +1,13 @@
 import { RegistryContext } from "@effect/atom-react";
 import { Atom, AtomRegistry } from "effect/reactivity";
+import * as Cause from "effect/Cause";
 import {
   DEFAULT_SERVER_SETTINGS,
   EnvironmentId,
   ThreadId,
   RunId,
   ProviderInstanceId,
+  TextGenerationError,
   type ServerProvider,
   type ServerSettings,
 } from "@t3tools/contracts";
@@ -76,12 +78,17 @@ function setup() {
     readonly runId: string;
     readonly eligible: boolean;
   }) {
-    const suggestion = useNextPromptSuggestion(
+    const { state, regenerate } = useNextPromptSuggestion(
       { environmentId: EnvironmentId.make(props.environmentId), threadId: ThreadId.make("thread") },
       RunId.make(props.runId),
       props.eligible,
     );
-    return <span>{suggestion}</span>;
+    return (
+      <>
+        <span data-state={state.status}>{state.status === "ready" ? state.suggestion : ""}</span>
+        <button disabled={!regenerate} onClick={() => regenerate?.()} />
+      </>
+    );
   }
   return {
     registry,
@@ -96,6 +103,16 @@ function setup() {
     },
     get suggestion() {
       return container.textContent;
+    },
+    get status() {
+      return container.querySelector("span")?.dataset.state;
+    },
+    async retryTwice() {
+      await act(() => {
+        const button = container.querySelector("button")!;
+        button.click();
+        button.click();
+      });
     },
     [Symbol.dispose]() {
       act(() => root.unmount());
@@ -123,7 +140,7 @@ it("makes no model request while ineligible, disabled, or without permission", a
   expect(mocks.request).not.toHaveBeenCalled();
 });
 
-it("reuses a completed turn's suggestion when the composer becomes eligible again", async () => {
+it("reads the host cache again when the composer becomes eligible", async () => {
   using screen = setup();
   const response = deferred();
   mocks.request.mockReturnValue(response.promise);
@@ -134,7 +151,7 @@ it("reuses a completed turn's suggestion when the composer becomes eligible agai
   expect(screen.suggestion).toBe("");
   await screen.render();
   expect(screen.suggestion).toBe("Review the diff");
-  expect(mocks.request).toHaveBeenCalledTimes(1);
+  expect(mocks.request).toHaveBeenCalledTimes(2);
 });
 
 it("isolates environments and ignores a late response from an older run", async () => {
@@ -155,7 +172,32 @@ it("isolates environments and ignores a late response from an older run", async 
     old.finish("Outdated");
   });
   expect(screen.suggestion).toBe("Host B");
+  mocks.request.mockResolvedValueOnce({ _tag: "Success", value: { suggestion: "Updated on PC" } });
   await screen.render("run-2");
-  expect(screen.suggestion).toBe("Current run");
-  expect(mocks.request).toHaveBeenCalledTimes(3);
+  expect(screen.suggestion).toBe("Updated on PC");
+  expect(mocks.request).toHaveBeenCalledTimes(4);
+});
+
+it("shows failure and retries once when tapped twice before rendering", async () => {
+  using screen = setup();
+  const response = deferred();
+  mocks.request
+    .mockResolvedValueOnce({
+      _tag: "Failure",
+      cause: Cause.fail(
+        new TextGenerationError({
+          operation: "generatePromptSuggestion",
+          detail: "Provider unavailable temporarily.",
+        }),
+      ),
+    })
+    .mockReturnValueOnce(response.promise);
+  await screen.render();
+  expect(screen.status).toBe("failed");
+  await screen.retryTwice();
+  expect(screen.status).toBe("generating");
+  expect(mocks.request).toHaveBeenCalledTimes(2);
+  expect(mocks.request.mock.calls[1]?.[0].input.regenerate).toBe(true);
+  await act(async () => response.finish("Run the checks"));
+  expect(screen.suggestion).toBe("Run the checks");
 });

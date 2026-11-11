@@ -210,6 +210,9 @@ import {
 } from "./ComposerAttachmentStrip";
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { ComposerFooterPrimaryActions } from "./ComposerFooterControls";
+import { ContextWindowMeter } from "./ContextWindowMeter";
+import { PromptSuggestionControl } from "./PromptSuggestionControl";
+import type { PromptSuggestionUnavailableReason } from "@t3tools/client-runtime/state/prompt-suggestions";
 import { ComposerPendingUserInputPanel } from "./ComposerPendingUserInputPanel";
 import { ComposerPlanFollowUpBanner } from "./ComposerPlanFollowUpBanner";
 import { resolveComposerMenuActiveItemId } from "./composerMenuHighlight";
@@ -1010,7 +1013,7 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     modelOptionsByInstance,
   );
   const reserveContextWindowMeter = shouldReserveContextWindowMeter({
-    meterEnabled: settings.contextWindowMeterEnabled,
+    meterEnabled: true,
     detailLoading: props.threadSyncPhase === "loading",
     threadStarted: threadShellHasStarted(props.activeThreadShell),
     providerReportsContextWindow: selectedProviderStatus
@@ -2313,46 +2316,38 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
   };
   const expandMobileComposerStable = useStableCallback(expandMobileComposer);
 
-  const { outcome: promptSuggestionOutcome, retry: retryPromptSuggestion } =
+  const promptSuggestionUnavailableReason: PromptSuggestionUnavailableReason | null =
+    phase === "running"
+      ? "running"
+      : routeKind !== "server" || promptSuggestionRunId == null
+        ? "no-turn"
+        : prompt.length > 0 || composerDraftHasUserContent(composerDraft)
+          ? "draft"
+          : pendingApprovals.length > 0 || incomingPendingUserInputs.length > 0
+            ? "approval"
+            : activeThreadId !== routeThreadRef.threadId ||
+                !canOperateThread ||
+                isSendBusy ||
+                isRevertingCheckpoint ||
+                isCompacting ||
+                isPreparingWorktree ||
+                isEditingQueuedMessage ||
+                composerMenuOpen ||
+                projectSelectionRequired ||
+                showProviderUnavailable ||
+                showPlanFollowUpPrompt ||
+                environmentUnavailable !== null ||
+                speechInput.state.phase !== "idle"
+              ? "busy"
+              : null;
+  const { state: promptSuggestionState, regenerate: regeneratePromptSuggestion } =
     useNextPromptSuggestion(
       routeThreadRef,
       promptSuggestionRunId ?? null,
-      routeKind === "server" &&
-        activeThreadId === routeThreadRef.threadId &&
-        canOperateThread &&
-        phase !== "running" &&
-        !isSendBusy &&
-        !isRevertingCheckpoint &&
-        !isCompacting &&
-        !isPreparingWorktree &&
-        !isEditingQueuedMessage &&
-        !composerMenuOpen &&
-        !projectSelectionRequired &&
-        !showProviderUnavailable &&
-        !showPlanFollowUpPrompt &&
-        environmentUnavailable === null &&
-        pendingApprovals.length === 0 &&
-        incomingPendingUserInputs.length === 0 &&
-        speechInput.state.phase === "idle" &&
-        prompt.length === 0 &&
-        !composerDraftHasUserContent(composerDraft),
+      promptSuggestionUnavailableReason,
     );
-  const promptSuggestionRetrying = promptSuggestionOutcome === "retrying";
-  const promptSuggestionResult =
-    typeof promptSuggestionOutcome === "object" ? promptSuggestionOutcome : null;
-  const promptSuggestion = promptSuggestionResult?.suggestion ?? null;
-  let promptSuggestionStatus: string | null = null;
-  if (promptSuggestionOutcome === "failed") {
-    promptSuggestionStatus = t("composer.promptSuggestionFailed");
-  } else if (promptSuggestionRetrying) {
-    promptSuggestionStatus = t("composer.promptSuggestionRetrying");
-  } else if (promptSuggestionResult?.suggestion === null) {
-    promptSuggestionStatus = t(
-      promptSuggestionResult.emptyReason
-        ? `composer.promptSuggestionEmpty.${promptSuggestionResult.emptyReason}`
-        : "composer.promptSuggestionEmpty",
-    );
-  }
+  const promptSuggestion =
+    promptSuggestionState.status === "ready" ? promptSuggestionState.suggestion : null;
   const acceptPromptSuggestion = () =>
     promptSuggestion !== null &&
     promptRef.current.length === 0 &&
@@ -2474,6 +2469,22 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
       : expandedControlsIconOnlyBlockCount;
   const composerControls = (
     <ComposerControlsBar
+      leadingControls={
+        <div data-composer-status-controls="true" className="flex shrink-0 items-center gap-0.5">
+          <PromptSuggestionControl
+            state={promptSuggestionState}
+            onRegenerate={regeneratePromptSuggestion}
+          />
+          <ContextWindowMeter
+            usage={activeContextWindow}
+            loading={reserveContextWindowMeter}
+            modelDisplayName={activeThreadModelDisplayName}
+            compactDisabled={compactDisabled || noProviderAvailable || isSendBusy}
+            compactDisabledReason={resolvedCompactDisabledReason}
+            {...(compactCommandAvailable ? { onCompact: compactThreadContextStable } : {})}
+          />
+        </div>
+      }
       environmentId={environmentId}
       routeKind={routeKind}
       routeThreadRef={routeThreadRef}
@@ -3618,22 +3629,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     <span>{t("composer.shortcutHints")}</span>
                   </div>
                 ) : null}
-                {promptSuggestionStatus !== null ? (
-                  <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                    <span role="status">{promptSuggestionStatus}</span>
-                    {retryPromptSuggestion !== null || promptSuggestionRetrying ? (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="xs"
-                        disabled={promptSuggestionRetrying}
-                        onClick={retryPromptSuggestion ?? undefined}
-                      >
-                        {t("composer.promptSuggestionRetry")}
-                      </Button>
-                    ) : null}
-                  </div>
-                ) : null}
                 {showMobilePendingAnswerActions ? (
                   <div
                     data-chat-composer-mobile-pending-actions="true"
@@ -3711,11 +3706,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                   <ComposerFooterPrimaryActions
                     compact={isComposerPrimaryActionsCompact}
                     canOperateThread={canOperateThread}
-                    activeContextWindow={
-                      settings.contextWindowMeterEnabled ? activeContextWindow : null
-                    }
-                    reserveContextWindowMeter={reserveContextWindowMeter}
-                    activeThreadModelDisplayName={activeThreadModelDisplayName}
                     pendingAction={pendingPrimaryAction}
                     isRunning={phase === "running"}
                     canInterrupt={canInterrupt}
@@ -3761,11 +3751,6 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
                     compactBeforeSendTokens={props.resumeCompactionTokens}
                     keepFullHistory={props.keepFullHistory}
                     onToggleKeepFullHistory={props.onToggleKeepFullHistory}
-                    compactDisabled={compactDisabled || noProviderAvailable || isSendBusy}
-                    compactDisabledReason={resolvedCompactDisabledReason}
-                    {...(compactCommandAvailable
-                      ? { onCompactContext: compactThreadContextStable }
-                      : {})}
                   >
                     {speechInput.available ? (
                       <>

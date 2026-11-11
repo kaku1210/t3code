@@ -167,14 +167,37 @@ Approval requests and other actions that need a specific response keep their own
 On web and desktop, open **Settings → Chat → Next prompt suggestions** to choose
 a provider, model, and reasoning effort, then enable automatic suggestions. Opening
 a conversation with a completed reply and an empty composer can make one model request
-using an excerpt of that turn. Suggestions stay in the client until it closes or a newer
-completed turn takes their place. Press **Tab** or click a suggestion to fill the draft,
+using an excerpt of that turn. Devices connected to the same environment share the pending
+request and its result; completed results are cached for ten minutes. Reopening the turn
+fetches the host's current result. Press **Tab** or click a suggestion to fill the draft,
 then review it and send it when ready.
+
+The next-prompt control stays visible before the model picker. It dims while a reply is
+running or the draft is busy, spins during generation, and shows a check when a suggestion
+is ready. Click the check to generate another suggestion (another model request), or click
+the retry arrow after a failed request. Hover or focus the control for its status and the
+reported error. Configuration and usage-limit problems use a warning; no useful next step
+is a neutral result. Regeneration never sends a message or overwrites your draft.
+
+Suggestions wait at most one minute in the queue and have up to three minutes for provider
+startup and generation. Antigravity reuses its background process with an independent session
+for each suggestion; its model reply has a one-minute limit after session setup. The process
+closes when idle or when its provider is stopped. A timeout leaves a retry in the suggestion
+control; it does not stop your chat.
+Suggestion progress and failures stay in this control instead of the global slow-request alert.
+
+The context ring beside it always shows the latest reported percentage used. Hover it for
+the full used/limit token counts and existing compaction actions. An unknown report or
+limit shows `—%`, not zero. The ring uses warning color from 70% and error color above 90%;
+these display thresholds do not change the provider's automatic compaction threshold.
 
 On mobile, configure the same environment-specific model and reasoning effort in
 **Settings → Chat → Next step**. A suggestion appears above an empty composer after
 a completed turn. Tap it to insert an editable draft, then send it when ready. Drafts,
 attachments, queued edits, active turns and hidden chats suppress suggestions.
+The mobile control also shows generation progress, errors, and retry or regeneration actions.
+It requests the result from the host, so the phone does not run a model. Changes made on
+another device appear when the turn is reopened or the connection becomes eligible again.
 
 ## Edit an earlier prompt
 

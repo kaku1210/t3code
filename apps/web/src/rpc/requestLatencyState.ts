@@ -32,6 +32,8 @@ const pendingRpcAckRequests = new Map<string, PendingRpcAckRequest>();
 const untrackedRpcAckMethods = new Set<string>([
   WS_METHODS.serverGetUsageSummary,
   WS_METHODS.serverReportClientActivity,
+  // The composer owns this background request's progress, timeout and retry state.
+  WS_METHODS.threadPromptSuggestion,
   WS_METHODS.sourceControlSignInWait,
 ]);
 const longRunningRpcAckMethods = new Set<string>([

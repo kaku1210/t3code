@@ -1396,7 +1396,12 @@ const WsAgentSessionsImportRpc = Rpc.make(WS_METHODS.agentSessionsImport, {
   ]),
 });
 
-export const ThreadPromptSuggestionInput = Schema.Struct({ threadId: ThreadId, runId: RunId });
+export const ThreadPromptSuggestionInput = Schema.Struct({
+  threadId: ThreadId,
+  runId: RunId,
+  /** Replace a completed cached suggestion; concurrent requests still share the pending attempt. */
+  regenerate: Schema.optionalKey(Schema.Boolean),
+});
 export type ThreadPromptSuggestionInput = typeof ThreadPromptSuggestionInput.Type;
 
 /** Explains why the server could not offer a suggestion for this request. */

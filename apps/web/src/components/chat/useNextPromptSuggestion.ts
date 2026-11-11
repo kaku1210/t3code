@@ -2,13 +2,18 @@ import { useAtomValue } from "@effect/atom-react";
 import {
   type RunId,
   type ScopedThreadRef,
-  type ThreadPromptSuggestionResult,
   WS_METHODS,
   isProviderAvailable,
   isProviderTextGenerationCapable,
 } from "@t3tools/contracts";
 import { createEnvironmentRpcCommand } from "@t3tools/client-runtime/state/runtime";
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
+import {
+  canRegenerateSuggestion,
+  settlePromptSuggestion,
+  type PromptSuggestionState,
+  type PromptSuggestionUnavailableReason,
+} from "@t3tools/client-runtime/state/prompt-suggestions";
 import { create } from "zustand";
 
 import { connectionAtomRuntime } from "../../connection/runtime";
@@ -20,31 +25,20 @@ const generateSuggestion = createEnvironmentRpcCommand(connectionAtomRuntime, {
   label: "environment-data:thread:suggest-next-prompt",
   tag: WS_METHODS.threadPromptSuggestion,
 });
-
-type SuggestionOutcome = ThreadPromptSuggestionResult | "failed" | "retrying";
-type CachedSuggestion = { readonly runId: RunId; readonly outcome: SuggestionOutcome | null };
+type CachedSuggestion = { readonly runId: RunId; readonly state: PromptSuggestionState };
 
 // Keep the latest attempt for each thread and model selection for this client session.
 const useSuggestionCache = create<Readonly<Record<string, CachedSuggestion>>>(() => ({}));
 
-function canRetrySuggestion(outcome: SuggestionOutcome | null): boolean {
-  return (
-    outcome === "failed" ||
-    (typeof outcome === "object" &&
-      outcome?.suggestion === null &&
-      outcome.emptyReason === "invalid-suggestion")
-  );
-}
-
 /**
- * Requests a suggestion for the open, eligible turn and exposes a retry for failed attempts.
- * A null outcome keeps the normal composer hint while no result is available.
+ * Fetches the host's shared result on entry; explicit regeneration replaces a successful suggestion.
+ * The synchronous cache claim prevents repeat clicks and stale completions from winning a newer attempt.
  */
 export function useNextPromptSuggestion(
   thread: ScopedThreadRef,
   runId: RunId | null,
-  eligible: boolean,
-): { readonly outcome: SuggestionOutcome | null; readonly retry: (() => void) | null } {
+  unavailableReason: PromptSuggestionUnavailableReason | null,
+): { readonly state: PromptSuggestionState; readonly regenerate: (() => void) | null } {
   const { environmentId, threadId } = thread;
   const settings = useAtomValue(serverEnvironment.settingsValueAtom(environmentId));
   const selection = settings?.nextPromptSuggestionModelSelection ?? null;
@@ -53,46 +47,83 @@ export function useNextPromptSuggestion(
   const providers = useAtomValue(serverEnvironment.providersValueAtom(environmentId));
   const provider = providers?.find((entry) => entry.instanceId === selection?.instanceId);
   const permitted = useAtomValue(generateSuggestion.permissionAtom(environmentId));
-  const request = useStableCallback(useAtomCommand(generateSuggestion));
-  const enabled = eligible && permitted && settings?.nextPromptSuggestionsEnabled === true;
+  const request = useStableCallback(useAtomCommand(generateSuggestion, { reportFailure: false }));
+  const enabled =
+    unavailableReason === null && permitted && settings?.nextPromptSuggestionsEnabled === true;
   const providerReady =
     provider?.enabled === true &&
     isProviderAvailable(provider) &&
     isProviderTextGenerationCapable(provider);
 
-  const startSuggestion = (trigger: "auto" | "retry") => {
-    if (!enabled || !providerReady || runId === null) return;
-    const current = useSuggestionCache.getState()[key];
-    if (trigger === "retry") {
-      if (current?.runId !== runId || !canRetrySuggestion(current.outcome)) return;
-    } else if (current?.runId === runId) {
+  const startSuggestion = (
+    trigger: "auto" | "regenerate",
+    cacheKey = key,
+    completedRunId = runId,
+  ) => {
+    if (!enabled || !providerReady || completedRunId === null) return;
+    const current = useSuggestionCache.getState()[cacheKey];
+    if (trigger === "regenerate") {
+      if (current?.runId !== completedRunId || !canRegenerateSuggestion(current.state)) return;
+    } else if (current?.runId === completedRunId && current.state.status === "generating") {
       return;
     }
 
     // Claim the attempt synchronously so repeated clicks can't start a second request.
-    const attempt: CachedSuggestion = { runId, outcome: trigger === "retry" ? "retrying" : null };
-    useSuggestionCache.setState({ [key]: attempt });
-    void request({ environmentId, input: { threadId, runId } }).then((result) => {
-      if (useSuggestionCache.getState()[key] !== attempt) return;
-      useSuggestionCache.setState({
-        [key]: { runId, outcome: result._tag === "Success" ? result.value : "failed" },
-      });
+    const attempt: CachedSuggestion = { runId: completedRunId, state: { status: "generating" } };
+    useSuggestionCache.setState({ [cacheKey]: attempt });
+    void request({
+      environmentId,
+      input: {
+        threadId,
+        runId: completedRunId,
+        ...(trigger === "regenerate" ? { regenerate: true } : {}),
+      },
+    }).then((result) => {
+      if (useSuggestionCache.getState()[cacheKey] !== attempt) return;
+      const state = settlePromptSuggestion(result);
+      useSuggestionCache.setState({ [cacheKey]: { runId: completedRunId, state } });
     });
   };
 
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Opening an eligible thread requests a suggestion once from its environment.
+  const requestOnEntry = useEffectEvent((entryKey: string, entryRunId: RunId) =>
+    startSuggestion("auto", entryKey, entryRunId),
+  );
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- Re-entering an eligible turn reads its shared server result.
   useEffect(() => {
-    startSuggestion("auto");
-  }, [startSuggestion]);
+    if (enabled && providerReady && runId !== null) requestOnEntry(key, runId);
+  }, [enabled, providerReady, key, runId]);
 
-  if (!enabled || runId === null) return { outcome: null, retry: null };
+  if (settings?.nextPromptSuggestionsEnabled !== true) {
+    return { state: { status: "unavailable", reason: "off" }, regenerate: null };
+  }
+  if (!permitted) {
+    return { state: { status: "unavailable", reason: "permission" }, regenerate: null };
+  }
+  if (unavailableReason !== null || runId === null) {
+    return {
+      state: { status: "unavailable", reason: unavailableReason ?? "no-turn" },
+      regenerate: null,
+    };
+  }
   if (selection === null) {
-    return { outcome: { suggestion: null, emptyReason: "not-configured" }, retry: null };
+    return { state: { status: "empty", reason: "not-configured" }, regenerate: null };
   }
-  if (providers === null) return { outcome: null, retry: null };
+  if (providers === null) {
+    return { state: { status: "unavailable", reason: "provider-loading" }, regenerate: null };
+  }
   if (!providerReady) {
-    return { outcome: { suggestion: null, emptyReason: "provider-unavailable" }, retry: null };
+    return {
+      state: {
+        status: "empty",
+        reason: provider?.enabled === false ? "provider-disabled" : "provider-unavailable",
+      },
+      regenerate: null,
+    };
   }
-  const outcome = cache?.runId === runId ? cache.outcome : null;
-  return { outcome, retry: canRetrySuggestion(outcome) ? () => startSuggestion("retry") : null };
+  const state =
+    cache?.runId === runId ? cache.state : ({ status: "unavailable", reason: "busy" } as const);
+  return {
+    state,
+    regenerate: canRegenerateSuggestion(state) ? () => startSuggestion("regenerate") : null,
+  };
 }

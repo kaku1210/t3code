@@ -29,6 +29,7 @@ import {
 } from "./ComposerModelEffort";
 import type { useComposerProviderModel } from "./useComposerProviderModel";
 import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
+import type { ReactNode } from "react";
 
 /**
  * The composer footer controls: the model picker (which also holds effort, speed and
@@ -39,6 +40,8 @@ import { resolveComposerControlsOwnership } from "./composerControlsOwnership";
 const MODEL_TRIGGER_STATES = "data-popup-open:bg-accent data-popup-open:text-foreground";
 
 export function ComposerControlsBar(props: {
+  /** Always-visible status controls, before the model and collapsible mode controls. */
+  leadingControls: ReactNode;
   environmentId: EnvironmentId;
   routeKind: ChatComposerProps["routeKind"];
   routeThreadRef: ChatComposerProps["routeThreadRef"];
@@ -251,71 +254,76 @@ export function ComposerControlsBar(props: {
       onOpenProviderSetup={onOpenProviderSetup}
     />
   );
-  return showProviderUnavailable ? (
-    <ComposerControl
-      type="button"
-      disabled={!providerSetupInstanceId}
-      onClick={() => {
-        if (providerSetupInstanceId) {
-          onOpenProviderSetup(providerSetupInstanceId);
-        }
-      }}
-      data-chat-provider-unavailable="true"
-      className="shrink-0"
-    >
-      <CircleAlertIcon className="size-4" />
-      {providerSetupInstanceId ? "Open provider settings" : "No provider available"}
-    </ComposerControl>
-  ) : (
+  return (
     <>
-      {composerModelPicker}
+      {props.leadingControls}
+      {showProviderUnavailable ? (
+        <ComposerControl
+          type="button"
+          disabled={!providerSetupInstanceId}
+          onClick={() => {
+            if (providerSetupInstanceId) {
+              onOpenProviderSetup(providerSetupInstanceId);
+            }
+          }}
+          data-chat-provider-unavailable="true"
+          className="shrink-0"
+        >
+          <CircleAlertIcon className="size-4" />
+          {providerSetupInstanceId ? "Open provider settings" : "No provider available"}
+        </ComposerControl>
+      ) : (
+        <>
+          {composerModelPicker}
 
-      <>
-        {restingBlockDefs.map((def, index) => {
-          const hidden = index >= restingBlockDefs.length - restingHiddenBlockCount;
-          return (
+          <>
+            {restingBlockDefs.map((def, index) => {
+              const hidden = index >= restingBlockDefs.length - restingHiddenBlockCount;
+              return (
+                <div
+                  key={def.id}
+                  data-resting-block={def.id}
+                  data-composer-block-icon-only={
+                    index >= restingBlockDefs.length - iconOnlyBlockCount ? "true" : "false"
+                  }
+                  aria-hidden={hidden || undefined}
+                  inert={hidden || undefined}
+                  className={cn(
+                    "flex w-max min-w-max shrink-0 items-center gap-1",
+                    hidden && "pointer-events-none invisible absolute",
+                    index >= restingBlockDefs.length - iconOnlyBlockCount &&
+                      "[&_[data-composer-control-label]]:pointer-events-none [&_[data-composer-control-label]]:invisible [&_[data-composer-control-label]]:absolute [&_[data-composer-control-label]]:w-max [&_[data-composer-control-label]]:max-w-none [&_[data-composer-control-compact-icon]]:[visibility:inherit] [&_[data-composer-control-compact-icon]]:relative",
+                  )}
+                >
+                  {def.content}
+                </div>
+              );
+            })}
             <div
-              key={def.id}
-              data-resting-block={def.id}
-              data-composer-block-icon-only={
-                index >= restingBlockDefs.length - iconOnlyBlockCount ? "true" : "false"
-              }
-              aria-hidden={hidden || undefined}
-              inert={hidden || undefined}
+              data-resting-controls-overflow
+              aria-hidden={hiddenRestingBlockIds.length === 0 || undefined}
+              inert={hiddenRestingBlockIds.length === 0 || undefined}
               className={cn(
-                "flex w-max min-w-max shrink-0 items-center gap-1",
-                hidden && "pointer-events-none invisible absolute",
-                index >= restingBlockDefs.length - iconOnlyBlockCount &&
-                  "[&_[data-composer-control-label]]:pointer-events-none [&_[data-composer-control-label]]:invisible [&_[data-composer-control-label]]:absolute [&_[data-composer-control-label]]:w-max [&_[data-composer-control-label]]:max-w-none [&_[data-composer-control-compact-icon]]:[visibility:inherit] [&_[data-composer-control-compact-icon]]:relative",
+                "min-w-0 shrink-0",
+                hiddenRestingBlockIds.length === 0 && "pointer-events-none invisible absolute",
               )}
             >
-              {def.content}
+              <CompactComposerControlsMenu
+                interactionMode={interactionMode}
+                runtimeMode={compatibleRuntimeMode}
+                runtimeModeOptions={compatibleRuntimeModeOptions}
+                size={controlSize}
+                hidden={composerControlsHidden || hiddenRestingBlockIds.length === 0}
+                showInteractionModeToggle={planModeUiEnabled && hiddenRestingBlockIds.length > 0}
+                // Permissions join the overflow only when their normal home is in it.
+                showPermissions={overflowShowsPermissions}
+                onToggleInteractionMode={toggleInteractionMode}
+                onRuntimeModeChange={handleRuntimeModeChange}
+              />
             </div>
-          );
-        })}
-        <div
-          data-resting-controls-overflow
-          aria-hidden={hiddenRestingBlockIds.length === 0 || undefined}
-          inert={hiddenRestingBlockIds.length === 0 || undefined}
-          className={cn(
-            "min-w-0 shrink-0",
-            hiddenRestingBlockIds.length === 0 && "pointer-events-none invisible absolute",
-          )}
-        >
-          <CompactComposerControlsMenu
-            interactionMode={interactionMode}
-            runtimeMode={compatibleRuntimeMode}
-            runtimeModeOptions={compatibleRuntimeModeOptions}
-            size={controlSize}
-            hidden={composerControlsHidden || hiddenRestingBlockIds.length === 0}
-            showInteractionModeToggle={planModeUiEnabled && hiddenRestingBlockIds.length > 0}
-            // Permissions join the overflow only when their normal home is in it.
-            showPermissions={overflowShowsPermissions}
-            onToggleInteractionMode={toggleInteractionMode}
-            onRuntimeModeChange={handleRuntimeModeChange}
-          />
-        </div>
-      </>
+          </>
+        </>
+      )}
     </>
   );
 }

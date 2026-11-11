@@ -277,6 +277,68 @@ const messages = {
   ],
   "composer.promptSuggestionRetry": ["Retry", "重试"],
   "composer.promptSuggestionRetrying": ["Retrying suggestion…", "正在重试推荐…"],
+  "composer.promptSuggestionGenerating": ["Generating the next prompt…", "正在生成下一步提示…"],
+  "composer.promptSuggestionReady": ["Next prompt is ready", "下一步提示已生成"],
+  "composer.promptSuggestionBlocked": ["Next prompt needs attention", "下一步提示暂不可生成"],
+  "composer.promptSuggestionRegenerate": [
+    "Click to regenerate · makes another model request",
+    "点击重新生成 · 会再发起一次模型请求",
+  ],
+  "composer.promptSuggestionRetryAction": ["Click to retry", "点击重试生成下一步提示"],
+  "composer.promptSuggestionUnavailable.running": [
+    "Conversation in progress · suggestions follow the reply",
+    "会话进行中 · 回答结束后生成下一步提示",
+  ],
+  "composer.promptSuggestionUnavailable.draft": [
+    "Draft has content · suggestions resume when it is empty",
+    "草稿已有内容 · 清空后可生成下一步提示",
+  ],
+  "composer.promptSuggestionUnavailable.approval": [
+    "Waiting for your response or approval",
+    "请先处理当前提问或审批",
+  ],
+  "composer.promptSuggestionUnavailable.busy": [
+    "Next prompt is temporarily unavailable while the composer is busy",
+    "输入区忙碌中 · 下一步提示暂不可用",
+  ],
+  "composer.promptSuggestionUnavailable.no-turn": [
+    "Complete a reply before generating a next prompt",
+    "完成一轮对话后可生成下一步提示",
+  ],
+  "composer.promptSuggestionUnavailable.off": [
+    "Next prompt suggestions are off · enable them in Chat settings",
+    "下一步提示已关闭 · 可在聊天设置中开启",
+  ],
+  "composer.promptSuggestionUnavailable.permission": [
+    "This connection cannot generate suggestions",
+    "当前连接没有生成下一步提示的权限",
+  ],
+  "composer.promptSuggestionUnavailable.provider-loading": [
+    "Loading the suggestion provider…",
+    "正在读取下一步提示的服务商状态…",
+  ],
+  "composer.contextWindow": ["Context window", "上下文用量"],
+  "composer.contextWindowUsed": ["Context window {percentage} used", "上下文已用 {percentage}"],
+  "composer.contextLoading": ["Loading the latest context report…", "正在读取最近一次上下文用量…"],
+  "composer.contextNotReported": [
+    "The provider has not reported context usage. Unknown is not zero.",
+    "服务商暂未上报上下文用量，未知不等于零。",
+  ],
+  "composer.contextLimitNotReported": [
+    "The provider has not reported its context limit; a percentage is unavailable.",
+    "服务商未上报上下文上限，暂时无法计算百分比。",
+  ],
+  "composer.contextTotalProcessed": ["Total processed", "累计处理量"],
+  "composer.contextCost": ["Cost", "费用"],
+  "composer.contextCompact": ["Compact context", "压缩上下文"],
+  "composer.contextAutoCompact": [
+    "Context compacts automatically when needed.",
+    "需要时会自动压缩上下文。",
+  ],
+  "composer.contextAutoCompactThreshold": [
+    "Compacts automatically at about {tokens} tokens.",
+    "约 {tokens} tokens 时自动压缩上下文。",
+  ],
   "composer.attach": ["Attach files", "添加附件"],
   "composer.send": ["Submit message", "发送消息"],
   "composer.expand": ["Expand composer", "展开输入区"],

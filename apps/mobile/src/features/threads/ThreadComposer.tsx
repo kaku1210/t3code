@@ -1,9 +1,9 @@
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useSidebarWorkspaceTabs } from "../layout/workspace/useSystemWorkspaceTabBar";
 import { Button } from "../../components/ui/Button";
-import { Pressable } from "react-native";
 import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { useNextPromptSuggestion } from "./useNextPromptSuggestion";
+import { PromptSuggestionControl } from "./PromptSuggestionControl";
 import { mobilePreferencesAtom } from "../../state/preferences";
 import * as Dialog from "../../components/ui/Dialog";
 import type { ComposerTextPaste } from "../../native/T3ComposerEditor.types";
@@ -867,25 +867,17 @@ export const ThreadComposer = function ThreadComposer(props: ThreadComposerProps
         style={{ maxWidth: props.contentMaxWidth }}
       >
         {props.draftControls}
-        {promptSuggestion ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`${uiText("Use suggestion")}: ${promptSuggestion}`}
-            className="mb-2 min-h-11 rounded-xl border border-border-subtle px-4 py-3 active:opacity-70"
-            onPress={() => {
-              // Re-read at tap time: an asynchronously restored draft must never be overwritten.
-              const draft = getComposerDraftSnapshot(composerDraftKey);
-              if (draft.text.length > 0 || draft.attachments.length > 0) return;
-              props.onChangeDraftMessage(promptSuggestion);
-              inputRef.current?.focus();
-            }}
-          >
-            <Text className="text-xs text-foreground-muted">{uiText("Next step")}</Text>
-            <Text className="text-sm text-foreground" numberOfLines={3}>
-              {promptSuggestion}
-            </Text>
-          </Pressable>
-        ) : null}
+        <PromptSuggestionControl
+          state={promptSuggestion.state}
+          onRegenerate={promptSuggestion.regenerate}
+          onUse={(suggestion) => {
+            // Re-read at tap time: an asynchronously restored draft must never be overwritten.
+            const draft = getComposerDraftSnapshot(composerDraftKey);
+            if (draft.text.length > 0 || draft.attachments.length > 0) return;
+            props.onChangeDraftMessage(suggestion);
+            inputRef.current?.focus();
+          }}
+        />
         {!isSubmissionLocked &&
         composerMenu.trigger &&
         (composerMenu.items.length > 0 || composerMenu.trigger.kind === "pull-request") ? (
