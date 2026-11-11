@@ -78,9 +78,10 @@ try {
       const updateEntry = page.getByRole("button", { name: /^(Updates|检查更新)$/ });
       const point = await updateEntry.evaluate((element) => {
         const bounds = element.getBoundingClientRect();
+        const pixelRatio = element.ownerDocument.defaultView!.devicePixelRatio;
         return {
-          x: Math.round((bounds.x + bounds.width / 2) * devicePixelRatio),
-          y: Math.round((bounds.y + bounds.height / 2) * devicePixelRatio),
+          x: Math.round((bounds.x + bounds.width / 2) * pixelRatio),
+          y: Math.round((bounds.y + bounds.height / 2) * pixelRatio),
         };
       });
       const hit = await app.evaluate(({ app, BrowserWindow }, point) => {

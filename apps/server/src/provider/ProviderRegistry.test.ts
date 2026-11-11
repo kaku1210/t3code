@@ -3215,6 +3215,7 @@ it.layer(
               },
             ],
           }),
+          {},
         );
         const catalogSlugs = new Set(BUNDLED_CLAUDE_MODEL_CATALOG.models.map((m) => m.model.slug));
         const added = status.models.filter((model) => !catalogSlugs.has(model.slug));
@@ -3456,6 +3457,7 @@ it.layer(
             apiKeySource: "ANTHROPIC_API_KEY",
             apiProvider: "firstParty",
           }),
+          {},
         );
         assert.strictEqual(status.status, "ready");
         assert.strictEqual(status.auth.status, "authenticated");
@@ -3475,6 +3477,7 @@ it.layer(
         const status = yield* checkClaudeProviderStatus(
           defaultClaudeSettings,
           claudeCapabilities(),
+          {},
         );
         assert.strictEqual(status.status, "ready");
         assert.strictEqual(status.auth.status, "authenticated");
@@ -3514,6 +3517,7 @@ it.layer(
             ],
           },
           claudeCapabilities(),
+          {},
         );
         const custom = status.models.find((model) => model.slug === "claude-custom-tuned");
         assert.deepStrictEqual(
