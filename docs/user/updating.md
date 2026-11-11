@@ -6,10 +6,23 @@ of the sidebar and **Settings → Environments** offer to update it.
 
 ## T3 Code Plus on Windows
 
-Use the title-bar **Updates** entry to check upstream T3 Code releases and the repository branch
-that built your client. These two checks show available versions or commits and links; they do
-not install them. **Settings → About → Check for updates** controls these checks and hides the
-entry when turned off.
+Use the title-bar **Updates** entry to check the latest stable upstream desktop/server release
+and the repository branch that built your client. These checks show versions or commits and
+links; they do not install them or check iOS App Store and TestFlight releases.
+**Settings → About → Check for updates** controls these checks and hides the entry when turned off.
+
+**Quick update with AI** starts a projectless conversation. It first checks local changes,
+identifies the update source, and reports the impact on PC, iOS, and connected servers, including
+compatibility and which targets need new packages. It waits for your confirmation before syncing.
+For an official mobile release, include its version or release link in that conversation so the
+agent can verify the corresponding source. Desktop and mobile versions are numbered independently;
+the latest desktop release does not necessarily contain the latest mobile release.
+
+The agent assesses protocol, database, and native dependency changes as well as version numbers.
+It reports source sync, Git delivery, built packages, installation, and device validation separately.
+Only affected targets need updates. An incompatible client/server change needs a coordinated update;
+have a compatible mobile package available before switching the server. Building, publishing,
+installing, and restarting remain subject to the scope you authorize in the conversation.
 
 The popup shows GitHub release notes and commit messages for the detected branch update.
 Expand a commit to read its full message. Long lists show a summary and a link to the full
@@ -20,7 +33,11 @@ Packaged `develop` builds additionally offer **Quick local update** in **Setting
 Enable it and select your local migration CMD. Keep the CMD with its complete prepared release,
 or use your checkout's reusable migration entry after building a new package. A matching, newer
 package enables **Update and restart**. Confirming exits the app and its locally hosted tasks,
-installs with an old-version backup, then reopens the client without a remaining command window.
+installs with an old-version backup, then reopens the client. A separate progress window stays
+visible during validation, shutdown, installation and startup; failures show a reason and log path.
+Successful portable updates keep only the immediate previous installation for rollback. Older
+installer-created backups are removed; a backup in use or containing links is retained with a
+cleanup warning. Failed installs clean up their own temporary copy without rotating backups.
 If the CMD moves, select it again. Other branches show the release and repository checks only.
 
 Plus versions use `upstreamVersion-plus.YYYYMMDD.N`. The package version, upstream version and
@@ -224,7 +241,13 @@ there before refreshing to find newer versions. The same setting controls whethe
 T3 Code downloads model catalog updates, so with it off new models may not appear
 until you enable it and refresh provider status.
 
-Install App Store or Google Play releases as usual. The mobile app can also
+T3 Code Plus iOS uses its own TestFlight builds. Updating the official App Store app does not update
+Plus. Plus currently disables online app updates, so changes to its mobile code, including JavaScript,
+require a new TestFlight build. Compatible server-only changes can take effect without a new mobile
+package. A source sync or successful TestFlight upload does not mean the new build is installed or
+validated on your phone.
+
+For the official mobile app, install App Store or Google Play releases as usual. It can also
 download updates in the background and apply them when you next leave the app.
 It saves drafts and queued messages before restarting. If you keep the app open
 for a long time, it may ask to install immediately; choosing **Later** leaves the

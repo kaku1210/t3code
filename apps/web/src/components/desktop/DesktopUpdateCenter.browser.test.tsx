@@ -44,8 +44,9 @@ it("shows detection separately from local installation and honors both switches 
     },
     repository: {
       ...source,
+      status: "available",
       current: "a".repeat(40),
-      latest: "a".repeat(40),
+      latest: "b".repeat(40),
       commits: [
         {
           sha: "a".repeat(40),
@@ -68,7 +69,13 @@ it("shows detection separately from local installation and honors both switches 
     for (const listener of listeners) listener(state);
   };
   const check = vi.fn(async () => state);
-  const install = vi.fn(async () => false);
+  let rejectInstall!: (error: Error) => void;
+  const install = vi.fn(
+    () =>
+      new Promise<boolean>((_resolve, reject) => {
+        rejectInstall = reject;
+      }),
+  );
   const bridge: DesktopUpdateCenterBridge = {
     getState: async () => state,
     check,
@@ -111,7 +118,10 @@ it("shows detection separately from local installation and honors both switches 
     .not.toBeVisible();
   await page.getByText("Release notes", { exact: true }).click();
   await expect.element(page.getByText("Readable update summaries", { exact: true })).toBeVisible();
-  await page.getByText("Current Git commit", { exact: false }).click();
+  await expect
+    .element(page.getByText("feat: portable migrations", { exact: false }))
+    .not.toBeVisible();
+  await page.getByText("Update commits", { exact: false }).click();
   await page.getByText("feat: portable migrations", { exact: false }).click();
   await expect
     .element(page.getByText("Preserve the previous installation.", { exact: true }))
@@ -120,6 +130,15 @@ it("shows detection separately from local installation and honors both switches 
   expect(openExternal).toHaveBeenCalledWith(
     "https://github.com/pingdotgg/t3code/releases/tag/v1.0.0",
   );
+  await expect
+    .element(page.getByRole("button", { name: "Quick update with AI", exact: true }).first())
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Update upstream with AI", exact: true }))
+    .toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Sync repository with AI", exact: true }))
+    .toBeVisible();
   await expect
     .element(page.getByRole("button", { name: "Update and restart", exact: true }))
     .not.toBeInTheDocument();
@@ -139,6 +158,23 @@ it("shows detection separately from local installation and honors both switches 
     .toBeVisible();
   await page.getByRole("button", { name: "Update and restart", exact: true }).click();
   expect(install).toHaveBeenCalledOnce();
+  await act(() => emit({ installing: true }));
+  await expect
+    .element(
+      page.getByText(
+        "Preparing the local update. A separate window will show installation progress.",
+        { exact: true },
+      ),
+    )
+    .toBeVisible();
+  await toggle.click();
+  await act(() => {
+    emit({ installing: false });
+    rejectInstall(new Error("The update coordinator could not start."));
+  });
+  await expect
+    .element(page.getByText("The update coordinator could not start.", { exact: true }))
+    .toBeVisible();
   await toggle.click();
   await screen.getByRole("switch", { name: "Check for updates", exact: true }).click();
   await expect.element(toggle).not.toBeInTheDocument();

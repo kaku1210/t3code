@@ -103,6 +103,7 @@ function layerExecutorFor(input: {
     Layer.succeed(
       ProviderSessionManager.ProviderSessionManagerV2,
       ProviderSessionManager.ProviderSessionManagerV2.of({
+        beginShutdown: Effect.void,
         shutdown: Effect.void,
         open: () => Effect.die("unused open"),
         get: () => Effect.succeedNone,

@@ -85,6 +85,11 @@ readiness or the launcher's commit boundary. Graceful shutdown captures intent b
 closing providers, then reconciles after ingestion has stopped so a late completion
 cannot be overwritten by a stale cancellation.
 
+Windows desktop termination kills the provider tree without a catchable server signal.
+The desktop writes a PID-specific stop marker before termination and removes it after
+the backend closes. Event ingestion accepts only a recent marker newer than that process,
+so expected shutdown does not become a failed turn and stale markers cannot hide crashes.
+
 The [continuation handler](../../apps/server/src/orchestration-v2/RestartContinuation.ts)
 rechecks the preference, provider selection, newer user work, a stop the user requested,
 and maintenance turns such as `/compact` before dispatching. Intent and delivery both

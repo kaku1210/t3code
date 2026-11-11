@@ -6,6 +6,8 @@ import {
   DesktopTelemetryControlMessage,
 } from "@t3tools/contracts";
 import { assert, describe, it } from "@effect/vitest";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import { desktopShutdownMarkerPath } from "@t3tools/shared/desktopShutdown";
 import * as Deferred from "effect/Deferred";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -118,6 +120,7 @@ function decodeBootstrap(raw: string) {
 }
 
 interface MakeInstanceInput {
+  readonly fileSystem?: Partial<FileSystem.FileSystem>;
   readonly spawnerLayer: Layer.Layer<ChildProcessSpawner.ChildProcessSpawner>;
   readonly httpClientLayer?: Layer.Layer<HttpClient.HttpClient>;
   readonly backendOutputLog?: Partial<DesktopObservability.DesktopBackendOutputLogShape>;
@@ -154,6 +157,10 @@ function makeTestInstance(input: MakeInstanceInput) {
   const layerServices = Layer.mergeAll(
     FileSystem.layerNoop({
       exists: () => Effect.succeed(true),
+      makeDirectory: () => Effect.void,
+      writeFileString: () => Effect.void,
+      remove: () => Effect.void,
+      ...input.fileSystem,
     }),
     input.spawnerLayer,
     input.httpClientLayer ?? layerHealthyHttpClient,
@@ -436,6 +443,7 @@ describe("DesktopBackendManager", () => {
         let persistedFailureCount = 0;
         let discardedSessionCount = 0;
         let removedTelemetrySources = 0;
+        const shutdownMarkers = new Map<string, string>();
 
         const layerSpawner = Layer.succeed(
           ChildProcessSpawner.ChildProcessSpawner,
@@ -467,6 +475,16 @@ describe("DesktopBackendManager", () => {
 
         const instance = yield* makeTestInstance({
           spawnerLayer: layerSpawner,
+          fileSystem: {
+            writeFileString: (path, value) =>
+              Effect.sync(() => {
+                shutdownMarkers.set(path, value);
+              }),
+            remove: (path) =>
+              Effect.sync(() => {
+                shutdownMarkers.delete(path);
+              }),
+          },
           onReady: Ref.set(backendReadyFlag, true).pipe(
             Effect.andThen(Deferred.succeed(ready, void 0)),
             Effect.asVoid,
@@ -493,7 +511,7 @@ describe("DesktopBackendManager", () => {
                 removedTelemetrySources += 1;
               }),
           },
-        });
+        }).pipe(Effect.provideService(HostProcess.Platform, "win32"));
         assert.isTrue(Option.isNone(yield* instance.currentConfig));
 
         yield* instance.start;
@@ -508,15 +526,20 @@ describe("DesktopBackendManager", () => {
 
         const stopFiber = yield* instance.stop().pipe(Effect.forkChild);
         yield* Deferred.await(teardownStarted).pipe(Effect.timeout("1 second"));
+        const markerAtTeardown = shutdownMarkers.get(
+          desktopShutdownMarkerPath(baseConfig.bootstrap.t3Home!, 123),
+        );
         assert.isFalse(yield* Ref.get(backendReadyFlag));
         assert.equal(shutdownCount, 1);
         yield* Deferred.succeed(finishTeardown, undefined);
         yield* Fiber.join(stopFiber).pipe(Effect.timeout("1 second"));
+        assert.equal(markerAtTeardown, "0");
         assert.equal(startCount, 1);
         assert.equal(closedCount, 1);
         assert.equal(persistedFailureCount, 0);
         assert.equal(discardedSessionCount, 1);
         assert.equal(removedTelemetrySources, 1);
+        assert.equal(shutdownMarkers.size, 0);
 
         const stoppedSnapshot = yield* instance.snapshot;
         assert.isFalse(yield* Ref.get(backendReadyFlag));

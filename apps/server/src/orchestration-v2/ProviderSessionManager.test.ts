@@ -4,6 +4,10 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
+  desktopShutdownMarkerPath,
+  markDesktopBackendShutdown,
+} from "@t3tools/shared/desktopShutdown";
+import {
   EnvironmentId,
   type ModelSelection,
   type OrchestrationV2AppThread,
@@ -41,6 +45,7 @@ import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderS
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import * as ServerSettings from "../serverSettings.ts";
+import * as ServerConfig from "../config.ts";
 import { CodexProviderCapabilitiesV2 } from "./Adapters/CodexAdapterV2.ts";
 import * as EventSink from "./EventSink.ts";
 import * as EventStore from "./EventStore.ts";
@@ -572,6 +577,8 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
 });
 
 function layerTest(input: {
+  readonly serverConfigLayer?: Layer.Layer<ServerConfig.ServerConfig>;
+  readonly fileSystemLayer?: Layer.Layer<FileSystem.FileSystem>;
   readonly state: Ref.Ref<TestProviderRuntimeState>;
   readonly idleTimeoutMs: number;
   readonly maxIdlePinMs?: number;
@@ -687,11 +694,20 @@ function layerTest(input: {
           layerConfiguredMcpRegistry,
           layerTestStores,
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
+          ...(input.serverConfigLayer === undefined ? [] : [input.serverConfigLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
         ),
       ),
     ),
-  ).pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, NodeCrypto.layer)));
+  ).pipe(
+    Layer.provide(
+      Layer.mergeAll(
+        NodeServices.layer,
+        NodeCrypto.layer,
+        ...(input.fileSystemLayer ? [input.fileSystemLayer] : []),
+      ),
+    ),
+  );
 }
 
 const fakeHttpServer = HttpServer.HttpServer.of({
@@ -3015,6 +3031,77 @@ it.effect(
         ),
       );
     }),
+);
+
+it.effect("ProviderSessionManagerV2 preserves a run when its desktop backend is stopping", () =>
+  Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const baseDir = yield* fs.makeTempDirectoryScoped();
+    const config = yield* ServerConfig.ServerConfig.pipe(
+      Effect.provide(ServerConfig.layerTest(baseDir, baseDir)),
+    );
+    yield* markDesktopBackendShutdown(baseDir, process.pid);
+    const checked = yield* Deferred.make<void>();
+    const state = yield* Ref.make(emptyState);
+    yield* Effect.gen(function* () {
+      const eventSink = yield* EventSink.EventSinkV2;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const projections = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = ThreadId.make("desktop-shutdown-stream");
+      const providerSessionId = yield* idAllocator.allocate.providerSession({
+        providerInstanceId: modelSelection.instanceId,
+        threadId,
+      });
+      yield* eventSink.write({
+        events: [
+          yield* makeThreadCreatedEvent({ idAllocator, threadId, now: yield* DateTime.now }),
+        ],
+      });
+      const runtime = yield* manager.open({
+        threadId,
+        providerSessionId,
+        modelSelection,
+        runtimePolicy,
+      });
+      const subscription = yield* runtime.subscribeEvents!;
+      yield* Deferred.await(checked);
+      yield* Effect.yieldNow;
+      assert.isTrue(Option.isSome(yield* manager.get(providerSessionId)));
+      assert.equal(
+        (yield* projections.getThreadProjection(threadId)).providerSessions.at(-1)?.lastError,
+        null,
+      );
+      yield* manager.shutdown;
+      const exit = yield* subscription.events.pipe(Stream.runCollect, Effect.exit);
+      assert.isTrue(Exit.isFailure(exit) && Cause.hasInterruptsOnly(exit.cause));
+    }).pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          failEventStream: true,
+          serverConfigLayer: Layer.succeed(ServerConfig.ServerConfig, {
+            ...config,
+            mode: "desktop",
+          }),
+          fileSystemLayer: Layer.succeed(FileSystem.FileSystem, {
+            ...fs,
+            readFileString: (file, encoding) =>
+              fs
+                .readFileString(file, encoding)
+                .pipe(
+                  Effect.tap(() =>
+                    file === desktopShutdownMarkerPath(baseDir, process.pid)
+                      ? Deferred.succeed(checked, undefined)
+                      : Effect.void,
+                  ),
+                ),
+          }),
+        }),
+      ),
+    );
+  }).pipe(Effect.provide(NodeServices.layer)),
 );
 
 it.effect("ProviderSessionManagerV2 releases sessions when provider event streams fail", () =>

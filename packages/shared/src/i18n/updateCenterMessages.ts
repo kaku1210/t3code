@@ -3,8 +3,8 @@ export const updateCenterMessages = {
   "updates.check": ["Check now", "立即检查"],
   "updates.enabled": ["Check for updates", "检查更新"],
   "updates.enabledDescription": [
-    "Check upstream releases and this build's repository branch every 30 minutes. Turning this off hides the title bar entry.",
-    "每 30 分钟检查上游发布和当前构建的仓库分支。关闭后隐藏标题栏入口。",
+    "Check the latest stable desktop/server release and this build's repository branch every 30 minutes. iOS releases are checked separately in the AI session. Turning this off hides the title bar entry.",
+    "每 30 分钟检查桌面/服务端最新稳定发布和当前构建的仓库分支；iOS 发布由 AI 会话另行核实。关闭后隐藏标题栏入口。",
   ],
   "updates.quick": ["Quick local update", "快捷本地更新"],
   "updates.quickDescription": [
@@ -36,8 +36,36 @@ export const updateCenterMessages = {
     "Detection only; installation will be added later.",
     "本期仅检测，安装方式后续提供。",
   ],
+  "updates.aiQuickUpdate": ["Quick update with AI", "AI 快捷更新"],
+  "updates.aiQuickUpdating": ["Starting AI session…", "正在启动 AI 会话…"],
+  "updates.aiQuickUpdateHint": [
+    "Start a projectless AI session to inspect local changes and PC, iOS, and server impact, then confirm the update plan with you.",
+    "发起无项目 AI 会话，检查本地变更及 PC、iOS、服务端影响，向你确认方案后继续。",
+  ],
+  "updates.aiQuickUpdateUpstream": ["Update upstream with AI", "AI 快捷更新上游"],
+  "updates.aiQuickUpdateRepository": ["Sync repository with AI", "AI 快捷同步仓库"],
+  "updates.aiQuickUpdateSettingsTitle": ["AI quick update session", "AI 快捷更新会话"],
+  "updates.aiQuickUpdateSettingsDescription": [
+    "Inspect local changes, compatibility, and separate PC/iOS build needs before confirming an upstream or repository sync. Source sync does not update installed apps.",
+    "先检查本地变更、兼容性及 PC/iOS 分别出包需求，经你确认后同步上游或远端仓库；源码同步不代表已安装应用完成更新。",
+  ],
+  "updates.aiQuickUpdateFailed": ["Could not start the AI update session", "无法启动 AI 更新会话"],
+  "updates.aiQuickUpdateNoLocalEnv": [
+    "The local desktop environment is not connected or cannot start a projectless session.",
+    "本地桌面环境未连接或无法启动无项目会话。",
+  ],
+  "updates.aiQuickUpdateDraftFallback": [
+    "Opened an update draft because no ready AI provider is selected. Choose a model and send.",
+    "当前没有可直接发送的就绪模型，已为你打开预填好指令的更新草稿，请选择模型后发送。",
+  ],
+  "updates.aiQuickUpdateStartedTitle": ["AI update session started", "AI 更新会话已启动"],
+  "updates.aiQuickUpdateOpenSession": ["Open session", "打开会话"],
   "updates.install": ["Update and restart", "更新并重启"],
   "updates.installing": ["Preparing update…", "正在准备更新…"],
+  "updates.installProgress": [
+    "Preparing the local update. A separate window will show installation progress.",
+    "正在准备本地更新，安装期间会显示独立进度窗口。",
+  ],
   "updates.dirty": [
     "Includes uncommitted changes not covered by the Git commit notes below.",
     "包含未提交修改，下方 Git 提交说明不包含这些本地改动。",

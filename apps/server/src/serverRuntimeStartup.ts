@@ -460,6 +460,7 @@ const make = Effect.fn("serverRuntimeStartup.make")(function* (options?: Startup
 
   yield* Effect.addFinalizer(() =>
     Effect.gen(function* () {
+      yield* providerSessions.beginShutdown;
       yield* commandGate.failCommandReady(
         new ServerRuntimeStartupError({
           mode: serverConfig.mode,

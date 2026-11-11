@@ -1,6 +1,11 @@
 import type { DesktopUpdateCenterState, DesktopUpdateSource } from "@t3tools/contracts";
-import { DownloadIcon, RefreshCwIcon } from "lucide-react";
+import { DownloadIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import {
+  useStartUpdateSession,
+  useUpdateSessionStartingKind,
+  type UpdateSessionKind,
+} from "../../hooks/useStartUpdateSession";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { getUpdateCenterBridge, useDesktopUpdateCenter } from "../../state/desktopUpdateCenter";
 import { Button } from "../ui/button";
@@ -25,6 +30,9 @@ function SourceRow({
   source,
   local,
   state,
+  quickUpdating,
+  quickUpdateDisabled,
+  onQuickUpdate,
   onInstall,
   onOpenUrl,
 }: {
@@ -32,6 +40,9 @@ function SourceRow({
   source: DesktopUpdateSource;
   local?: boolean;
   state: DesktopUpdateCenterState;
+  quickUpdating?: boolean;
+  quickUpdateDisabled?: boolean;
+  onQuickUpdate?: () => void;
   onInstall: () => void;
   onOpenUrl: (url: string) => void;
 }) {
@@ -106,7 +117,7 @@ function SourceRow({
         </details>
       ) : null}
       {commits && commits.length > 0 ? (
-        <details open={source.status === "available"}>
+        <details>
           <summary className="cursor-pointer text-xs font-medium">
             {t(source.status === "current" ? "updates.currentCommit" : "updates.commits")}
             {source.commitCount !== undefined ? (
@@ -151,13 +162,37 @@ function SourceRow({
         <p className="text-xs text-muted-foreground">{t("updates.noNotes")}</p>
       ) : null}
       {!local ? (
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-2xs text-muted-foreground">{t("updates.detectOnly")}</span>
-          {source.url ? (
-            <Button size="xs" variant="ghost" onClick={() => onOpenUrl(source.url!)}>
-              {t("updates.notes")}
-            </Button>
-          ) : null}
+        <div className="space-y-1.5">
+          <p className="text-2xs text-muted-foreground">{t("updates.aiQuickUpdateHint")}</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            {onQuickUpdate ? (
+              <Button
+                size="xs"
+                variant={
+                  source.status === "available" || source.status === "diverged"
+                    ? "default"
+                    : "outline"
+                }
+                disabled={
+                  quickUpdating ||
+                  quickUpdateDisabled ||
+                  source.status === "checking" ||
+                  state.installing
+                }
+                onClick={onQuickUpdate}
+              >
+                <SparklesIcon className="size-3" />
+                {t(quickUpdating ? "updates.aiQuickUpdating" : "updates.aiQuickUpdate")}
+              </Button>
+            ) : (
+              <span className="text-2xs text-muted-foreground">{t("updates.detectOnly")}</span>
+            )}
+            {source.url ? (
+              <Button size="xs" variant="ghost" onClick={() => onOpenUrl(source.url!)}>
+                {t("updates.notes")}
+              </Button>
+            ) : null}
+          </div>
         </div>
       ) : source.status === "available" ? (
         <Button size="sm" disabled={state.installing} onClick={onInstall}>
@@ -171,6 +206,9 @@ function SourceRow({
 export function DesktopUpdateCenter() {
   const state = useDesktopUpdateCenter();
   const { t } = useUiLanguage();
+  const startUpdateSession = useStartUpdateSession();
+  const startingKind = useUpdateSessionStartingKind();
+  const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const visible = Boolean(state?.supported && state.preferences.checkingEnabled);
   // Reserve the same title-bar width in chat, split panels and Settings.
@@ -193,18 +231,28 @@ export function DesktopUpdateCenter() {
   );
   const act = (operation: () => Promise<unknown>) => {
     setError(null);
-    void operation().catch((cause: unknown) =>
-      setError(cause instanceof Error ? cause.message : String(cause)),
-    );
+    void operation().catch((cause: unknown) => {
+      setError(cause instanceof Error ? cause.message : String(cause));
+      setOpen(true);
+    });
   };
   const openUrl = (url: string) =>
     act(async () => {
       if (!(await window.desktopBridge!.openExternal(url)))
         throw new Error(t("updates.openFailed"));
     });
+  const startQuickUpdate = (kind: UpdateSessionKind) => {
+    if (startingKind !== null) return;
+    setError(null);
+    void startUpdateSession(kind, state)
+      .then((started) => {
+        if (started) setOpen(false);
+      })
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)));
+  };
   return (
     <div className="[-webkit-app-region:no-drag] fixed top-(--workspace-controls-top) right-(--workspace-update-center-right) z-50 flex h-(--workspace-topbar-height) w-28 items-center justify-end">
-      <Popover>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           render={
             <Button
@@ -214,8 +262,12 @@ export function DesktopUpdateCenter() {
             />
           }
         >
-          <DownloadIcon className="size-3.5" />
-          {t("updates.title")}
+          {state.installing ? (
+            <RefreshCwIcon className="size-3.5 animate-spin motion-reduce:animate-none" />
+          ) : (
+            <DownloadIcon className="size-3.5" />
+          )}
+          {t(state.installing ? "updates.installing" : "updates.title")}
           {available ? <span className="size-1.5 rounded-full bg-primary" /> : null}
         </PopoverTrigger>
         <PopoverPopup width="lg" align="end" className="max-h-[min(80vh,44rem)] overflow-y-auto">
@@ -238,6 +290,11 @@ export function DesktopUpdateCenter() {
           {state.build.sourceDirty ? (
             <p className="mt-1 text-2xs text-muted-foreground">{t("updates.dirty")}</p>
           ) : null}
+          {state.installing ? (
+            <p role="status" className="mt-2 text-xs text-muted-foreground">
+              {t("updates.installProgress")}
+            </p>
+          ) : null}
           {error ? (
             <p role="alert" className="mt-2 text-xs break-words text-destructive">
               {error}
@@ -248,6 +305,9 @@ export function DesktopUpdateCenter() {
               title={t("updates.upstream")}
               source={state.upstream}
               state={state}
+              quickUpdating={startingKind === "upstream"}
+              quickUpdateDisabled={startingKind !== null}
+              onQuickUpdate={() => startQuickUpdate("upstream")}
               onInstall={() => {}}
               onOpenUrl={openUrl}
             />
@@ -255,6 +315,9 @@ export function DesktopUpdateCenter() {
               title={`${t("updates.repository")} · ${state.build.sourceBranch ?? "?"}`}
               source={state.repository}
               state={state}
+              quickUpdating={startingKind === "repository"}
+              quickUpdateDisabled={startingKind !== null}
+              onQuickUpdate={() => startQuickUpdate("repository")}
               onInstall={() => {}}
               onOpenUrl={openUrl}
             />

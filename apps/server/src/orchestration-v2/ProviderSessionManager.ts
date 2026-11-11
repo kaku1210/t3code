@@ -1,6 +1,7 @@
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { isDesktopBackendShuttingDown } from "@t3tools/shared/desktopShutdown";
 import {
   isOrchestrationV2WorkActive,
   ModelSelection,
@@ -44,6 +45,7 @@ import { ProviderWorkspaceMissingError } from "../provider/Errors.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
+import * as ServerConfig from "../config.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
@@ -152,6 +154,7 @@ export const ProviderSessionManagerV2Error = Schema.Union([
 export type ProviderSessionManagerV2Error = typeof ProviderSessionManagerV2Error.Type;
 
 export interface ProviderSessionManagerV2Shape {
+  readonly beginShutdown: Effect.Effect<void>;
   readonly shutdown: Effect.Effect<void>;
   readonly open: (input: {
     readonly threadId: ThreadId;
@@ -335,6 +338,8 @@ export const layerWithOptions = (
     Effect.gen(function* () {
       const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistryV2;
       const fileSystem = yield* FileSystem.FileSystem;
+      const serverConfig = yield* Effect.serviceOption(ServerConfig.ServerConfig);
+      const processStartedAt = (yield* Clock.currentTimeMillis) - process.uptime() * 1_000;
       const mcpSessionRegistry = yield* McpSessionRegistry.McpSessionRegistry;
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
       /** Unreadable settings must preserve explicit browser-access opt-outs. */
@@ -390,6 +395,7 @@ export const layerWithOptions = (
       const onShutdownSignal = () => {
         shutdownSignal.received = true;
       };
+      const beginShutdown = Effect.sync(onShutdownSignal);
       yield* Effect.acquireRelease(
         Effect.sync(() => {
           process.on("SIGINT", onShutdownSignal);
@@ -2063,6 +2069,18 @@ export const layerWithOptions = (
           Effect.flatMap((exit) =>
             Effect.gen(function* () {
               if (shutdownSignal.received) return;
+              if (
+                Option.isSome(serverConfig) &&
+                serverConfig.value.mode === "desktop" &&
+                (yield* isDesktopBackendShuttingDown(
+                  serverConfig.value.baseDir,
+                  process.pid,
+                  processStartedAt,
+                ).pipe(Effect.provideService(FileSystem.FileSystem, fileSystem)))
+              ) {
+                yield* beginShutdown;
+                return;
+              }
               const current = (yield* Ref.get(sessions)).get(
                 sessionKey(entry.runtime.providerSessionId),
               );
@@ -2113,6 +2131,7 @@ export const layerWithOptions = (
       // Shutdown must fit the launcher's 5 s deadline with up to 15 sessions.
       const sessionScopes = yield* Scope.make("parallel");
       const shutdown = Effect.gen(function* () {
+        yield* beginShutdown;
         const activeSessions = [...(yield* Ref.get(sessions)).values()];
         yield* Effect.forEach(
           activeSessions,
@@ -2138,6 +2157,7 @@ export const layerWithOptions = (
       );
 
       return ProviderSessionManagerV2.of({
+        beginShutdown,
         shutdown,
         open: (input) =>
           sessionOpen.withLock(

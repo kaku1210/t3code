@@ -26,6 +26,8 @@ import {
   type DesktopTelemetryControlMessage as DesktopTelemetryControlMessageValue,
 } from "@t3tools/contracts";
 import { waitForHttpReady as waitForHttpReadyShared } from "@t3tools/shared/httpReadiness";
+import * as HostProcess from "@t3tools/shared/HostProcess";
+import { markDesktopBackendShutdown } from "@t3tools/shared/desktopShutdown";
 
 import * as DesktopObservability from "../app/DesktopObservability.ts";
 import * as DesktopTelemetryPublisher from "../telemetry/DesktopTelemetryPublisher.ts";
@@ -1063,7 +1065,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
   const stop = Effect.fn("desktop.backendInstance.stop")(function* (options?: {
     readonly timeout?: Duration.Duration;
   }) {
-    const { active, restartFiber, notifyShutdown } = yield* mutex.withPermits(1)(
+    const { active, restartFiber, notifyShutdown, config } = yield* mutex.withPermits(1)(
       Effect.gen(function* () {
         const result = yield* SubscriptionRef.modify(state, (latest) => {
           const active = Option.map(latest.active, (run) =>
@@ -1074,6 +1076,7 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
               active,
               restartFiber: latest.restartFiber,
               notifyShutdown: latest.ready,
+              config: latest.config,
             },
             {
               ...latest,
@@ -1088,6 +1091,24 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
       }),
     );
 
+    const stoppingConfig = Option.getOrUndefined(config);
+    const stoppingRun = Option.getOrUndefined(active);
+    const pid = stoppingRun ? Option.getOrUndefined(stoppingRun.pid) : undefined;
+    const shutdownMarker =
+      (yield* HostProcess.Platform) === "win32" &&
+      stoppingConfig?.bootstrapDelivery === "fd3" &&
+      stoppingConfig.bootstrap.t3Home !== undefined &&
+      stoppingRun?.exitObserved === false &&
+      pid !== undefined
+        ? yield* markDesktopBackendShutdown(stoppingConfig.bootstrap.t3Home, pid).pipe(
+            Effect.provideService(FileSystem.FileSystem, fileSystem),
+            Effect.catch((cause) =>
+              logInstanceError("could not mark backend shutdown", { cause }).pipe(
+                Effect.as(undefined),
+              ),
+            ),
+          )
+        : undefined;
     if (notifyShutdown) {
       yield* (spec.onShutdown?.() ?? Effect.void).pipe(Effect.ignore);
     }
@@ -1102,6 +1123,15 @@ export const makeBackendInstance = Effect.fn("makeBackendInstance")(function* (
         const closed = yield* closeRun(run, parentScope, options);
         if (!closed) {
           return;
+        }
+        if (shutdownMarker !== undefined) {
+          yield* fileSystem
+            .remove(shutdownMarker)
+            .pipe(
+              Effect.catch((cause) =>
+                logInstanceError("could not clear backend shutdown marker", { cause }),
+              ),
+            );
         }
         const cleanup = yield* mutex.withPermits(1)(
           SubscriptionRef.modify(

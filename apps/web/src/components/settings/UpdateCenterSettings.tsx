@@ -1,4 +1,10 @@
+import { SparklesIcon } from "lucide-react";
 import { useState } from "react";
+import {
+  useStartUpdateSession,
+  useUpdateSessionStartingKind,
+  type UpdateSessionKind,
+} from "../../hooks/useStartUpdateSession";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { getUpdateCenterBridge, useDesktopUpdateCenter } from "../../state/desktopUpdateCenter";
 import { Button } from "../ui/button";
@@ -9,6 +15,8 @@ import { searchableSetting } from "./settingsSearch";
 export function UpdateCenterSettings() {
   const state = useDesktopUpdateCenter();
   const { t } = useUiLanguage();
+  const startUpdateSession = useStartUpdateSession();
+  const startingKind = useUpdateSessionStartingKind();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   if (!state?.supported) return null;
@@ -18,6 +26,13 @@ export function UpdateCenterSettings() {
     void operation()
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
       .finally(() => setPending(false));
+  };
+  const startQuickUpdate = (kind: UpdateSessionKind) => {
+    if (startingKind !== null) return;
+    setError(null);
+    void startUpdateSession(kind, state).catch((cause: unknown) =>
+      setError(cause instanceof Error ? cause.message : String(cause)),
+    );
   };
   return (
     <>
@@ -34,6 +49,59 @@ export function UpdateCenterSettings() {
               act(() => getUpdateCenterBridge()!.configure({ checkingEnabled }))
             }
           />
+        }
+      />
+      <SettingsRow
+        id="ai-quick-update"
+        title={t("updates.aiQuickUpdateSettingsTitle")}
+        description={t("updates.aiQuickUpdateSettingsDescription")}
+        control={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="xs"
+              variant={
+                state.upstream.status === "available" || state.upstream.status === "diverged"
+                  ? "default"
+                  : "outline"
+              }
+              disabled={
+                pending ||
+                startingKind !== null ||
+                state.installing ||
+                state.upstream.status === "checking"
+              }
+              onClick={() => startQuickUpdate("upstream")}
+            >
+              <SparklesIcon className="size-3" />
+              {t(
+                startingKind === "upstream"
+                  ? "updates.aiQuickUpdating"
+                  : "updates.aiQuickUpdateUpstream",
+              )}
+            </Button>
+            <Button
+              size="xs"
+              variant={
+                state.repository.status === "available" || state.repository.status === "diverged"
+                  ? "default"
+                  : "outline"
+              }
+              disabled={
+                pending ||
+                startingKind !== null ||
+                state.installing ||
+                state.repository.status === "checking"
+              }
+              onClick={() => startQuickUpdate("repository")}
+            >
+              <SparklesIcon className="size-3" />
+              {t(
+                startingKind === "repository"
+                  ? "updates.aiQuickUpdating"
+                  : "updates.aiQuickUpdateRepository",
+              )}
+            </Button>
+          </div>
         }
       />
       {state.localAllowed ? (

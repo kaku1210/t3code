@@ -2,8 +2,9 @@
 .SYNOPSIS
 Installs this prepared T3 Code Plus portable release after the user exits the desktop client.
 .DESCRIPTION
-Checks the release payload, stages a complete copy and preserves an existing installation as a
-backup. It neither stops processes nor launches the app, and does not change the user profile.
+Checks the release payload, stages a complete copy and keeps the immediate previous installation
+as a backup. Older generated backups are removed after activation; linked or running backups
+are retained with a warning. It neither stops processes nor launches the app or changes profiles.
 .PARAMETER DestinationRoot
 Installation directory. The normal launcher uses D:\AI Program Files\T3 Code Plus; a separate
 directory can be supplied for a file-installation smoke test without opening another client.
@@ -47,6 +48,32 @@ function Assert-ReleaseFiles {
     }
 }
 
+# Never follow links or remove an executable's directory while cleaning installer-owned copies.
+function Remove-InstallerDirectory {
+    param([string]$Root, [string]$Name)
+    $directory = Get-ContainedPath $Root $Name
+    $pending = [Collections.Generic.Stack[string]]::new()
+    $pending.Push($directory)
+    while ($pending.Count -gt 0) {
+        $current = $pending.Pop()
+        if ((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            throw "Cleanup directory is a link: $current"
+        }
+        foreach ($entry in Get-ChildItem -LiteralPath $current -Force) {
+            if ($entry.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw "Cleanup directory contains a link: $($entry.FullName)"
+            }
+            if ($entry.PSIsContainer) { $pending.Push($entry.FullName) }
+        }
+    }
+    $running = @(Get-CimInstance Win32_Process | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($directory + '\', [StringComparison]::OrdinalIgnoreCase)
+    })
+    if ($running.Count -gt 0) { throw "Cleanup directory is in use: $directory" }
+    Remove-Item -LiteralPath $directory -Recurse
+}
+
+$stage = $null
 try {
     $releaseRoot = [IO.Path]::GetFullPath($PSScriptRoot).TrimEnd('\')
     $destination = [IO.Path]::GetFullPath($DestinationRoot).TrimEnd('\')
@@ -134,10 +161,31 @@ try {
     # The payload was moved out, so only this task's empty staging directory is removed.
     Remove-Item -LiteralPath $stage
     Write-Host "Installed: $($manifest.appName) $($manifest.version)"
-    if ($backedUp) { Write-Host "Previous installation retained at: $backup" }
+    if ($backedUp) {
+        Write-Host "Previous installation retained at: $backup"
+        $oldBackups = @(Get-ChildItem -LiteralPath $destination -Directory -Force | Where-Object {
+            $_.Name -match '^win-unpacked\.backup-\d{8}-\d{6}-[0-9a-f]{8}$' -and $_.FullName -ne $backup
+        })
+        foreach ($oldBackup in $oldBackups) {
+            try {
+                Remove-InstallerDirectory $destination $oldBackup.Name
+                Write-Host "Removed old installation backup: $($oldBackup.FullName)"
+            } catch {
+                Write-Warning "Backup rotation incomplete for $($oldBackup.FullName). $($_.Exception.Message)"
+            }
+        }
+    }
     Write-Host ('Open manually: ' + (Join-Path $installed $executableName))
     exit 0
 } catch {
     Write-Error $_
     exit 1
+} finally {
+    if ($stage -and (Test-Path -LiteralPath $stage)) {
+        try {
+            Remove-InstallerDirectory $destination (Split-Path $stage -Leaf)
+        } catch {
+            Write-Warning "Temporary installation cleanup incomplete: $stage. $($_.Exception.Message)"
+        }
+    }
 }

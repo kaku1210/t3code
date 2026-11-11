@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./desktopShutdown": {
+      "types": "./src/desktopShutdown.ts",
+      "import": "./src/desktopShutdown.ts"
+    },
     "./usageEstimates": {
       "types": "./src/usageEstimates.ts",
       "import": "./src/usageEstimates.ts"
