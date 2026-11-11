@@ -353,7 +353,6 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
     options.validate ??
     Effect.fn("AntigravityInstallation.validate")(
       function* (executable: AntigravityExecutable, expectedVersion: string) {
-        const validationScope = yield* Effect.scope;
         const profileDirectory = yield* Effect.acquireRelease(
           fs.makeTempDirectory({ prefix: "t3-antigravity-validate-" }),
           (directory) =>
@@ -386,20 +385,7 @@ export const makeAntigravityInstallation = Effect.fn("AntigravityInstallation.ma
             baseEnv: environment,
           }),
           cwd: profileDirectory,
-          childProcessSpawner:
-            platform === "win32"
-              ? ChildProcessSpawner.make(
-                  Effect.fnUntraced(function* (command) {
-                    const child = yield* spawner.spawn(command);
-                    // Stop PyInstaller's tree before ACP closes pipes; after launcher exit, taskkill cannot reach children holding DLLs open.
-                    yield* Scope.addFinalizer(
-                      validationScope,
-                      child.kill({ forceKillAfter: "1 second" }).pipe(Effect.orDie),
-                    );
-                    return child;
-                  }),
-                )
-              : spawner,
+          childProcessSpawner: spawner,
         });
         const initialized = yield* runtime.initialize();
         if (

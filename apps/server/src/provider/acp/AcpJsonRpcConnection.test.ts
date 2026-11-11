@@ -951,6 +951,19 @@ describe("AcpSessionRuntime", () => {
 
       const resumed = yield* runtime.resumeSession(started.sessionId);
       expect(resumed.sessionId).toBe("mock-session-1");
+      const fresh = yield* runtime.createSession();
+      expect(fresh.sessionId).toBe("mock-session-1-2");
+      yield* runtime.prompt({ prompt: [{ type: "text", text: "on fresh session" }] });
+      expect(
+        requestEvents.findLast(
+          (event) => event.method === "session/prompt" && event.status === "started",
+        )?.payload,
+      ).toMatchObject({ sessionId: fresh.sessionId });
+      expect(
+        requestEvents.filter(
+          (event) => event.method === "initialize" && event.status === "started",
+        ),
+      ).toHaveLength(1);
       yield* runtime.closeSession();
       yield* runtime.logout;
 

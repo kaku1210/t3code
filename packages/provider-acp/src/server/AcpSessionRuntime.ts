@@ -1124,6 +1124,11 @@ export class AcpSessionRuntime extends Context.Service<
     >;
     readonly authenticate?: (methodId: string) => Effect.Effect<void, EffectAcpErrors.AcpError>;
     readonly start: () => Effect.Effect<AcpSessionRuntimeStartResult, EffectAcpErrors.AcpError>;
+    /** Creates and activates an empty session on the connected process, after any active prompt. */
+    readonly createSession: () => Effect.Effect<
+      AcpSessionRuntimeStartResult,
+      EffectAcpErrors.AcpError
+    >;
     readonly getEvents: () => Stream.Stream<AcpSessionRuntimeEvent, never>;
     readonly drainEvents: Effect.Effect<void>;
     readonly getModeState: Effect.Effect<AcpSessionModeState | undefined>;
@@ -2439,6 +2444,24 @@ export const make = Effect.fn("AcpSessionRuntime.make")(function* (
         Effect.asVoid,
       ),
     start: () => start,
+    createSession: () =>
+      promptSerializationSemaphore.withPermit(
+        start.pipe(
+          Effect.flatMap((started) => {
+            const requestPayload = {
+              cwd: options.cwd,
+              ...sessionSetupFields(started.initializeResult),
+              mcpServers: sessionMcpServers(started.initializeResult),
+            } satisfies EffectAcpSchema.NewSessionRequest;
+            return runLoggedRequest(
+              "session/new",
+              requestPayload,
+              acp.agent.createSession(requestPayload),
+            );
+          }),
+          Effect.flatMap((response) => adoptSession(response.sessionId, response)),
+        ),
+      ),
     getEvents: () => Stream.fromQueue(eventQueue),
     drainEvents,
     getModeState: Ref.get(modeStateRef),

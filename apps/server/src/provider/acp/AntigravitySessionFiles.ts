@@ -2,6 +2,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Schedule from "effect/Schedule";
 
 const isNativeSessionId = Schema.is(Schema.String.check(Schema.isUUID(4)));
 const decodeSessionMetadata = Schema.decodeEffect(
@@ -39,6 +40,13 @@ export const removeAntigravitySessionFiles = Effect.fn("removeAntigravitySession
       force: true,
     });
   },
+  Effect.retry({
+    times: 10,
+    schedule: Schedule.spaced("100 millis"),
+    while: (error) =>
+      error._tag === "PlatformError" &&
+      (error.reason._tag === "Busy" || error.reason._tag === "PermissionDenied"),
+  }),
   Effect.catch(() => Effect.logWarning("Could not remove temporary Antigravity session files.")),
 );
 

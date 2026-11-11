@@ -55,7 +55,13 @@ import {
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import packageJson from "../../package.json" with { type: "json" };
 const isCodexAppServerSpawnError = Schema.is(CodexErrors.CodexAppServerSpawnError);
-const RATE_LIMITS_PROBE_TIMEOUT_MS = 3_000;
+const isCodexWorkspaceRoutingTimeout = (error: CodexErrors.CodexAppServerError) =>
+  error._tag === "CodexAppServerRequestError" &&
+  error.method === "account/read" &&
+  error.code === -32603 &&
+  /^workspace routing discovery timed out\.?$/i.test(error.errorMessage.trim());
+// Account quota reads commonly take around 3s; allow network jitter within the auth deadline.
+const RATE_LIMITS_PROBE_TIMEOUT_MS = 5_000;
 
 type CodexRateLimitsProbe =
   | {
@@ -785,11 +791,18 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
     // Process teardown can outlast the work budget without discarding a completed snapshot.
     Effect.timeoutOption(Duration.millis(CODEX_AUTH_PROBE_TIMEOUT_MS)),
     Effect.scoped,
+    // A failed discovery process must close before one fresh routing attempt.
+    Effect.retry({
+      times: 1,
+      schedule: Schedule.spaced("500 millis"),
+      while: isCodexWorkspaceRoutingTimeout,
+    }),
     Effect.result,
   );
 
   if (Result.isFailure(probeResult)) {
     const error = probeResult.failure;
+    const routingUnavailable = isCodexWorkspaceRoutingTimeout(error);
     const installed = !isCodexAppServerSpawnError(error);
     const version = installed
       ? yield* probeCodexCliVersion({
@@ -808,14 +821,16 @@ export const checkCodexProviderStatus = Effect.fn("checkCodexProviderStatus")(fu
       probe: {
         installed,
         version,
-        status: "error",
+        status: routingUnavailable ? "warning" : "error",
         auth: { status: "unknown" },
-        message: installed
-          ? `Codex app-server provider probe failed: ${error.message}.`
-          : `Could not start Codex CLI (\`${codexSettings.binaryPath}\`). Check Settings → Providers → Codex → Binary path on the server.` +
-            (codexSettings.binaryPath === "codex"
-              ? " Installing ChatGPT or Codex desktop may not add codex to PATH."
-              : " Make sure the configured executable exists and can be run."),
+        message: routingUnavailable
+          ? "Codex workspace routing is temporarily unavailable after retrying (workspace routing discovery timed out). Refresh provider status to try again."
+          : installed
+            ? `Codex app-server provider probe failed: ${error.message}.`
+            : `Could not start Codex CLI (\`${codexSettings.binaryPath}\`). Check Settings → Providers → Codex → Binary path on the server.` +
+              (codexSettings.binaryPath === "codex"
+                ? " Installing ChatGPT or Codex desktop may not add codex to PATH."
+                : " Make sure the configured executable exists and can be run."),
       },
     });
   }

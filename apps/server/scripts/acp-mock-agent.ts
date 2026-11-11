@@ -585,14 +585,17 @@ const program = Effect.gen(function* () {
     }
   });
 
+  let createdSessions = 0;
   yield* agent.handleCreateSession(() =>
     Effect.gen(function* () {
       yield* requireAuthentication();
+      const createdSessionId =
+        ++createdSessions === 1 ? sessionId : `${sessionId}-${createdSessions}`;
       if (antigravityProfile) {
-        yield* publishAntigravityCommands(sessionId);
+        yield* publishAntigravityCommands(createdSessionId);
       }
       return {
-        sessionId,
+        sessionId: createdSessionId,
         configOptions: configOptions(),
       };
     }),

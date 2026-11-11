@@ -1,4 +1,5 @@
 import * as CodexErrors from "effect-codex-app-server/errors";
+import * as CodexClient from "effect-codex-app-server/client";
 import { vi } from "vite-plus/test";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
 import * as CodexInstallation from "./CodexInstallation.ts";
@@ -358,6 +359,149 @@ it.layer(
   Layer.mergeAll(layerTestNodeServices, ServerSettingsModule.layerTest(), layerTestHttpClient),
 )("ProviderRegistry", (it) => {
   describe("checkCodexProviderStatus", () => {
+    it.effect.each([
+      { delay: 4_000, available: true },
+      { delay: 6_000, available: false },
+    ])("bounds the quota request without discarding a $delay ms response too early", (fixture) =>
+      Effect.gen(function* () {
+        const requested = yield* Deferred.make<void>();
+        const home = yield* (yield* FileSystem.FileSystem).makeTempDirectoryScoped();
+        const request = (method: string) => {
+          if (method === "account/rateLimits/read") {
+            return Deferred.succeed(requested, undefined).pipe(
+              Effect.andThen(Effect.sleep(fixture.delay)),
+              Effect.as({
+                rateLimits: {
+                  limitId: "codex",
+                  planType: "pro",
+                  primary: { usedPercent: 33, windowDurationMins: 10080, resetsAt: 604800 },
+                },
+              }),
+            );
+          }
+          const responses: Record<string, unknown> = {
+            initialize: { userAgent: "codex/0.167.0", codexHome: home },
+            "account/read": makeCodexProbeSnapshot().account,
+            "model/list": { data: [], nextCursor: null },
+            "skills/list": { data: [] },
+            "config/read": { config: {} },
+          };
+          assert.ok(method in responses, `Unexpected Codex request: ${method}`);
+          return Effect.succeed(responses[method]);
+        };
+        using _client = vi.spyOn(CodexClient, "layerChildProcess").mockReturnValue(
+          Layer.mock(CodexClient.CodexAppServerClient)({
+            raw: {
+              notifications: Stream.empty,
+              requests: Stream.empty,
+              request: () => Effect.die("Unexpected raw request"),
+              notify: () => Effect.die("Unexpected raw notification"),
+              respond: () => Effect.die("Unexpected raw response"),
+              respondError: () => Effect.die("Unexpected raw error response"),
+            },
+            request: request as CodexClient.CodexAppServerClient["Service"]["request"],
+            notify: () => Effect.void,
+          }),
+        );
+        const fiber = yield* checkCodexProviderStatus(defaultCodexSettings).pipe(
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            ChildProcessSpawner.make(() =>
+              Effect.succeed(mockHandle({ stdout: "", stderr: "", code: 0 })),
+            ),
+          ),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(requested);
+        yield* TestClock.adjust("6 seconds");
+        const status = yield* Fiber.join(fiber);
+        assert.equal(status.status, "ready");
+        assert.equal(status.auth.status, "authenticated");
+        if (fixture.available) {
+          assert.equal(status.usageLimits?.windows[0]?.usedPercent, 33);
+          assert.equal(status.usageLimits?.unavailable, undefined);
+        } else {
+          assert.equal(status.usageLimits?.unavailable?.reason, "probeFailed");
+        }
+      }),
+    );
+
+    it.effect.each([
+      {
+        name: "recovered routing",
+        method: "account/read",
+        message: "workspace routing discovery timed out",
+        recover: true,
+        attempts: 2,
+        status: "ready",
+      },
+      {
+        name: "persistent routing",
+        method: "account/read",
+        message: "workspace routing discovery timed out",
+        recover: false,
+        attempts: 2,
+        status: "warning",
+      },
+      {
+        name: "unrelated failure",
+        method: "account/read",
+        message: "Invalid account configuration",
+        recover: false,
+        attempts: 1,
+        status: "error",
+      },
+      {
+        name: "unrelated method",
+        method: "model/list",
+        message: "workspace routing discovery timed out",
+        recover: false,
+        attempts: 1,
+        status: "error",
+      },
+    ])("bounds retries and releases every probe for $name", (fixture) =>
+      Effect.gen(function* () {
+        const firstAttempt = yield* Deferred.make<void>();
+        let attempts = 0;
+        let released = 0;
+        const fiber = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+          Effect.gen(function* () {
+            assert.equal(released, attempts);
+            attempts += 1;
+            yield* Effect.addFinalizer(() =>
+              Effect.sync(() => {
+                released += 1;
+              }),
+            );
+            yield* Deferred.succeed(firstAttempt, undefined);
+            if (fixture.recover && attempts === 2) return makeCodexProbeSnapshot();
+            return yield* new CodexErrors.CodexAppServerRequestError({
+              code: -32603,
+              method: fixture.method,
+              errorMessage: fixture.message,
+            });
+          }),
+        ).pipe(
+          Effect.provideService(
+            ChildProcessSpawner.ChildProcessSpawner,
+            ChildProcessSpawner.make(() =>
+              Effect.succeed(mockHandle({ stdout: "codex-cli 0.167.0", stderr: "", code: 0 })),
+            ),
+          ),
+          Effect.forkChild,
+        );
+        yield* Deferred.await(firstAttempt);
+        yield* TestClock.adjust("500 millis");
+        const status = yield* Fiber.join(fiber);
+        assert.equal(attempts, fixture.attempts);
+        assert.equal(released, fixture.attempts);
+        assert.equal(status.status, fixture.status);
+        assert.equal(status.auth.status, fixture.recover ? "authenticated" : "unknown");
+        if (fixture.status === "warning")
+          assert.match(status.message ?? "", /temporarily unavailable/);
+      }),
+    );
+
     it.effect("uses the app-server account and model list for provider status", () =>
       Effect.gen(function* () {
         const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>

@@ -12,10 +12,12 @@ import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as PlatformError from "effect/PlatformError";
 import * as Queue from "effect/Queue";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
+import * as TestClock from "effect/testing/TestClock";
 import { type AcpError, AcpRequestError } from "effect-acp/errors";
 import type * as AcpSchema from "effect-acp/compat";
 import { expect } from "vite-plus/test";
@@ -78,14 +80,17 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
   yield* fs.writeFileString(path.join(projectDirectory, "keep.txt"), "untouched");
   yield* fs.writeFileString(path.join(conversations, "user-session.db"), "keep native history");
   const enteredPrompt = yield* Deferred.make<void>();
+  const workerClosed = yield* Deferred.make<void>();
   const state = {
     workspaces: [] as Array<string>,
     closed: [] as Array<string>,
     prompts: [] as Array<Parameters<TextRuntime["prompt"]>[0]>,
     selectedModels: [] as Array<string>,
     selectedModes: [] as Array<string>,
+    selectedOptions: [] as Array<{ id: string; value: string | boolean }>,
     nativeFilesAtClose: [] as Array<boolean>,
     cancellations: 0,
+    sessionIds: [] as Array<string>,
     stop: undefined as Effect.Effect<void> | undefined,
   };
   const outputs = [...(options.outputs ?? ['{"title":"Repair login"}'])];
@@ -129,14 +134,17 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
         Effect.gen(function* () {
           state.nativeFilesAtClose.push(yield* fs.exists(`${sessionBase}.db`).pipe(Effect.orDie));
           state.closed.push(cwd);
+          yield* Deferred.succeed(workerClosed, undefined);
         }),
       );
       let sessionUpdate: Parameters<TextRuntime["handleSessionUpdate"]>[0] = () => Effect.void;
+      let currentSessionId = nativeSessionId;
 
       return {
         start: () =>
           Effect.gen(function* () {
             if (options.startError) return yield* options.startError;
+            state.sessionIds.push(currentSessionId);
             if (options.startupSkills) {
               for (const directory of [".agents", ".gemini"]) {
                 yield* fs
@@ -164,6 +172,17 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
             state.selectedModes.push(mode);
             return {};
           }),
+        createSession: () =>
+          Effect.sync(() => {
+            currentSessionId = `047c62f6-607b-44db-bfbe-${String(state.sessionIds.length + 1).padStart(12, "0")}`;
+            state.sessionIds.push(currentSessionId);
+            return {
+              sessionId: currentSessionId,
+              initializeResult: { protocolVersion: 1 },
+              sessionSetupResult: { sessionId: currentSessionId },
+              modelConfigId: "model",
+            };
+          }),
         getConfigOptions: Effect.succeed([
           {
             id: "model",
@@ -173,18 +192,33 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
             currentValue: modelSelection.model,
             options: [{ value: modelSelection.model, name: "Gemini test" }],
           },
+          {
+            id: "thinking_level",
+            name: "Thinking level",
+            category: "thought_level",
+            type: "select",
+            currentValue: "high",
+            options: [
+              { value: "low", name: "Low" },
+              { value: "high", name: "High" },
+            ],
+          },
         ]),
         getEvents: () => Stream.fromQueue(events),
         setModel: (model) =>
           Effect.sync(() => {
             state.selectedModels.push(model);
           }),
-        setConfigOption: () => Effect.succeed({ configOptions: [] }),
+        setConfigOption: (id, value) =>
+          Effect.sync(() => {
+            state.selectedOptions.push({ id, value });
+            return { configOptions: [] };
+          }),
         prompt: (request) =>
           Effect.gen(function* () {
             state.prompts.push(request);
             yield* Deferred.succeed(enteredPrompt, undefined);
-            const emit: PromptContext["emit"] = (update, sessionId = nativeSessionId) =>
+            const emit: PromptContext["emit"] = (update, sessionId = currentSessionId) =>
               sessionUpdate({ sessionId, update });
             if (options.prompt) {
               return yield* options.prompt({
@@ -251,11 +285,14 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
       } satisfies TextRuntime;
     });
 
+  const helperScope = yield* Scope.make();
+  const close = Scope.close(helperScope, Exit.void);
+  yield* Effect.addFinalizer(() => close);
   const textGeneration = yield* makeAntigravityTextGeneration({
     profileDirectory,
     makeRuntime,
     withProcess,
-  });
+  }).pipe(Effect.provideService(Scope.Scope, helperScope));
   const titleInput = { cwd: projectDirectory, message: "Repair Google login", modelSelection };
   const assertCleaned = Effect.gen(function* () {
     expect(state.closed).toEqual(state.workspaces);
@@ -284,10 +321,114 @@ const makeFixture = Effect.fn("makeAntigravityTextGenerationFixture")(function* 
     textGeneration,
     titleInput,
     assertCleaned,
+    close,
+    workerClosed,
   };
 });
 
 it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
+  it.effect(
+    "reuses the suggestion process with independent sessions and releases it when idle",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture({
+          outputs: ['{"suggestion":"Check login."}', '{"suggestion":"Check billing."}'],
+        });
+        const input = {
+          cwd: fixture.projectDirectory,
+          modelSelection,
+          prompt: "Suggest a next step.",
+        };
+        expect(yield* fixture.textGeneration.generatePromptSuggestion(input)).toEqual({
+          suggestion: "Check login.",
+        });
+        expect(yield* fixture.textGeneration.generatePromptSuggestion(input)).toEqual({
+          suggestion: "Check billing.",
+        });
+        expect(fixture.state.workspaces).toHaveLength(1);
+        expect(new Set(fixture.state.sessionIds).size).toBe(2);
+        expect(fixture.state.closed).toHaveLength(0);
+        yield* TestClock.adjust("5 minutes");
+        yield* Deferred.await(fixture.workerClosed);
+        yield* fixture.close;
+        yield* fixture.assertCleaned;
+      }).pipe(Effect.scoped),
+  );
+  it.effect(
+    "retires a failed suggestion worker and reacquires after sign-out closes an idle worker",
+    () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeFixture({
+          outputs: [
+            "invalid JSON",
+            '{"suggestion":"Check login."}',
+            '{"suggestion":"Check billing."}',
+          ],
+        });
+        const input = {
+          cwd: fixture.projectDirectory,
+          modelSelection,
+          prompt: "Suggest a next step.",
+        };
+        const failure = yield* fixture.textGeneration
+          .generatePromptSuggestion(input)
+          .pipe(Effect.flip);
+        expect(failure.detail).toContain("invalid structured output");
+        expect(fixture.state.closed).toHaveLength(1);
+        expect(yield* fixture.textGeneration.generatePromptSuggestion(input)).toEqual({
+          suggestion: "Check login.",
+        });
+        expect(fixture.state.workspaces).toHaveLength(2);
+        yield* fixture.state.stop!;
+        expect(yield* fixture.textGeneration.generatePromptSuggestion(input)).toEqual({
+          suggestion: "Check billing.",
+        });
+        expect(fixture.state.workspaces).toHaveLength(3);
+        yield* fixture.close;
+        yield* fixture.assertCleaned;
+      }).pipe(Effect.scoped),
+  );
+  it.effect.each(["workspace", "session"])(
+    "retries transient %s file locks after process exit",
+    (target) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const path = yield* Path.Path;
+        const locked = yield* Deferred.make<void>();
+        let failed = false;
+        const fixture = yield* makeFixture().pipe(
+          Effect.provideService(FileSystem.FileSystem, {
+            ...fs,
+            remove: (file, options) =>
+              Effect.gen(function* () {
+                const matches =
+                  target === "workspace"
+                    ? path.basename(file).startsWith("t3-antigravity-text-")
+                    : file.endsWith(`${SESSION_ID}.db`);
+                if (matches && !failed) {
+                  failed = true;
+                  yield* Deferred.succeed(locked, undefined);
+                  return yield* PlatformError.systemError({
+                    _tag: "Busy",
+                    module: "FileSystem",
+                    method: "remove",
+                    pathOrDescriptor: file,
+                  });
+                }
+                return yield* fs.remove(file, options);
+              }),
+          }),
+        );
+        const fiber = yield* fixture.textGeneration
+          .generateThreadTitle(fixture.titleInput)
+          .pipe(Effect.forkChild);
+        yield* Deferred.await(locked);
+        yield* TestClock.adjust("100 millis");
+        expect(yield* Fiber.join(fiber)).toEqual({ title: "Repair login" });
+        yield* fixture.assertCleaned;
+      }),
+  );
+
   it.effect.each([false, true])(
     "generates all helper types and cleans up with startupSkills=%s",
     (startupSkills) =>
@@ -299,6 +440,7 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
             '```json\n{"title":" Repair Google login\\nExtra line","body":"  ## Summary\\nSupport remote callbacks.  "}\n```',
             '{"branch":" Repair Google Login "}',
             '{"title":"  \\"Repair Google login\\"  "}',
+            '{"suggestion":"Run the login checks."}',
           ],
         });
         const common = { cwd: fixture.projectDirectory, modelSelection };
@@ -334,11 +476,26 @@ it.layer(NodeServices.layer)("AntigravityTextGeneration", (it) => {
         expect(yield* fixture.textGeneration.generateThreadTitle(fixture.titleInput)).toEqual({
           title: "Repair Google login",
         });
-        expect(new Set(fixture.state.workspaces).size).toBe(4);
+        expect(
+          yield* fixture.textGeneration.generatePromptSuggestion({
+            ...common,
+            prompt: "Suggest a follow-up, or null when finished.",
+            modelSelection: {
+              ...modelSelection,
+              options: [{ id: "thinking_level", value: "low" }],
+            },
+          }),
+        ).toEqual({ suggestion: "Run the login checks." });
+        expect(fixture.state.selectedOptions).toEqual([{ id: "thinking_level", value: "low" }]);
+        expect(fixture.state.prompts[4]?.prompt).toEqual([
+          { type: "text", text: expect.stringContaining('"required":["suggestion"]') },
+        ]);
+        yield* fixture.close;
+        expect(new Set(fixture.state.workspaces).size).toBe(5);
         expect(fixture.state.workspaces).not.toContain(fixture.projectDirectory);
-        expect(fixture.state.nativeFilesAtClose).toEqual([true, true, true, true]);
-        expect(fixture.state.selectedModes).toEqual(["default", "default", "default", "default"]);
-        expect(fixture.state.selectedModels).toEqual(Array(4).fill(modelSelection.model));
+        expect(fixture.state.nativeFilesAtClose).toEqual([true, true, true, true, true]);
+        expect(fixture.state.selectedModes).toEqual(Array(5).fill("default"));
+        expect(fixture.state.selectedModels).toEqual(Array(5).fill(modelSelection.model));
         expect(fixture.state.prompts[0]?.prompt).toEqual([
           { type: "text", text: expect.stringContaining("+handleRemoteCallback()") },
         ]);

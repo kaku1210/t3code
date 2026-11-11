@@ -1,4 +1,5 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import { describe, expect, it } from "@effect/vitest";
 import {
   ANTIGRAVITY_DEFAULT_MODEL,
@@ -7,8 +8,12 @@ import {
 } from "@t3tools/contracts";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
 import * as FileSystem from "effect/FileSystem";
+import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as Sink from "effect/Sink";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as Stream from "effect/Stream";
 import * as EffectAcpErrors from "effect-acp/errors";
 import type * as EffectAcpSchema from "effect-acp/compat";
@@ -20,6 +25,7 @@ import {
   antigravitySessionMeta,
   buildAntigravityPrompt,
   isQualifiedAntigravityRelease,
+  makeAntigravityAcpRuntime,
 } from "./AntigravityAcpSupport.ts";
 
 const modelConfig = {
@@ -32,6 +38,47 @@ const modelConfig = {
     { value: "gemini-saved", name: "Gemini saved" },
   ],
 } satisfies EffectAcpSchema.SessionConfigOption;
+
+it.effect("stops the Windows Antigravity tree before closing its transport scope", () =>
+  Effect.gen(function* () {
+    const closed: string[] = [];
+    const reading = yield* Deferred.make<void>();
+    const spawner = ChildProcessSpawner.make(() =>
+      Effect.gen(function* () {
+        yield* Effect.addFinalizer(() => Effect.sync(() => closed.push("transport")));
+        return ChildProcessSpawner.makeHandle({
+          pid: ChildProcessSpawner.ProcessId(1),
+          exitCode: Effect.never,
+          isRunning: Effect.succeed(true),
+          kill: () =>
+            Effect.sync(() => {
+              closed.push("tree");
+            }),
+          unref: Effect.succeed(Effect.void),
+          stdin: Sink.drain,
+          stdout: Stream.never,
+          stderr: Stream.fromEffect(Deferred.succeed(reading, undefined)).pipe(
+            Stream.drain,
+            Stream.concat(Stream.never),
+            Stream.ensuring(Effect.sync(() => closed.push("pipe"))),
+          ),
+          all: Stream.never,
+          getInputFd: () => Sink.drain,
+          getOutputFd: () => Stream.never,
+        });
+      }),
+    );
+    yield* makeAntigravityAcpRuntime({
+      cwd: ".",
+      spawn: { command: "agy_acp_server.exe", args: [] },
+      childProcessSpawner: spawner,
+    }).pipe(Effect.andThen(Deferred.await(reading)), Effect.scoped);
+    expect(closed).toEqual(["tree", "pipe", "transport"]);
+  }).pipe(
+    Effect.provideService(HostProcess.Platform, "win32"),
+    Effect.provide(Layer.merge(NodeServices.layer, NodeCrypto.layer)),
+  ),
+);
 
 function makeModelRuntime(
   configOptions: ReadonlyArray<EffectAcpSchema.SessionConfigOption> = [modelConfig],

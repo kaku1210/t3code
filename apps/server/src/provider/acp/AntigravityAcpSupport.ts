@@ -125,6 +125,23 @@ export const makeAntigravityAcpRuntime = Effect.fn("makeAntigravityAcpRuntime")(
   EffectAcpErrors.AcpError,
   SecureRandom.SecureRandom | Scope.Scope
 > {
+  const ownerScope = yield* Effect.scope;
+  const platform = yield* HostProcess.Platform;
+  const runtimeScope = platform === "win32" ? yield* Scope.fork(ownerScope) : ownerScope;
+  const spawner =
+    platform === "win32"
+      ? ChildProcessSpawner.make(
+          Effect.fn("AntigravityAcpSupport.spawn")(function* (command) {
+            const child = yield* input.childProcessSpawner.spawn(command);
+            // PyInstaller's parent must still be alive for Windows to terminate its children.
+            yield* Scope.addFinalizer(
+              ownerScope,
+              child.kill({ forceKillAfter: "1 second" }).pipe(Effect.orDie),
+            );
+            return child;
+          }),
+        )
+      : input.childProcessSpawner;
   const context = yield* Layer.build(
     AcpSessionRuntime.layer({
       ...input,
@@ -151,12 +168,8 @@ export const makeAntigravityAcpRuntime = Effect.fn("makeAntigravityAcpRuntime")(
         input.onAuthorizationUrl ? { onAuthorizationUrl: input.onAuthorizationUrl } : {},
       ),
       transformSessionUpdate: normalizeAntigravitySessionUpdate,
-    }).pipe(
-      Layer.provide(
-        Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, input.childProcessSpawner),
-      ),
-    ),
-  );
+    }).pipe(Layer.provide(Layer.succeed(ChildProcessSpawner.ChildProcessSpawner, spawner))),
+  ).pipe(Effect.provideService(Scope.Scope, runtimeScope));
   return yield* Effect.service(AcpSessionRuntime.AcpSessionRuntime).pipe(Effect.provide(context));
 });
 
