@@ -13,10 +13,17 @@ import {
   type LimitPoolWindow,
   paceRemainingPercent,
   remainingPercent,
+  subscriptionPeriodLabel,
 } from "@t3tools/shared/usageLimits";
 import type { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
-import { AlertTriangleIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
+import { AlertTriangleIcon, ChevronRightIcon, ExternalLinkIcon, TicketIcon } from "lucide-react";
+import {
+  latestUsageEstimate,
+  usageEstimatesForWindow,
+  usageEstimateText,
+} from "@t3tools/shared/usageEstimates";
+import { formatUsd } from "@t3tools/shared/usageFormat";
 import {
   createContext,
   Fragment,
@@ -36,6 +43,11 @@ import { ProviderInstanceIcon } from "../chat/ProviderInstanceIcon";
 import { providerClients } from "../settings/providerDriverMeta";
 import { RedactedSensitiveText } from "../settings/RedactedSensitiveText";
 import { Button } from "../ui/button";
+import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "../ui/collapsible";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
+import type { EnvironmentUsageStatus } from "../../state/usage";
+import { UsageEstimateCards } from "./UsageEstimateCards";
 import { OpenAI } from "../Icons";
 import { Alert, AlertTitle } from "../ui/alert";
 import { Popover, PopoverCreateHandle, PopoverPopup, PopoverTrigger } from "../ui/popover";
@@ -534,42 +546,91 @@ function PoolWindowCard({
   now,
   label,
   description,
+  estimates,
 }: {
   readonly pool: LimitPoolWindow;
   readonly color: string;
   readonly now: number;
   readonly label?: string | undefined;
   readonly description?: string | undefined;
+  readonly estimates: ReturnType<typeof usageEstimatesForWindow>;
 }) {
+  const { language } = useUiLanguage();
+  const text = usageEstimateText(language);
+  const estimate = pool.members.length === 1 ? latestUsageEstimate(estimates, now) : undefined;
   const nextRefill = pool.resets.find((reset) => reset.restoresPercent > 0);
   return (
-    <div className="grid items-center gap-x-6 gap-y-3 rounded-lg border border-border/60 p-4 md:grid-cols-[11rem_minmax(0,1fr)]">
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-foreground">{label ?? pool.label}</span>
-        <span className="flex items-baseline gap-2">
-          <span className="text-3xl font-semibold text-foreground tabular-nums">
-            {pool.remainingPercent}%
-          </span>
-          <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-            <span>left</span>
-            {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
-          </span>
-        </span>
-        {nextRefill && pool.columns.length > 1 ? (
-          <span className="text-xs font-medium text-foreground tabular-nums">
-            ↻ +{nextRefill.restoresPercent}%
-          </span>
+    <div className="rounded-lg border border-border/60 p-4">
+      <Collapsible>
+        <div className="grid items-center gap-x-6 gap-y-3 md:grid-cols-[11rem_minmax(0,1fr)]">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-foreground">{label ?? pool.label}</span>
+            <span className="flex items-baseline gap-2">
+              <span className="text-3xl font-semibold text-foreground tabular-nums">
+                {pool.remainingPercent}%
+              </span>
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <span>left</span>
+                {pool.pace ? <PaceIcon pace={pool.pace} /> : null}
+              </span>
+            </span>
+            {nextRefill && pool.columns.length > 1 ? (
+              <span className="text-xs font-medium text-foreground tabular-nums">
+                ↻ +{nextRefill.restoresPercent}%
+              </span>
+            ) : null}
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            {estimates.length > 0 ? (
+              <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1">
+                {estimate ? (
+                  <Tooltip>
+                    <TooltipTrigger render={<span className="text-xs text-muted-foreground" />}>
+                      {text.total}{" "}
+                      <span className="font-medium text-foreground tabular-nums">
+                        ≈ {formatUsd(estimate.series.current!.result.cycleEquivalentUsd!)}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipPopup>
+                      {estimate.label} · {text.title}
+                    </TooltipPopup>
+                  </Tooltip>
+                ) : null}
+                <CollapsibleTrigger className="group flex min-h-7 items-center gap-1.5 rounded-sm text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring">
+                  {text.section}
+                  <ChevronRightIcon
+                    aria-hidden
+                    className="size-3.5 shrink-0 transition-transform duration-150 group-data-panel-open:rotate-90 motion-reduce:transition-none"
+                  />
+                </CollapsibleTrigger>
+              </div>
+            ) : null}
+            <PoolBar pool={pool} color={color} now={now} />
+          </div>
+          {description ? (
+            <p className="text-xs text-muted-foreground md:col-span-2">{description}</p>
+          ) : null}
+        </div>
+        {estimates.length > 0 ? (
+          <CollapsiblePanel>
+            <UsageEstimateCards entries={estimates} now={now} />
+          </CollapsiblePanel>
         ) : null}
-      </div>
-      <PoolBar pool={pool} color={color} now={now} />
-      {description ? (
-        <p className="text-xs text-muted-foreground md:col-span-2">{description}</p>
-      ) : null}
+      </Collapsible>
     </div>
   );
 }
 
-function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: number }) {
+function PoolSection({
+  pool,
+  now,
+  estimateEnvironments,
+}: {
+  readonly pool: LimitPool;
+  readonly now: number;
+  readonly estimateEnvironments: readonly EnvironmentUsageStatus[];
+}) {
+  const { language } = useUiLanguage();
   const color = barColor(pool.driver);
   const label =
     pool.accounts[0]?.limits.provider?.label ??
@@ -588,6 +649,27 @@ function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: nu
         />
         {label}
       </h2>
+      {pool.accounts.map((account) => {
+        const period = subscriptionPeriodLabel(account.limits, now, language);
+        return period ? (
+          <Tooltip key={account.key}>
+            <TooltipTrigger
+              render={
+                <p
+                  className={cn(
+                    "flex flex-wrap items-center gap-2 text-xs",
+                    period.dueSoon ? "text-warning" : "text-muted-foreground",
+                  )}
+                />
+              }
+            >
+              {pool.accounts.length > 1 ? <AccountName account={account} /> : null}
+              <span>{period.label}</span>
+            </TooltipTrigger>
+            <TooltipPopup>{period.help}</TooltipPopup>
+          </Tooltip>
+        ) : null;
+      })}
       {windows.map((window) => {
         const details = pool.driver === "cursor" ? cursorUsageWindowDetails(window.id) : undefined;
         return (
@@ -598,6 +680,7 @@ function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: nu
             now={now}
             label={details?.label}
             description={details?.description}
+            estimates={usageEstimatesForWindow(estimateEnvironments, window)}
           />
         );
       })}
@@ -609,10 +692,12 @@ export function UsageLimitsPooled({
   presentations,
   now,
   cursorPrompt,
+  estimateEnvironments = [],
 }: {
   readonly presentations: Parameters<typeof collectLimitAccounts>[0];
   readonly now: number;
   readonly cursorPrompt?: ReactNode;
+  readonly estimateEnvironments?: readonly EnvironmentUsageStatus[];
 }) {
   const [segmentPopover] = useState(() => PopoverCreateHandle<SegmentPayload>());
   const segmentPopoverActions = useRef<PopoverPrimitive.Root.Actions | null>(null);
@@ -635,7 +720,7 @@ export function UsageLimitsPooled({
         {pools.map((pool, index) => (
           <Fragment key={`${pool.driver}:${pool.accounts[0]?.limits.provider?.id ?? ""}`}>
             {index === cursorPromptAt ? cursorPrompt : null}
-            <PoolSection pool={pool} now={now} />
+            <PoolSection pool={pool} now={now} estimateEnvironments={estimateEnvironments} />
           </Fragment>
         ))}
       </SegmentPopoverContext>

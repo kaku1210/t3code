@@ -65,6 +65,40 @@ function readAccount(options: {
 }
 
 describe("Devin account limits", () => {
+  it.effect("reports the subscription period independently of daily and weekly quota resets", () =>
+    Effect.gen(function* () {
+      const account = yield* readAccount({
+        body: {
+          userStatus: {
+            ...response.userStatus,
+            planStatus: {
+              ...response.userStatus.planStatus,
+              planEnd: "2026-11-12T06:12:15Z",
+            },
+          },
+        },
+      });
+      expect(account.usageLimits).toMatchObject({
+        subscription: { periodEndsAt: "2026-11-12T06:12:15.000Z", plan: "Pro" },
+      });
+      const unknown = yield* readAccount({});
+      expect(unknown.usageLimits.subscription?.periodEndsAt).toBeUndefined();
+      expect(unknown.usageLimits.subscription?.plan).toBe("Pro");
+      const invalid = yield* readAccount({
+        body: {
+          userStatus: {
+            ...response.userStatus,
+            planStatus: {
+              ...response.userStatus.planStatus,
+              planEnd: "not-a-date",
+            },
+          },
+        },
+      });
+      expect(invalid.usageLimits.windows).toHaveLength(2);
+      expect(invalid.usageLimits.subscription?.periodEndsAt).toBeUndefined();
+    }),
+  );
   it.live("uses the configured proxy without relying on the host's built-in fetch", () =>
     Effect.gen(function* () {
       const requests: string[] = [];
@@ -130,26 +164,53 @@ describe("Devin account limits", () => {
     }),
   );
 
-  it.effect("keeps explicit zero and omits unreported daily allowance", () =>
-    Effect.gen(function* () {
-      const account = yield* readAccount({
-        body: {
-          userStatus: {
-            userId: "account-one",
-            planStatus: { weeklyQuotaRemainingPercent: 0 },
+  it.effect(
+    "keeps exhausted windows with reset clocks while omitting wholly unreported allowances",
+    () =>
+      Effect.gen(function* () {
+        const account = yield* readAccount({
+          body: {
+            userStatus: {
+              userId: "account-one",
+              planStatus: { weeklyQuotaRemainingPercent: 0 },
+            },
           },
-        },
-      });
-      expect(account.usageLimits.windows).toEqual([
-        {
-          id: "weekly",
-          label: "Weekly",
-          kind: "weekly",
-          usedPercent: 100,
-          windowDurationMins: 10080,
-        },
-      ]);
-    }),
+        });
+        expect(account.usageLimits.windows).toEqual([
+          {
+            id: "weekly",
+            label: "Weekly",
+            kind: "weekly",
+            usedPercent: 100,
+            windowDurationMins: 10080,
+          },
+        ]);
+        const exhausted = yield* readAccount({
+          body: {
+            userStatus: {
+              userId: "account-one",
+              planStatus: {
+                dailyQuotaResetAtUnix: "1794384000",
+                weeklyQuotaRemainingPercent: 32,
+                weeklyQuotaResetAtUnix: "1794729600",
+              },
+            },
+          },
+        });
+        expect(exhausted.usageLimits.windows).toMatchObject([
+          { id: "daily", usedPercent: 100, resetsAt: "2026-11-11T08:00:00.000Z" },
+          { id: "weekly", usedPercent: 68, resetsAt: "2026-11-15T08:00:00.000Z" },
+        ]);
+        const noClock = yield* readAccount({
+          body: {
+            userStatus: {
+              userId: "account-one",
+              planStatus: { dailyQuotaResetAtUnix: "0", weeklyQuotaRemainingPercent: 32 },
+            },
+          },
+        });
+        expect(noClock.usageLimits.windows.map((window) => window.id)).toEqual(["weekly"]);
+      }),
   );
 
   it.effect(

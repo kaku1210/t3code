@@ -2,6 +2,12 @@ import { useUiLanguage } from "../../i18n/useUiLanguage";
 import { useAtomValue } from "@effect/atom-react";
 import { useNavigation, type StaticScreenProps } from "@react-navigation/native";
 import { EnvironmentId } from "@t3tools/contracts";
+import {
+  latestUsageEstimate,
+  usageEstimatesForWindow,
+  usageEstimateText,
+} from "@t3tools/shared/usageEstimates";
+import { formatUsd } from "@t3tools/shared/usageFormat";
 import { normalizeProviderAccentColor } from "@t3tools/client-runtime/state/provider-instance-display";
 import {
   collectLimitAccounts,
@@ -13,6 +19,7 @@ import {
   formatResetsIn,
   paceRemainingPercent,
   remainingPercent,
+  subscriptionPeriodLabel,
   type LimitAccount,
   type LimitPoolWindow,
 } from "@t3tools/shared/usageLimits";
@@ -29,6 +36,8 @@ import { SettingsScreen } from "../settings/components/SettingsScreen";
 import { environmentPresentations } from "../../state/presentation";
 import { ResetCredits } from "./UsageLimitsSection";
 import { usageProviderKind, useProviderColors } from "./usageProviders";
+import type { EnvironmentUsageStatus } from "../../state/usage";
+import { UsageEstimateCards } from "./UsageEstimateCards";
 
 const DRIVER_LABEL: Partial<Record<string, string>> = {
   codex: "Codex",
@@ -172,6 +181,7 @@ function PoolWindowCard({
   label,
   description,
   wide,
+  estimates,
 }: {
   readonly pool: LimitPoolWindow;
   readonly color: string;
@@ -180,8 +190,12 @@ function PoolWindowCard({
   readonly label?: string;
   readonly description?: string;
   readonly wide: boolean;
+  readonly estimates: ReturnType<typeof usageEstimatesForWindow>;
 }) {
-  const { text: uiText } = useUiLanguage();
+  const { text: uiText, language } = useUiLanguage();
+  const estimateText = usageEstimateText(language);
+  const estimate = pool.members.length === 1 ? latestUsageEstimate(estimates, now) : undefined;
+  const [expanded, setExpanded] = useState(false);
   const navigation = useNavigation();
   const [barWidth, setBarWidth] = useState(0);
   // Each segment needs room for its account, percent and reset to label itself.
@@ -386,22 +400,53 @@ function PoolWindowCard({
       })}
     </View>
   );
-  if (wide) {
-    return (
-      <View className="flex-row items-center gap-6 rounded-[24px] border-continuous bg-grouped-card p-4">
-        <View className="w-44 gap-1">{summary}</View>
-        <View className="min-w-0 flex-1 gap-1">
-          {bar}
-          {inlineLabels ? null : legend}
-        </View>
-      </View>
-    );
-  }
   return (
     <View className="gap-3 rounded-[24px] border-continuous bg-grouped-card p-4">
-      {summary}
-      {bar}
-      {legend}
+      {estimates.length > 0 ? (
+        <View className="flex-row flex-wrap items-center justify-end gap-x-4 gap-y-1">
+          {estimate ? (
+            <Text className="text-xs text-foreground-muted">
+              {estimateText.total}{" "}
+              <Text className="font-t3-medium tabular-nums text-foreground">
+                ≈ {formatUsd(estimate.series.current!.result.cycleEquivalentUsd!)}
+              </Text>
+            </Text>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={estimateText.section}
+            accessibilityState={{ expanded }}
+            onPress={() => setExpanded((value) => !value)}
+            className="min-h-11 flex-row items-center justify-end gap-2"
+          >
+            <Text className="text-xs text-foreground-muted">{estimateText.section}</Text>
+            <SymbolView
+              name={expanded ? "chevron.down" : "chevron.right"}
+              size={14}
+              tintColorClassName="accent-chevron"
+              type="monochrome"
+            />
+          </Pressable>
+        </View>
+      ) : null}
+      {wide ? (
+        <View className="flex-row items-center gap-6">
+          <View className="w-44 gap-1">{summary}</View>
+          <View className="min-w-0 flex-1 gap-1">
+            {bar}
+            {inlineLabels ? null : legend}
+          </View>
+        </View>
+      ) : (
+        <>
+          {summary}
+          {bar}
+          {legend}
+        </>
+      )}
+      {expanded && estimates.length > 0 ? (
+        <UsageEstimateCards entries={estimates} now={now} />
+      ) : null}
     </View>
   );
 }
@@ -411,15 +456,17 @@ export function UsageLimitsSection({
   failedLabels,
   selectedEnvironmentIds,
   cursorPrompt,
+  estimateEnvironments = [],
   wide = false,
 }: {
   readonly now: number;
   readonly failedLabels: readonly string[];
   readonly selectedEnvironmentIds: ReadonlySet<EnvironmentId> | null;
   readonly cursorPrompt?: ReactNode;
+  readonly estimateEnvironments?: readonly EnvironmentUsageStatus[];
   readonly wide?: boolean;
 }) {
-  const { text: uiText } = useUiLanguage();
+  const { text: uiText, language } = useUiLanguage();
   const presentations = useAtomValue(environmentPresentations.presentationsWithProvidersAtom);
   const selected =
     selectedEnvironmentIds === null
@@ -461,6 +508,21 @@ export function UsageLimitsSection({
                     pool.driver}
                 </Text>
               </View>
+              {pool.accounts.map((account) => {
+                const period = subscriptionPeriodLabel(account.limits, now, language);
+                return period ? (
+                  <Text
+                    key={account.key}
+                    accessibilityHint={period.help}
+                    className={
+                      period.dueSoon ? "text-xs text-amber-600" : "text-xs text-foreground-muted"
+                    }
+                  >
+                    {pool.accounts.length > 1 ? `${accountName(account)} · ` : ""}
+                    {period.label}
+                  </Text>
+                ) : null;
+              })}
               {windows.map((window) => {
                 const details =
                   pool.driver === "cursor" ? cursorUsageWindowDetails(window.id) : undefined;
@@ -476,6 +538,7 @@ export function UsageLimitsSection({
                     label={details?.label}
                     description={details?.description}
                     wide={wide}
+                    estimates={usageEstimatesForWindow(estimateEnvironments, window)}
                   />
                 );
               })}

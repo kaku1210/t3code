@@ -13,6 +13,7 @@ import * as Toml from "effect/encoding/Toml";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
@@ -33,6 +34,7 @@ const UserStatus = Schema.Struct({
     email: Schema.optional(Schema.String),
     planStatus: Schema.Struct({
       planInfo: Schema.optional(Schema.Struct({ planName: Schema.optional(Schema.String) })),
+      planEnd: Schema.optional(Schema.String),
       dailyQuotaRemainingPercent: Schema.optional(Percentage),
       weeklyQuotaRemainingPercent: Schema.optional(Percentage),
       dailyQuotaResetAtUnix: Schema.optional(Reset),
@@ -143,17 +145,19 @@ function quotaWindows(status: (typeof UserStatus.Type)["userStatus"]["planStatus
       10080,
     ],
   ] as const) {
-    if (remaining === undefined) continue;
     const resetMs = reset === undefined ? Number.NaN : Number(reset) * 1000;
     const resetsAt =
       Number.isFinite(resetMs) && resetMs > 0 && resetMs <= 8_640_000_000_000_000
         ? DateTime.formatIso(DateTime.makeUnsafe(resetMs))
         : undefined;
+    // Exhausted windows omit the zero-valued percentage but still report their reset clock.
+    // A wholly absent window remains unknown; it must not become an invented daily allowance.
+    if (remaining === undefined && resetsAt === undefined) continue;
     windows.push({
       id,
       label,
       kind,
-      usedPercent: 100 - remaining,
+      usedPercent: 100 - (remaining ?? 0),
       windowDurationMins: duration,
       ...(resetsAt ? { resetsAt } : {}),
     });
@@ -272,6 +276,8 @@ export const readDevinAccount = Effect.fn("DevinUsageLimits.readAccount")(functi
       yield* HttpClientResponse.filterStatusOk(response),
     );
     const windows = quotaWindows(userStatus.planStatus);
+    const periodEnd = DateTime.make(userStatus.planStatus.planEnd ?? "");
+    const plan = userStatus.planStatus.planInfo?.planName?.trim();
     if (windows.length === 0) {
       return unavailable(
         "unsupported",
@@ -285,11 +291,21 @@ export const readDevinAccount = Effect.fn("DevinUsageLimits.readAccount")(functi
     );
     return {
       email: userStatus.email?.trim() || undefined,
-      plan: userStatus.planStatus.planInfo?.planName?.trim() || undefined,
+      plan: plan || undefined,
       usageLimits: {
         ...makeUsageLimits({ checkedAt, windows }),
         provider: PROVIDER,
         credentialFingerprint: Hex.encode(fingerprint),
+        ...(Option.isSome(periodEnd) || plan
+          ? {
+              subscription: {
+                ...(Option.isSome(periodEnd)
+                  ? { periodEndsAt: DateTime.formatIso(periodEnd.value) }
+                  : {}),
+                ...(plan ? { plan } : {}),
+              },
+            }
+          : {}),
       } satisfies ServerProviderUsageLimits,
     };
   }).pipe(

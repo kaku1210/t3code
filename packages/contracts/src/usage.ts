@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { ForwardCompatibleArray, NonNegativeInt, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { UsageEstimateSeries } from "./usageEstimates.ts";
 
 /** Bump for incompatible UsageSummary changes; skipped unknown array variants need no bump. */
 export const USAGE_CONTRACT_VERSION = 6 as const;
@@ -16,6 +17,7 @@ export const UsageProviderKind = Schema.Literals([
   "antigravity",
   "pi",
   "muse",
+  "devin",
 ]);
 export type UsageProviderKind = typeof UsageProviderKind.Type;
 
@@ -105,6 +107,21 @@ export const UsagePricing = Schema.Struct({
   source: TrimmedNonEmptyString,
   fetchedAt: Schema.NullOr(Schema.String),
   knownModels: NonNegativeInt,
+  /** Official fallback rules; amounts are USD per million tokens, separate from custom overrides. */
+  defaults: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        model: TrimmedNonEmptyString,
+        source: TrimmedNonEmptyString,
+        input: Schema.Number,
+        output: Schema.Number,
+        cacheRead: Schema.Number,
+        cacheWrite: Schema.Number,
+        changesAt: Schema.optionalKey(Schema.String),
+        quotaFreeUntil: Schema.optionalKey(Schema.String),
+      }),
+    ),
+  ),
 });
 export type UsagePricing = typeof UsagePricing.Type;
 
@@ -148,6 +165,8 @@ export const UsageSummary = Schema.Struct({
   sources: ForwardCompatibleArray(UsageSource),
   pricing: UsagePricing,
   scanDurationMs: NonNegativeInt,
+  /** Optional for older servers; estimates stay per origin and are never summed across hosts. */
+  subscriptionEstimates: Schema.optionalKey(ForwardCompatibleArray(UsageEstimateSeries)),
   /** The filter the server applied; absent means unfiltered, including servers that predate filters. */
   modelFilter: Schema.optional(UsageModelFilter),
 });

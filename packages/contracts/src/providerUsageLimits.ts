@@ -16,6 +16,7 @@ export const ServerProviderUsageWindow = Schema.Struct({
   label: TrimmedNonEmptyString,
   usedPercent: Schema.Number.check(Schema.isBetween({ minimum: 0, maximum: 100 })),
   resetsAt: Schema.optional(IsoDateTime),
+  startsAt: Schema.optional(IsoDateTime),
   windowDurationMins: Schema.optional(NonNegativeInt),
 });
 export type ServerProviderUsageWindow = typeof ServerProviderUsageWindow.Type;
@@ -38,6 +39,13 @@ export const ServerProviderUsageLimits = Schema.Struct({
   ),
   credentialFingerprint: Schema.optional(TrimmedNonEmptyString),
   resetCredits: Schema.optional(ServerProviderResetCredits),
+  /** Reported subscription/billing period, never inferred from a quota reset clock. */
+  subscription: Schema.optional(
+    Schema.Struct({
+      periodEndsAt: Schema.optional(IsoDateTime),
+      plan: Schema.optional(TrimmedNonEmptyString),
+    }),
+  ),
   externalUsage: Schema.optional(
     Schema.Struct({
       label: TrimmedNonEmptyString,

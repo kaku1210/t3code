@@ -1133,6 +1133,14 @@ export function createServerEnvironmentAtoms<R, E>(
           .sort()
           .map((model) => [model, aliases[model]]),
         settings?.cursorKeychainUsageEnabled ?? false,
+        get(configValueAtom(environmentId))
+          ?.providers.filter((provider) => provider.enabled && provider.usageLimits)
+          .map((provider) => [
+            provider.instanceId,
+            provider.auth.email,
+            provider.usageLimits?.credentialFingerprint,
+            provider.usageLimits?.checkedAt,
+          ]),
       ]);
     }).pipe(Atom.withLabel(`environment-data:server:usage-scan-settings:${environmentId}`)),
   );

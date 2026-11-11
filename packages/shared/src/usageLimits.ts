@@ -22,6 +22,33 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/** A plan/billing boundary is a renewal reminder, not proof that auto-renew is disabled. */
+export function subscriptionPeriodLabel(
+  limits: ServerProviderUsageLimits,
+  now: number,
+  language: string,
+) {
+  const endsAt = limits.subscription?.periodEndsAt;
+  if (!endsAt) return null;
+  const end = Date.parse(endsAt);
+  const chinese = language.startsWith("zh");
+  const date = new Intl.DateTimeFormat(language, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(end);
+  const days = Math.ceil((end - now) / DAY);
+  return {
+    label: `${chinese ? "本期结束" : "Period ends"} ${date}${days <= 0 ? (chinese ? " · 请刷新状态" : " · refresh status") : days <= 7 ? (chinese ? ` · ${days} 天内` : ` · within ${days} days`) : ""}`,
+    dueSoon: days <= 7,
+    help: chinese
+      ? "平台返回的套餐或账期结束时间；尚未提供自动续费状态。"
+      : "Provider-reported subscription or billing period end; auto-renew status is not provided.",
+  };
+}
+
 export function exhaustedUsageWindow(
   provider: ServerProvider | undefined,
   now: number,
@@ -248,6 +275,7 @@ export interface LimitAccount {
   readonly driver: ServerProvider["driver"];
   readonly displayName: string | null;
   readonly email: string | undefined;
+  readonly workspaceId?: string | undefined;
   readonly plan: string | undefined;
   readonly accentColor: string | undefined;
   readonly environments: ReadonlyArray<{
@@ -352,6 +380,7 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
         driver: provider.driver,
         displayName: provider.displayName?.trim() || null,
         email: provider.auth.email,
+        workspaceId: provider.auth.workspaceId,
         plan: provider.auth.label,
         accentColor: provider.accentColor,
         environments: [{ environmentId, label }],
@@ -375,6 +404,7 @@ export function collectLimitAccounts(presentations: LimitPresentations): readonl
           driver: account.driver,
           displayName: account.email ? null : hubAccountName(account),
           email: account.email,
+          workspaceId: account.workspaceId,
           plan: account.plan,
           accentColor: undefined,
           environments: [],

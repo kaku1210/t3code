@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./usageEstimates": {
+      "types": "./src/usageEstimates.ts",
+      "import": "./src/usageEstimates.ts"
+    },
     "./uiLanguage": {
       "types": "./src/uiLanguage.ts",
       "import": "./src/uiLanguage.ts"

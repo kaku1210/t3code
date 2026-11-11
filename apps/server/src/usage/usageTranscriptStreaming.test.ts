@@ -6,6 +6,7 @@ import * as NodePath from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "@effect/vitest";
 
 import { TEST_FORMATS } from "./usageTestFormats.ts";
+import { codexEstimateFormat, takeCodexEstimateCapture } from "./codexEstimateTranscript.ts";
 import {
   readTranscriptRecords as readWithDefaultThreshold,
   type TranscriptParsePosition,
@@ -69,6 +70,42 @@ const codex = [
     },
   },
 ];
+
+it("captures quota fields on the streaming path without retaining transcript content", async () => {
+  const file = NodePath.join(dir, "estimate.jsonl");
+  const token = codex[2]!;
+  const lines = [
+    ...codex.slice(0, 2),
+    {
+      ...token,
+      payload: {
+        ...token.payload,
+        padding: content,
+        rate_limits: {
+          limit_id: "codex",
+          plan_type: "test",
+          primary: {
+            used_percent: 14,
+            window_minutes: 10080,
+            resets_at: 1786147200,
+          },
+        },
+      },
+    },
+  ];
+  await NodeFSP.writeFile(file, lines.map((line) => JSON.stringify(line)).join("\n") + "\n");
+  const parsed = await readWithDefaultThreshold(file, codexEstimateFormat, undefined, {
+    streamingThresholdBytes: 256,
+  });
+  expect(parsed).not.toBeNull();
+  const captured = takeCodexEstimateCapture(parsed!.position, "test-database");
+  expect(captured.events.filter((event) => event.kind === "quota")).toMatchObject([
+    { usedPercent: 14, windowMinutes: 10080, origin: "session_cache" },
+  ]);
+  expect(captured.events.filter((event) => event.kind === "usage")).toHaveLength(1);
+  expect(JSON.stringify(captured.position.state)).not.toContain("padding");
+  expect(takeCodexEstimateCapture(captured.position, "test-database").events).toEqual([]);
+});
 const grok = {
   timestamp: 1785578400,
   params: {

@@ -199,6 +199,9 @@ const readDatabase = Effect.fn("readDatabase")(function* (
         "SELECT name FROM sqlite_master WHERE type = 'table'",
       )).map((row) => row.name),
     );
+    // The native client creates empty conversation files before initializing their schema.
+    // SQLite has validated the file; no tables means no recorded usage yet.
+    if (tables.size === 0) return [];
     if (!tables.has("gen_metadata") && !tables.has("steps")) {
       return yield* new AntigravityDatabaseDecodeError({ path });
     }

@@ -70,6 +70,11 @@ export function applyUsageLimitsUpdate(input: {
       ...(window.windowDurationMins === undefined && existing?.windowDurationMins !== undefined
         ? { windowDurationMins: existing.windowDurationMins }
         : {}),
+      ...(window.startsAt === undefined &&
+      existing?.startsAt !== undefined &&
+      (window.resetsAt === undefined || window.resetsAt === existing.resetsAt)
+        ? { startsAt: existing.startsAt }
+        : {}),
     };
     if (existing === undefined || !usageWindowEquals(existing, next)) {
       merged.set(window.id, next);
@@ -85,6 +90,7 @@ export function applyUsageLimitsUpdate(input: {
     ...makeUsageLimits({ checkedAt: input.checkedAt, windows: merged.values() }),
     ...(previous?.provider ? { provider: previous.provider } : {}),
     ...(previous?.resetCredits !== undefined ? { resetCredits: previous.resetCredits } : {}),
+    ...(previous?.subscription ? { subscription: previous.subscription } : {}),
     ...(unavailable !== undefined ? { unavailable } : {}),
   };
 }
@@ -96,6 +102,7 @@ function usageWindowEquals(a: ServerProviderUsageWindow, b: ServerProviderUsageW
     a.label === b.label &&
     a.usedPercent === b.usedPercent &&
     a.resetsAt === b.resetsAt &&
+    a.startsAt === b.startsAt &&
     a.windowDurationMins === b.windowDurationMins
   );
 }

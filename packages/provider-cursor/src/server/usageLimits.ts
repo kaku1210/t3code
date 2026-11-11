@@ -22,6 +22,7 @@ import * as CursorKeychain from "./CursorKeychain.ts";
 const CursorCredentials = Schema.Struct({ accessToken: Schema.optional(Schema.String) });
 const decodeCredentials = Schema.decodeEffect(Schema.fromJsonString(CursorCredentials));
 const CursorUsageResponse = Schema.Struct({
+  billingCycleStart: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
   billingCycleEnd: Schema.optional(Schema.Union([Schema.String, Schema.Number])),
   planUsage: Schema.optional(
     Schema.Struct({
@@ -42,6 +43,12 @@ export function cursorUsageResponseToLimits(
     Number(response.billingCycleEnd) > 0 && Option.isSome(reset)
       ? DateTime.formatIso(reset.value)
       : undefined;
+  const start = Number(response.billingCycleStart);
+  const startDate = DateTime.make(start);
+  const startsAt =
+    start > 0 && start < Number(response.billingCycleEnd) && Option.isSome(startDate)
+      ? DateTime.formatIso(startDate.value)
+      : undefined;
   const windows: ServerProviderUsageWindow[] = [];
   if (response.planUsage) {
     for (const { id, label } of CURSOR_USAGE_WINDOWS) {
@@ -53,11 +60,15 @@ export function cursorUsageResponseToLimits(
         label,
         usedPercent: clampPercent(usedPercent),
         ...(resetsAt ? { resetsAt } : {}),
+        ...(startsAt ? { startsAt } : {}),
       });
     }
   }
   return windows.length > 0
-    ? makeUsageLimits({ checkedAt, windows })
+    ? {
+        ...makeUsageLimits({ checkedAt, windows }),
+        ...(resetsAt ? { subscription: { periodEndsAt: resetsAt } } : {}),
+      }
     : makeUnavailableUsageLimits({ checkedAt, reason: "unsupported" });
 }
 

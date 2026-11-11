@@ -22,6 +22,8 @@ export interface UsageRecord {
   readonly speed: UsageSpeed;
   readonly unresolvedServiceTierTurnId?: string;
   readonly dedupeKey: string | null;
+  /** Native billing route, when recorded; separates subscription calls from direct API calls. */
+  readonly billingProvider?: string;
 }
 
 export const EMPTY_TOTALS: UsageTokenTotals = {

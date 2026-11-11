@@ -8,7 +8,7 @@ On mobile, choose **Usage** in the workspace navigation.
 
 ## Understand your usage
 
-**Usage** combines Codex, Claude Code, Grok Build, OpenCode, Antigravity, Pi, Muse Code, and Cursor history
+**Usage** combines Codex, Claude Code, Devin, Grok Build, OpenCode, Antigravity, Pi, Muse Code, and Cursor history
 from your connected environments. It shows token use, cache savings, model breakdowns, and estimated API-equivalent
 cost, split by token type and by speed. These estimates are not your subscription bill.
 **Premium** is what Fast and Ultrafast requests cost above standard rates. Cost that cannot be
@@ -60,6 +60,63 @@ saved totals first, then updates them when Cursor's API responds.
 
 If recent work is missing or a new model shows no cost, refresh to rescan session history and
 update model pricing.
+
+## Estimate a subscription's API equivalent
+
+In **Usage → Limits**, each supported quota card shows **Estimated cycle total** when a
+current local estimate is available. With no usable estimate, the amount is hidden.
+Expand **API equivalent estimates and history** inside that card to view the sample
+and chart. Details start collapsed whenever you open Limits and show
+an estimated full-cycle API equivalent and the remaining equivalent **at the sample time**.
+It divides this cycle's recorded local cost by the total quota consumed, assuming
+the cycle's usage took place on this device. At least five percentage points of
+quota usage are required. Refresh Usage to collect samples. Codex, Claude, Devin,
+Antigravity, Grok, OpenCode Go, Muse and Cursor quota windows use the same local store.
+The calculation uses the reported cycle start or reset minus its duration. When
+the provider omits the start and duration, it collects an observation interval
+instead, requiring five percentage points of change. It never guesses a monthly start.
+The chart shows values above the cycle totals and recorded cost; sample details identify the
+device, source directory, model mix and price version.
+
+These figures are references, not subscription balances. Account ownership is not
+confirmed by the logs, quota observations can be cached, and unrecorded usage can
+affect the result. Environments and source directories are shown separately and
+their estimates are not added together. Missing prices or inconsistent records
+leave the cycle without an estimate. Expired cycles retain their history.
+Estimates match the environment, provider, account and quota window; pooled accounts
+do not show a combined estimated total. Antigravity model groups and Claude's scoped
+weekly windows use only matching models. OpenCode Go excludes direct API providers.
+Exhausted daily or weekly windows remain visible, with zero remaining equivalent
+and their reported reset time.
+
+Devin reads request models and token/cache counts from its local CLI SQLite history,
+deduplicates rendered copies and excludes direct API backends. Some proprietary
+models such as the internal `compactor` have no verified API price; the card lists
+the missing models instead of treating them as free. Official defaults cover SWE-2,
+SWE-2 Flash and Gemini 4 Argon/Carbon, including reasoning variants. Antigravity's
+`gemini-4-argon-trial` uses the Argon API price. Thinking tokens are included in output.
+Devin's confirmed self-serve quota estimates exclude SWE requests during their official
+free periods; the cost view retains their API list equivalent. Explicit custom prices
+take precedence. **Model prices → Default prices and free-model rules** shows the
+rates, source links and deadlines. Rules use request timestamps, so an expired promotion
+does not make future usage free or reprice earlier requests at the new rate.
+Cursor history is downloaded account history cached locally, so it can include other
+devices. When history cannot distinguish subscription pools from separately billed
+requests, the card explains that allocation is unavailable and withholds the estimate.
+Providers without quota percentages or readable token history cannot produce an
+API-equivalent estimate; registering a model alone does not supply that information.
+
+Switch the history between hourly and daily samples. Each point preserves its
+price when recorded; gaps and cycle changes remain disconnected. Subscription
+estimates use automatic API model prices and explicit custom token prices. Model
+aliases and filters in the cost/token views do not change quota membership. Updating
+a custom price refreshes the current estimate; previously saved points keep their original price.
+
+Devin's reported subscription period end and Cursor's billing cycle end appear beneath
+their provider headings on desktop, web and mobile, with a reminder within seven days.
+These dates are separate from daily/weekly quota resets. They do not establish whether
+auto-renew is enabled. A past date asks you to refresh the status; providers that do not
+report a subscription date do not display a guessed expiration.
 
 ## Set custom model prices
 
@@ -164,9 +221,9 @@ anything. The command is offered only for providers that appear under **Usage �
 To keep them in view on web and desktop, turn on **Usage limits** in **Settings → Appearance → Thread details**, or right-click the thread details card.
 The bottom of the thread details card then shows how much is left in each limit window of the
 current provider account. Some windows, such as a weekly Opus limit, count only one model. Hover a
-row to see when it resets and your pace. Turn on **Context window** to also show the thread's
-context use against the model's limit. A tick on the bar marks where the provider compacts
-automatically, when it reports that point.
+row to see when it resets and your pace. The composer always shows the thread's
+context use against the model's limit. Hover the ring for full token counts and the provider's
+automatic compaction threshold, when reported.
 
 OpenCode Go reports its session, weekly, and monthly allowance when OpenCode runs locally in
 the environment. T3 cannot report limits for external OpenCode servers because their credentials

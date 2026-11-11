@@ -25,6 +25,7 @@ import * as HttpClient from "effect/http/HttpClient";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import { readDevinAccount } from "./devinUsageLimits.ts";
+import { devinUsageReader } from "./devinUsage.ts";
 
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
 import { AcpRegistryAdapterV2Driver, type AcpRegistryAdapterV2DriverEnv } from "./adapter.ts";
@@ -476,7 +477,12 @@ export type AcpRegistryDriverEnv =
   | HttpClient.HttpClient
   | ProviderHost.ProviderHost;
 
-export const AcpRegistryDriver: ProviderDriver<AcpRegistrySettings, AcpRegistryDriverEnv> = {
+export const AcpRegistryDriver: ProviderDriver<
+  AcpRegistrySettings,
+  AcpRegistryDriverEnv,
+  FileSystem.FileSystem | Path.Path
+> = {
+  usage: devinUsageReader,
   driverKind: DRIVER_KIND,
   metadata: {
     displayName: "ACP Registry",

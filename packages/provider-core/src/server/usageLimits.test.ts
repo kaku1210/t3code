@@ -21,6 +21,23 @@ const weekly = {
 const published = { checkedAt, windows: [session, weekly] };
 
 describe("applyUsageLimitsUpdate", () => {
+  it("preserves a reported cycle start only while the reset is unchanged", () => {
+    const previous = { checkedAt, windows: [{ ...session, startsAt: "2026-09-03T09:00:00.000Z" }] };
+    expect(
+      applyUsageLimitsUpdate({
+        previous,
+        checkedAt,
+        update: { windows: [{ ...session, usedPercent: 60 }] },
+      })?.windows[0]?.startsAt,
+    ).toBe(previous.windows[0]?.startsAt);
+    expect(
+      applyUsageLimitsUpdate({
+        previous,
+        checkedAt,
+        update: { windows: [{ ...session, usedPercent: 0, resetsAt: "2026-09-03T19:00:00.000Z" }] },
+      })?.windows[0]?.startsAt,
+    ).toBeUndefined();
+  });
   it("returns the published object itself when no window moved", () => {
     const next = applyUsageLimitsUpdate({
       previous: published,

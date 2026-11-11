@@ -11,6 +11,7 @@ type UsageProviderPresentation = {
 };
 
 export const PROVIDER_PRESENTATION = {
+  devin: { label: "Devin", color: "#808080", driverKind: ProviderDriverKind.make("acpRegistry") },
   codex: {
     label: "Codex",
     color: "var(--contrast-foreground)",

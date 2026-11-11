@@ -3,6 +3,7 @@ import { AuthSettingsWriteScope, type EnvironmentId, sessionGrantsScope } from "
 import { ChevronDownIcon, PlusIcon, RotateCcwIcon, XIcon } from "lucide-react";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { useRef, useState } from "react";
+import { useUiLanguage } from "../../i18n/useUiLanguage";
 
 import { cn } from "../../lib/utils";
 import { environmentPresentations } from "../../state/presentation";
@@ -101,6 +102,8 @@ export function UsagePriceOverrides({
   readonly initialModel?: string | undefined;
   readonly onOpenChange: (open: boolean) => void;
 }) {
+  const { language } = useUiLanguage();
+  const chinese = language.startsWith("zh");
   const environments = useAtomValue(priceTargetsAtom);
   const [selectedIds, setSelectedIds] = useState(initialSelectedEnvironmentIds);
   const selected = environments.filter(
@@ -278,9 +281,80 @@ export function UsagePriceOverrides({
           <DialogTitle>Custom model prices</DialogTitle>
           <DialogDescription>
             Prices and mappings apply to all past and future usage on the environments you select.
+            {chinese
+              ? " 自定义单价也用于当前额度估算；历史曲线已保存的点保持原价。"
+              : " Custom prices also apply to current quota estimates; saved history keeps its original prices."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel>
+          {usage.some((environment) => environment.summary?.pricing.defaults?.length) ? (
+            <details className="mb-4 text-xs text-muted-foreground">
+              <summary className="cursor-pointer font-medium text-foreground">
+                {chinese ? "默认单价与免费规则" : "Default prices and free-model rules"}
+              </summary>
+              <p className="my-2">
+                {chinese
+                  ? "单位：美元 / 百万 token。思考强度共用模型单价，思考 token 计入输出。自定义价格优先；免费规则仅用于已确认套餐的额度估算。"
+                  : "USD / million tokens. Reasoning levels share unit rates; thinking tokens count as output. Custom prices take precedence; free rules apply only to confirmed subscription quota estimates."}
+              </p>
+              {usage
+                .filter((environment) =>
+                  selected.some((target) => target.environmentId === environment.environmentId),
+                )
+                .map((environment) => (
+                  <div key={environment.environmentId} className="mb-3 overflow-x-auto">
+                    {selected.length > 1 ? (
+                      <p>
+                        {
+                          selected.find(
+                            (target) => target.environmentId === environment.environmentId,
+                          )?.label
+                        }
+                      </p>
+                    ) : null}
+                    <Table aria-label={chinese ? "默认模型单价" : "Default model prices"}>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Model</TableHead>
+                          <TableHead>Input</TableHead>
+                          <TableHead>Output</TableHead>
+                          <TableHead>Cache read</TableHead>
+                          <TableHead>Cache write</TableHead>
+                          <TableHead>{chinese ? "规则" : "Rule"}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {environment.summary?.pricing.defaults?.map((rule) => (
+                          <TableRow key={rule.model}>
+                            <TableCell>
+                              <a
+                                href={rule.source}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="underline underline-offset-2"
+                              >
+                                {rule.model}
+                              </a>
+                            </TableCell>
+                            <TableCell>{rule.input}</TableCell>
+                            <TableCell>{rule.output}</TableCell>
+                            <TableCell>{rule.cacheRead}</TableCell>
+                            <TableCell>{rule.cacheWrite}</TableCell>
+                            <TableCell className="min-w-48 whitespace-normal">
+                              {rule.quotaFreeUntil
+                                ? `${chinese ? "Devin 自助套餐免费至" : "Devin self-serve free until"} ${new Date(rule.quotaFreeUntil).toLocaleString(language)}`
+                                : rule.changesAt && Date.parse(rule.changesAt) > Date.now()
+                                  ? `${chinese ? "优惠单价截至" : "Introductory rates until"} ${new Date(rule.changesAt).toLocaleString(language)}`
+                                  : "–"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ))}
+            </details>
+          ) : null}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
               <Label id="usage-prices-apply-label" className="shrink-0">

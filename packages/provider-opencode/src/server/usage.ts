@@ -72,6 +72,8 @@ function parseOpenCodeMessage(
     reportedCostUsd: typeof cost === "number" && Number.isFinite(cost) && cost > 0 ? cost : null,
     speed: "standard",
     dedupeKey: id ? `opencode:${id}` : null,
+    billingProvider:
+      text(modelReference.providerID) || text(modelReference.provider) || text(message.providerID),
   };
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@effect/vitest";
 
 import { cursorRateModel } from "@t3tools/provider-cursor/server/accountUsage";
+import { withDefaultPrices } from "./usageDefaultPrices.ts";
 import type { UsageSpeed } from "@t3tools/provider-core/server/usage";
 import {
   cacheSavingsUsd,
@@ -33,6 +34,66 @@ describe("usage pricing", () => {
     totals,
     reportedCostUsd,
     speed,
+  });
+
+  it("prices Gemini reasoning and trial routes equally, with dated introductory rates", () => {
+    const table = withDefaultPrices(new Map());
+    for (const model of [
+      "gemini-4-argon",
+      "gemini-4-argon-low",
+      "gemini-4-argon-medium",
+      "gemini-4-argon-high",
+      "gemini-4-argon-trial",
+    ]) {
+      const before = { ...record(model), timestampMs: Date.parse("2026-11-11T00:00:00Z") };
+      expect(priceUsage(table, before).costUsd).toBeCloseTo(14.1);
+      expect(
+        priceUsage(table, { ...before, timestampMs: Date.parse("2026-12-01T08:00:00Z") }).costUsd,
+      ).toBeCloseTo(28.2);
+    }
+    expect(priceUsage(table, record("unknown-high")).costSource).toBe("unpriced");
+  });
+
+  it("excludes free SWE only from confirmed Devin self-serve quota and honors custom prices", () => {
+    const table = withDefaultPrices(new Map());
+    const swe = {
+      ...record("swe-2-high"),
+      provider: "devin" as const,
+      timestampMs: Date.parse("2026-11-11T00:00:00Z"),
+    };
+    expect(priceUsage(table, swe).costUsd).toBeCloseTo(21.3);
+    expect(priceUsage(table, swe, undefined, "Pro")).toMatchObject({ costUsd: 0, quotaFree: true });
+    expect(priceUsage(table, swe, undefined, "Enterprise").costUsd).toBeCloseTo(21.3);
+    expect(priceUsage(table, { ...swe, provider: "codex" }, undefined, "Pro").costUsd).toBeCloseTo(
+      21.3,
+    );
+    expect(
+      priceUsage(
+        table,
+        { ...swe, timestampMs: Date.parse("2026-12-01T08:00:00Z") },
+        undefined,
+        "Pro",
+      ).costUsd,
+    ).toBeCloseTo(21.3);
+    const flash = {
+      ...swe,
+      model: "swe-2-flash-max",
+      timestampMs: Date.parse("2026-12-04T17:59:59Z"),
+    };
+    expect(priceUsage(table, flash, undefined, "Pro").costUsd).toBe(0);
+    expect(
+      priceUsage(
+        table,
+        { ...flash, timestampMs: Date.parse("2026-12-04T18:00:00Z") },
+        undefined,
+        "Pro",
+      ).costUsd,
+    ).toBeCloseTo(0.735);
+    const custom = createOverrideRateTable({
+      "swe-2-high": { inputCostPerMillionTokens: 1, outputCostPerMillionTokens: 1 },
+    });
+    expect(priceUsage(table, swe, custom, "Pro").costUsd).toBe(4);
+    expect(priceUsage(table, record("compactor")).costSource).toBe("unpriced");
   });
 
   it("uses custom token rates ahead of public and provider-reported costs", () => {

@@ -21,8 +21,10 @@ import {
   type UsageSource,
   type UsageSummary,
   type UsageSummaryInput,
+  type ServerProvider,
 } from "@t3tools/contracts";
 import * as Duration from "effect/Duration";
+import * as DateTime from "effect/DateTime";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -51,6 +53,8 @@ import * as AntigravityUsage from "../provider/Drivers/AntigravityUsage.ts";
 import * as ProviderHostLive from "../provider/ProviderHostLive.ts";
 import { totalTokens, type UsageRecord } from "@t3tools/provider-core/server/usage";
 import * as UsageService from "./UsageService.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import * as UsageEstimateStore from "./UsageEstimateStore.ts";
 import * as MuseSdk from "../../../../packages/provider-muse/src/server/sdk.ts";
 import { MuseUsageHome } from "@t3tools/provider-muse/server";
 import { makeScanCacheWriter, SCAN_CACHE_FILE_NAME } from "./usageScanCache.ts";
@@ -157,15 +161,29 @@ const layerService = (input: {
   readonly environment?: NodeJS.ProcessEnv;
   readonly platform?: NodeJS.Platform;
   readonly hostname?: string;
+  readonly providers?: () => readonly ServerProvider[];
   readonly secretStore?: Partial<ServerSecretStore.ServerSecretStore["Service"]>;
 }) =>
   layerCursorUsageAccounts(
     CursorAccountReader.layer.pipe(Layer.provide(CursorKeychain.layer)),
   ).pipe(
     Layer.provideMerge(AntigravityUsage.layer),
+    Layer.provideMerge(
+      Layer.mock(ProviderRegistry.ProviderRegistry)({
+        getProviders: Effect.sync(() => input.providers?.() ?? []),
+      }),
+    ),
     Layer.provideMerge(MuseUsageHome.layer),
     Layer.provideMerge(ProviderHostLive.layer),
     Layer.provideMerge(CodexUsageHistory.layer.pipe(Layer.provideMerge(Sqlite.layerMemory))),
+    Layer.provideMerge(
+      Layer.unwrap(
+        Effect.gen(function* () {
+          const config = yield* ServerConfig.ServerConfig;
+          return UsageEstimateStore.layerLocal(config.stateDir);
+        }),
+      ),
+    ),
     Layer.provideMerge(Layer.mock(BackgroundPolicy.BackgroundPolicy)({})),
     Layer.provideMerge(
       Layer.mock(ServerSecretStore.ServerSecretStore)({
@@ -493,6 +511,158 @@ describe("Codex usage history", () => {
 });
 
 describe("UsageService", () => {
+  it.live("persists Codex estimate observations through append, duplicate scans, and restart", () =>
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse("2026-08-01T11:00:00Z"));
+      const { home, settings } = yield* setup;
+      const prefix = "usage-estimate-integration";
+      const sessions = NodePath.join(home, "codex", "sessions");
+      const transcript = NodePath.join(sessions, "estimate.jsonl");
+      const database = NodePath.join(home, prefix, "userdata", "usage-estimates.sqlite");
+      const tick = (minute: number, used: number) =>
+        encodeUnknownJsonString({
+          type: "event_msg",
+          timestamp: `2026-08-01T10:${String(minute).padStart(2, "0")}:00Z`,
+          payload: {
+            type: "token_count",
+            info: {
+              last_token_usage: { input_tokens: 10, output_tokens: minute + 1 },
+            },
+            rate_limits: {
+              limit_id: "codex",
+              plan_type: "test",
+              primary: { used_percent: used, window_minutes: 10080, resets_at: 1786147200 },
+            },
+          },
+        });
+      const initial =
+        [
+          { type: "session_meta", payload: { id: "estimate-session", model_provider: "openai" } },
+          { type: "turn_context", payload: { model: "gpt-6-astra", turn_id: "estimate-turn" } },
+          {
+            type: "event_msg",
+            payload: {
+              type: "thread_settings_applied",
+              thread_settings: { service_tier: "standard" },
+            },
+          },
+        ]
+          .map((line) => encodeUnknownJsonString(line))
+          .join("\n") +
+        "\n" +
+        tick(0, 10) +
+        "\n";
+      yield* Effect.promise(async () => {
+        await NodeFSP.mkdir(sessions, { recursive: true });
+        await NodeFSP.writeFile(transcript, initial);
+      });
+      const readStored = () => {
+        const db = new NodeSqlite.DatabaseSync(database, { readOnly: true });
+        try {
+          return {
+            events: db
+              .prepare("SELECT payload FROM usage_estimate_events ORDER BY timestamp_ms,id")
+              .all()
+              .map((row) => decodeUnknownJsonString(row.payload as string)),
+            sources: db
+              .prepare("SELECT payload FROM usage_estimate_sources")
+              .all()
+              .map((row) => decodeUnknownJsonString(row.payload as string)),
+            prices: db.prepare("SELECT count(*) AS count FROM usage_estimate_prices").get()?.count,
+            integrity: db.prepare("PRAGMA quick_check").get()?.quick_check,
+            databaseId: db.prepare("SELECT database_id FROM usage_estimate_meta").get()
+              ?.database_id,
+          };
+        } finally {
+          db.close();
+        }
+      };
+      const dependencies = () =>
+        layerService({
+          prefix,
+          home,
+          settings,
+          ratesDocument: {
+            "gpt-6-astra": { input_cost_per_token: 1e-5, output_cost_per_token: 5e-5 },
+          },
+        });
+      yield* Effect.gen(function* () {
+        const store = yield* UsageEstimateStore.UsageEstimateStore;
+        let failNextIngest = false;
+        const service = yield* UsageService.make.pipe(
+          Effect.provideService(UsageEstimateStore.UsageEstimateStore, {
+            ...store,
+            ingest: (batch) =>
+              Effect.suspend(() => {
+                if (!failNextIngest) return store.ingest(batch);
+                failNextIngest = false;
+                return Effect.fail(
+                  new UsageEstimateStore.UsageEstimateStoreError({
+                    operation: "ingest",
+                    cause: new Error("fixture write failure"),
+                  }),
+                );
+              }),
+          }),
+        );
+        yield* service.readSummary(WINDOW);
+        assert.lengthOf(readStored().events, 2);
+        yield* Effect.promise(() => NodeFSP.appendFile(transcript, tick(5, 15)));
+        yield* service.readSummary(WINDOW);
+        assert.lengthOf(readStored().events, 2);
+        yield* Effect.promise(() => NodeFSP.appendFile(transcript, "\n"));
+        failNextIngest = true;
+        assert.strictEqual((yield* Effect.flip(service.readSummary(WINDOW))).reason, "scanFailed");
+        assert.lengthOf(readStored().events, 2);
+        const summary = yield* service.readSummary(WINDOW);
+        const estimate = summary.subscriptionEstimates?.[0];
+        assert.strictEqual(estimate?.current?.result.status, "reference_only");
+        assert.strictEqual(estimate?.current?.result.basis, "cycle_to_date");
+        assert.strictEqual(estimate?.current?.result.interval?.consumedPercent, 15);
+        assert.lengthOf(estimate?.history ?? [], 2);
+        assert.lengthOf(readStored().events, 4);
+        yield* Effect.promise(() =>
+          NodeFSP.copyFile(transcript, NodePath.join(sessions, "copy.jsonl")),
+        );
+        yield* Effect.all(
+          [
+            service.readSummary(WINDOW),
+            service.readSummary({
+              ...WINDOW,
+              modelFilter: { include: [{ model: "gpt-6-astra" }] },
+            }),
+          ],
+          { concurrency: 2 },
+        );
+        assert.lengthOf(readStored().events, 4);
+        assert.strictEqual(readStored().prices, 1);
+        assert.strictEqual(readStored().integrity, "ok");
+        yield* service.awaitPersisted;
+      }).pipe(Effect.provide(dependencies()), Effect.scoped);
+      const beforeRestart = readStored();
+      assert.include(beforeRestart.sources[0], {
+        deviceId: "usage-test-host",
+        accountId: null,
+        coverage: "selected_sessions",
+      });
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        yield* service.readSummary(WINDOW);
+        assert.deepStrictEqual(readStored(), beforeRestart);
+        yield* service.awaitPersisted;
+      }).pipe(Effect.provide(dependencies()), Effect.scoped);
+      yield* Effect.promise(() => NodeFSP.rename(database, database + ".previous"));
+      yield* Effect.gen(function* () {
+        const service = yield* UsageService.make;
+        yield* service.readSummary(WINDOW);
+        const recreated = readStored();
+        assert.notStrictEqual(recreated.databaseId, beforeRestart.databaseId);
+        assert.deepStrictEqual(recreated.events, beforeRestart.events);
+        yield* service.awaitPersisted;
+      }).pipe(Effect.provide(dependencies()), Effect.scoped);
+    }).pipe(Effect.scoped, Effect.provide(TestClock.layer())),
+  );
+
   it.live("counts compressed Codex rollouts across refresh, rewrites, and cache restarts", () =>
     Effect.gen(function* () {
       const { home, settings } = yield* setup;
@@ -1459,8 +1629,10 @@ describe("UsageService", () => {
         await NodeFSP.writeFile(authPath, "invalid json");
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({ prefix: "usage-service-cursor-invalid-login", home, settings }),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({ prefix: "usage-service-cursor-invalid-login", home, settings }),
+          ),
         ),
       );
       const summary = yield* service.readSummary({ ...WINDOW, awaitRefresh: true });
@@ -1509,14 +1681,16 @@ describe("UsageService", () => {
     Effect.gen(function* () {
       const { settings, home } = yield* setup;
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-cursor-keychain-disabled",
-            home,
-            settings,
-            platform: "darwin",
-            environment: {},
-          }),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({
+              prefix: "usage-service-cursor-keychain-disabled",
+              home,
+              settings,
+              platform: "darwin",
+              environment: {},
+            }),
+          ),
         ),
       );
       const summary = yield* service.readSummary(WINDOW);
@@ -1581,14 +1755,16 @@ describe("UsageService", () => {
           );
         });
         const service = yield* UsageService.make.pipe(
-          Effect.provide(
-            layerService({
-              prefix: `usage-service-cursor-store-${index}`,
-              home,
-              settings,
-              platform: testCase.platform,
-              environment: testCase.environment,
-            }),
+          Effect.provideContext(
+            yield* Layer.build(
+              layerService({
+                prefix: `usage-service-cursor-store-${index}`,
+                home,
+                settings,
+                platform: testCase.platform,
+                environment: testCase.environment,
+              }),
+            ),
           ),
         );
         const summary = yield* service.readSummary(WINDOW);
@@ -1844,7 +2020,9 @@ describe("UsageService", () => {
           }
         });
         const service = yield* UsageService.make.pipe(
-          Effect.provide(layerService({ prefix: "usage-service-opencode", home, settings })),
+          Effect.provideContext(
+            yield* Layer.build(layerService({ prefix: "usage-service-opencode", home, settings })),
+          ),
         );
         const summary = yield* service.readSummary(WINDOW);
         assert.strictEqual(summary.buckets[0]?.provider, "opencode");
@@ -1893,32 +2071,34 @@ describe("UsageService", () => {
         await NodeFSP.symlink(instanceRoot, alias, "junction");
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-opencode-instances",
-            home,
-            environment: { XDG_DATA_HOME: dataHome },
-            settings: {
-              ...settings,
-              providerInstances: {
-                ...settings.providerInstances,
-                [ProviderInstanceId.make("opencode-work")]: {
-                  driver: ProviderDriverKind.make("opencode"),
-                  environment: [
-                    {
-                      name: "OPENCODE_DATA_DIR",
-                      value: ` ${instanceRoot}, ${alias} `,
-                      sensitive: false,
-                    },
-                  ],
-                },
-                [ProviderInstanceId.make("opencode-xdg")]: {
-                  driver: ProviderDriverKind.make("opencode"),
-                  environment: [{ name: "OPENCODE_DATA_DIR", value: "", sensitive: false }],
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({
+              prefix: "usage-service-opencode-instances",
+              home,
+              environment: { XDG_DATA_HOME: dataHome },
+              settings: {
+                ...settings,
+                providerInstances: {
+                  ...settings.providerInstances,
+                  [ProviderInstanceId.make("opencode-work")]: {
+                    driver: ProviderDriverKind.make("opencode"),
+                    environment: [
+                      {
+                        name: "OPENCODE_DATA_DIR",
+                        value: ` ${instanceRoot}, ${alias} `,
+                        sensitive: false,
+                      },
+                    ],
+                  },
+                  [ProviderInstanceId.make("opencode-xdg")]: {
+                    driver: ProviderDriverKind.make("opencode"),
+                    environment: [{ name: "OPENCODE_DATA_DIR", value: "", sensitive: false }],
+                  },
                 },
               },
-            },
-          }),
+            }),
+          ),
         ),
       );
       const summary = yield* service.readSummary(WINDOW);
@@ -1968,16 +2148,18 @@ describe("UsageService", () => {
         );
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-aliased-roots-test",
-            home,
-            settings,
-            environment: {
-              OPENCODE_DATA_DIR: `${opencode},${opencodeAlias}`,
-              ANTIGRAVITY_DATA_DIR: `${antigravityA},${antigravityB}`,
-            },
-          }),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({
+              prefix: "usage-service-aliased-roots-test",
+              home,
+              settings,
+              environment: {
+                OPENCODE_DATA_DIR: `${opencode},${opencodeAlias}`,
+                ANTIGRAVITY_DATA_DIR: `${antigravityA},${antigravityB}`,
+              },
+            }),
+          ),
         ),
       );
       const summary = yield* service.readSummary(WINDOW);
@@ -2033,18 +2215,20 @@ describe("UsageService", () => {
         environment: [{ name: "ANTIGRAVITY_DATA_DIR", value: dataDir, sensitive: false }],
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-antigravity-instances-test",
-            home,
-            settings: {
-              providerInstances: {
-                ...settings.providerInstances,
-                [ProviderInstanceId.make("antigravity-first")]: instance(first),
-                [ProviderInstanceId.make("antigravity-second")]: instance(` ${second}, `),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({
+              prefix: "usage-service-antigravity-instances-test",
+              home,
+              settings: {
+                providerInstances: {
+                  ...settings.providerInstances,
+                  [ProviderInstanceId.make("antigravity-first")]: instance(first),
+                  [ProviderInstanceId.make("antigravity-second")]: instance(` ${second}, `),
+                },
               },
-            },
-          }),
+            }),
+          ),
         ),
       );
       const summary = yield* service.readSummary(WINDOW);
@@ -2118,42 +2302,50 @@ describe("UsageService", () => {
         );
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(
-          layerService({
-            prefix: "usage-service-accounts-test",
-            home,
-            settings: {
-              ...settings,
-              providerInstances: {
-                ...settings.providerInstances,
-                [ProviderInstanceId.make("claude-work")]: {
-                  driver: ProviderDriverKind.make("claudeAgent"),
-                  enabled: false,
-                  environment: [{ name: "CLAUDE_CONFIG_DIR", value: claudeHome, sensitive: false }],
-                },
-                [ProviderInstanceId.make("codex-work")]: {
-                  driver: ProviderDriverKind.make("codex"),
-                  environment: [{ name: "CODEX_HOME", value: codexHome, sensitive: false }],
-                },
-                [ProviderInstanceId.make("codex-alias")]: {
-                  driver: ProviderDriverKind.make("codex"),
-                  config: { homePath: alias },
-                },
-                [ProviderInstanceId.make("codex-shadow")]: {
-                  driver: ProviderDriverKind.make("codex"),
-                  config: { homePath: codexHome, shadowHomePath: NodePath.join(home, "shadow") },
-                  environment: [
-                    { name: "CODEX_HOME", value: NodePath.join(home, "ignored"), sensitive: false },
-                  ],
-                },
-                [ProviderInstanceId.make("grok-work")]: {
-                  driver: ProviderDriverKind.make("grok"),
-                  config: { customModels: "not-a-list" },
-                  environment: [{ name: "GROK_HOME", value: grokHome, sensitive: false }],
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({
+              prefix: "usage-service-accounts-test",
+              home,
+              settings: {
+                ...settings,
+                providerInstances: {
+                  ...settings.providerInstances,
+                  [ProviderInstanceId.make("claude-work")]: {
+                    driver: ProviderDriverKind.make("claudeAgent"),
+                    enabled: false,
+                    environment: [
+                      { name: "CLAUDE_CONFIG_DIR", value: claudeHome, sensitive: false },
+                    ],
+                  },
+                  [ProviderInstanceId.make("codex-work")]: {
+                    driver: ProviderDriverKind.make("codex"),
+                    environment: [{ name: "CODEX_HOME", value: codexHome, sensitive: false }],
+                  },
+                  [ProviderInstanceId.make("codex-alias")]: {
+                    driver: ProviderDriverKind.make("codex"),
+                    config: { homePath: alias },
+                  },
+                  [ProviderInstanceId.make("codex-shadow")]: {
+                    driver: ProviderDriverKind.make("codex"),
+                    config: { homePath: codexHome, shadowHomePath: NodePath.join(home, "shadow") },
+                    environment: [
+                      {
+                        name: "CODEX_HOME",
+                        value: NodePath.join(home, "ignored"),
+                        sensitive: false,
+                      },
+                    ],
+                  },
+                  [ProviderInstanceId.make("grok-work")]: {
+                    driver: ProviderDriverKind.make("grok"),
+                    config: { customModels: "not-a-list" },
+                    environment: [{ name: "GROK_HOME", value: grokHome, sensitive: false }],
+                  },
                 },
               },
-            },
-          }),
+            }),
+          ),
         ),
       );
       const summary = yield* service.readSummary(WINDOW);
@@ -2275,28 +2467,30 @@ describe("UsageService", () => {
         const { transcript, settings, home } = yield* setup;
         yield* Effect.promise(() => NodeFSP.writeFile(transcript, claudeLine(1, 5)));
         const service = yield* UsageService.make.pipe(
-          Effect.provide(
-            layerService({
-              prefix: "usage-service-inherited-homes-test",
-              home,
-              environment: {
-                CODEX_HOME: NodePath.join(home, "inherited-codex"),
-                CLAUDE_CONFIG_DIR: NodePath.join(home, "claude"),
-              },
-              settings: {
-                ...settings,
-                providerInstances: {
-                  [ProviderInstanceId.make("codex")]: {
-                    driver: ProviderDriverKind.make("codex"),
-                    config: {},
-                  },
-                  [ProviderInstanceId.make("claudeAgent")]: {
-                    driver: ProviderDriverKind.make("claudeAgent"),
-                    config: {},
+          Effect.provideContext(
+            yield* Layer.build(
+              layerService({
+                prefix: "usage-service-inherited-homes-test",
+                home,
+                environment: {
+                  CODEX_HOME: NodePath.join(home, "inherited-codex"),
+                  CLAUDE_CONFIG_DIR: NodePath.join(home, "claude"),
+                },
+                settings: {
+                  ...settings,
+                  providerInstances: {
+                    [ProviderInstanceId.make("codex")]: {
+                      driver: ProviderDriverKind.make("codex"),
+                      config: {},
+                    },
+                    [ProviderInstanceId.make("claudeAgent")]: {
+                      driver: ProviderDriverKind.make("claudeAgent"),
+                      config: {},
+                    },
                   },
                 },
-              },
-            }),
+              }),
+            ),
           ),
         );
         const summary = yield* service.readSummary(WINDOW);
@@ -2445,6 +2639,112 @@ describe("UsageService", () => {
         ),
       );
     }).pipe(Effect.scoped),
+  );
+
+  it.live(
+    "publishes provider-window estimates through the actual summary and preserves history after quota refresh",
+    () =>
+      Effect.gen(function* () {
+        const { transcript, settings, home } = yield* setup;
+        const now = yield* Clock.currentTimeMillis;
+        const checkedAt = DateTime.formatIso(DateTime.makeUnsafe(now));
+        let percent = 50;
+        let tick = 0;
+        const providers = (): ServerProvider[] => [
+          {
+            driver: ProviderDriverKind.make("claudeAgent"),
+            instanceId: ProviderInstanceId.make("claudeAgent"),
+            enabled: true,
+            installed: true,
+            status: "ready",
+            version: null,
+            checkedAt,
+            models: [],
+            slashCommands: [],
+            skills: [],
+            auth: { status: "authenticated", email: "test@example.com" },
+            usageLimits: {
+              checkedAt: DateTime.formatIso(DateTime.makeUnsafe(now - 1000 + tick)),
+              windows: [
+                {
+                  id: "five_hour",
+                  kind: "session",
+                  label: "5-hour",
+                  usedPercent: percent,
+                  windowDurationMins: 300,
+                  resetsAt: DateTime.formatIso(DateTime.makeUnsafe(now + 3600000)),
+                },
+              ],
+            },
+          },
+        ];
+        yield* Effect.promise(() =>
+          NodeFSP.writeFile(
+            transcript,
+            claudeLine(1, 65).replace(
+              "2026-08-01T10:00:00Z",
+              DateTime.formatIso(DateTime.makeUnsafe(now - 2000)),
+            ),
+          ),
+        );
+        yield* Effect.gen(function* () {
+          const service = yield* UsageService.make;
+          const first = yield* service.readSummary(WINDOW);
+          const estimate = first.subscriptionEstimates?.find(
+            (s) => s.source.scope?.windowId === "five_hour",
+          );
+          assert.strictEqual(estimate?.current?.result.costUsd, 75);
+          assert.strictEqual(estimate?.current?.result.cycleEquivalentUsd, 150);
+          assert.strictEqual(estimate?.current?.result.remainingEquivalentUsd, 75);
+          assert.strictEqual(estimate?.source.scope?.provider, "claude");
+          percent = 100;
+          tick = 1000;
+          const refreshed = yield* service.readSummary(WINDOW);
+          const exhausted = refreshed.subscriptionEstimates?.find(
+            (s) => s.source.id === estimate?.source.id,
+          );
+          assert.strictEqual(exhausted?.current?.result.cycleEquivalentUsd, 75);
+          assert.strictEqual(exhausted?.current?.result.remainingEquivalentUsd, 0);
+          assert.deepStrictEqual(
+            exhausted?.history.map((p) => p.cycleEquivalentUsd),
+            [150, 75],
+          );
+          const settingsService = yield* ServerSettings.ServerSettingsService;
+          yield* settingsService.updateSettings({
+            usagePriceOverrides: {
+              "claude-fable-5": {
+                inputCostPerMillionTokens: 2_000_000,
+                outputCostPerMillionTokens: 2_000_000,
+              },
+            },
+          });
+          const custom = (yield* service.readSummary(WINDOW)).subscriptionEstimates?.find(
+            (s) => s.source.id === estimate?.source.id,
+          );
+          assert.strictEqual(custom?.current?.result.cycleEquivalentUsd, 150);
+          assert.deepStrictEqual(custom?.history, exhausted?.history);
+          yield* settingsService.updateSettings({
+            usagePriceOverrides: { "claude-fable-5": null },
+          });
+          const restored = (yield* service.readSummary(WINDOW)).subscriptionEstimates?.find(
+            (s) => s.source.id === estimate?.source.id,
+          );
+          assert.strictEqual(restored?.current?.result.cycleEquivalentUsd, 75);
+          yield* service.awaitPersisted;
+        }).pipe(
+          Effect.provide(
+            layerService({
+              prefix: "usage-subscription-providers",
+              home,
+              settings,
+              providers,
+              ratesDocument: {
+                "claude-fable-5": { input_cost_per_token: 1, output_cost_per_token: 1 },
+              },
+            }),
+          ),
+        );
+      }).pipe(Effect.scoped),
   );
 
   it.live("reprices unchanged transcripts when custom prices are added, edited, or removed", () =>
@@ -3119,7 +3419,11 @@ describe("UsageService", () => {
         await NodeFSP.utimes(transcript, lastWrite, lastWrite);
       });
       const service = yield* UsageService.make.pipe(
-        Effect.provide(layerService({ prefix: "usage-service-saved-window-test", home, settings })),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({ prefix: "usage-service-saved-window-test", home, settings }),
+          ),
+        ),
       );
       const first = yield* service.readSummary(WINDOW);
       yield* Effect.promise(() =>
@@ -3238,11 +3542,16 @@ describe("UsageService", () => {
             );
           },
         });
-        const service = yield* UsageService.make.pipe(Effect.provide(serviceLayer));
+        const serviceContext = yield* Layer.build(serviceLayer);
+        const service = yield* UsageService.make.pipe(Effect.provideContext(serviceContext));
 
         const summary = yield* service.readSummary(WINDOW);
         assert.strictEqual(summary.pricing.status, "fresh");
-        assert.strictEqual(summary.pricing.knownModels, 1);
+        assert.isAtLeast(summary.pricing.knownModels, 1);
+        assert.include(
+          summary.pricing.defaults?.map((entry) => entry.model) ?? [],
+          "gemini-4-argon",
+        );
         assert.closeTo(summary.buckets[0]?.costUsd ?? -1, 0.00035, 1e-12);
         assert.deepStrictEqual(
           requests.map((request) => request.url),
@@ -3253,7 +3562,7 @@ describe("UsageService", () => {
         );
         assert.strictEqual(requests[1]?.headers.accept, "application/vnd.github.raw+json");
 
-        const restarted = yield* UsageService.make.pipe(Effect.provide(serviceLayer));
+        const restarted = yield* UsageService.make.pipe(Effect.provideContext(serviceContext));
         const cached = yield* restarted.readSummary(WINDOW);
         assert.strictEqual(cached.pricing.status, "cached");
         assert.deepStrictEqual(cached.buckets, summary.buckets);
@@ -3265,7 +3574,11 @@ describe("UsageService", () => {
     Effect.gen(function* () {
       const { settings, home } = yield* setup;
       const service = yield* UsageService.make.pipe(
-        Effect.provide(layerService({ prefix: "usage-service-interruption-test", home, settings })),
+        Effect.provideContext(
+          yield* Layer.build(
+            layerService({ prefix: "usage-service-interruption-test", home, settings }),
+          ),
+        ),
       );
 
       let orphanedAt: number | undefined;

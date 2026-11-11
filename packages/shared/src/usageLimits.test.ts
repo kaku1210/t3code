@@ -24,9 +24,43 @@ import {
   paceRemainingPercent,
   usesChatGptSharing,
   resolveNewThreadModelSelection,
+  subscriptionPeriodLabel,
 } from "./usageLimits.ts";
 
 const now = Date.parse("2026-09-03T12:00:00.000Z");
+
+it("shows subscription period reminders independently from quota resets", () => {
+  const limits = { checkedAt: "2026-09-03T12:00:00Z", windows: [] };
+  expect(subscriptionPeriodLabel(limits, now, "zh-CN")).toBeNull();
+  expect(
+    subscriptionPeriodLabel(
+      { ...limits, subscription: { periodEndsAt: "2026-09-04T12:00:00Z" } },
+      now,
+      "zh-CN",
+    ),
+  ).toMatchObject({ dueSoon: true });
+  expect(
+    subscriptionPeriodLabel(
+      { ...limits, subscription: { periodEndsAt: "2026-09-04T12:00:00Z" } },
+      now,
+      "zh-CN",
+    )?.label,
+  ).toContain("1 天内");
+  expect(
+    subscriptionPeriodLabel(
+      { ...limits, subscription: { periodEndsAt: "2026-09-13T12:00:00Z" } },
+      now,
+      "en",
+    )?.dueSoon,
+  ).toBe(false);
+  expect(
+    subscriptionPeriodLabel(
+      { ...limits, subscription: { periodEndsAt: "2026-09-02T12:00:00Z" } },
+      now,
+      "zh-CN",
+    )?.label,
+  ).toContain("请刷新状态");
+});
 
 const window = {
   id: "five_hour",

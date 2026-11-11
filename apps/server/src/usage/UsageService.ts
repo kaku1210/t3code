@@ -13,6 +13,8 @@ import {
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
+import * as Digest from "effect/crypto/Digest";
+import * as Hex from "effect/encoding/Hex";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Deferred from "effect/Deferred";
@@ -40,7 +42,29 @@ import type {
   UsageRecord,
 } from "@t3tools/provider-core/server/usage";
 import { canonicalModelFilter, resolveModelAliases, UsageAggregator } from "./usageAggregation.ts";
-import { createOverrideRateTable, parseRateTable, type RateTable } from "./usagePricing.ts";
+import {
+  createOverrideRateTable,
+  parseRateTable,
+  ratesAt,
+  type RateTable,
+} from "./usagePricing.ts";
+import {
+  DEFAULT_MODEL_PRICES,
+  DEFAULT_PRICE_REVISION,
+  withDefaultPrices,
+} from "./usageDefaultPrices.ts";
+import * as UsageEstimateStore from "./UsageEstimateStore.ts";
+import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
+import {
+  subscriptionEstimateSources,
+  type SubscriptionUsageSource,
+} from "./subscriptionEstimateSources.ts";
+import type { EstimateEvent } from "./usageEstimate.ts";
+import {
+  codexEstimateFormat,
+  hasCodexEstimateCapture,
+  takeCodexEstimateCapture,
+} from "./codexEstimateTranscript.ts";
 import {
   listTranscriptFiles,
   readDirectoryVolumeId,
@@ -75,7 +99,20 @@ const CACHE_RETENTION_DAYS = 92;
 const TRANSCRIPT_READ_CONCURRENCY = 4;
 
 const transcriptReaders = BUILT_IN_USAGE_DRIVERS.flatMap((driver) =>
-  driver.usage?.kind === "transcripts" ? [{ driver, reader: driver.usage }] : [],
+  driver.usage?.kind === "transcripts"
+    ? [
+        {
+          driver,
+          reader: {
+            ...driver.usage,
+            format:
+              driver.usage.provider === "codex"
+                ? (codexEstimateFormat as TranscriptUsageFormat<unknown>)
+                : driver.usage.format,
+          },
+        },
+      ]
+    : [],
 );
 
 const scanReaders = BUILT_IN_USAGE_DRIVERS.flatMap((driver) =>
@@ -87,6 +124,7 @@ const transcriptFormats = new Map(
 );
 
 interface TranscriptSource {
+  readonly instanceIds: string[];
   readonly provider: UsageProviderKind;
   readonly format: TranscriptUsageFormat<unknown>;
   readonly dir: string;
@@ -100,6 +138,7 @@ const RatesCacheFile = Schema.Struct({
 });
 const decodeRatesCache = Schema.decodeUnknownEffect(Schema.fromJsonString(RatesCacheFile));
 const encodeRatesCache = Schema.encodeEffect(Schema.fromJsonString(RatesCacheFile));
+const encodePricingOverrides = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
 
 const ScanCacheJson = Schema.fromJsonString(Schema.Unknown);
 const decodeScanCacheFile = Schema.decodeUnknownEffect(ScanCacheJson);
@@ -148,6 +187,7 @@ export class UsageService extends Context.Service<
 >()("t3/usage/UsageService") {}
 
 export const make = Effect.gen(function* () {
+  const crypto = yield* Digest.Digest;
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig.ServerConfig;
@@ -155,6 +195,8 @@ export const make = Effect.gen(function* () {
   const httpClient = yield* HttpClient.HttpClient;
   const hostEnvironment = yield* HostProcess.Environment;
   const hostname = yield* HostProcess.Hostname;
+  const estimateStore = yield* UsageEstimateStore.UsageEstimateStore;
+  const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
   const readerContext = yield* Effect.context<BuiltInUsageReadersEnv>();
 
   const fileCache: ScanCache = new Map();
@@ -208,18 +250,37 @@ export const make = Effect.gen(function* () {
       Effect.map((value) => value.trim() || hostname),
       Effect.orElseSucceed(() => hostname),
     ));
-  let rates: RateTable = new Map();
+  let rates: RateTable = withDefaultPrices(new Map());
   let ratesFetchedAtMs: number | null = null;
   let ratesLastFailedAtMs: number | null = null;
   let ratesStatus: UsagePricing["status"] = "unavailable";
+  let savedEstimatePricingId: string | null = null;
+  let savedEstimatePricingKey: string | null = null;
   const ratesLock = yield* Semaphore.make(1);
 
-  const pricing = (): UsagePricing => ({
+  const pricing = (nowMs: number): UsagePricing => ({
     status: ratesStatus,
     source: LITELLM_RATES_URL,
     fetchedAt:
       ratesFetchedAtMs === null ? null : DateTime.formatIso(DateTime.makeUnsafe(ratesFetchedAtMs)),
     knownModels: rates.size,
+    defaults: DEFAULT_MODEL_PRICES.map(({ model, source, rate }) => {
+      const current = ratesAt(rate, "standard", nowMs);
+      return {
+        model,
+        source,
+        input: current.inputCostPerToken * 1_000_000,
+        output: current.outputCostPerToken * 1_000_000,
+        cacheRead: current.cacheReadCostPerToken * 1_000_000,
+        cacheWrite: current.cacheCreationCostPerToken * 1_000_000,
+        ...(rate.introductory
+          ? { changesAt: DateTime.formatIso(DateTime.makeUnsafe(rate.introductory.untilMs)) }
+          : {}),
+        ...(rate.quotaFree
+          ? { quotaFreeUntil: DateTime.formatIso(DateTime.makeUnsafe(rate.quotaFree.untilMs)) }
+          : {}),
+      };
+    }),
   });
 
   const fetchRates = (url: string, accept = "application/json") =>
@@ -247,7 +308,7 @@ export const make = Effect.gen(function* () {
       if (fromDisk !== null) {
         const parsed = parseRateTable(fromDisk.document);
         if (parsed.size > 0) {
-          rates = parsed;
+          rates = withDefaultPrices(parsed);
           ratesFetchedAtMs = fromDisk.fetchedAtMs;
           ratesStatus = "cached";
           if (now - fromDisk.fetchedAtMs < maxAgeMs) return;
@@ -267,7 +328,7 @@ export const make = Effect.gen(function* () {
       return;
     }
 
-    rates = fetched.parsed;
+    rates = withDefaultPrices(fetched.parsed);
     ratesFetchedAtMs = now;
     ratesLastFailedAtMs = null;
     ratesStatus = "fresh";
@@ -281,6 +342,7 @@ export const make = Effect.gen(function* () {
   const ensureRates = (force: boolean) => ratesLock.withPermit(loadRates(force));
 
   const refreshRates = ensureRates(true).pipe(
+    Effect.andThen(Clock.currentTimeMillis),
     Effect.map(pricing),
     Effect.withSpan("UsageService.refreshRates"),
   );
@@ -336,9 +398,16 @@ export const make = Effect.gen(function* () {
       const { provider, format } = reader;
       const directories = yield* Effect.forEach(
         yield* usageInstances(driver, settings),
-        (instance) => reader.directories(instance),
+        (instance) =>
+          reader
+            .directories(instance)
+            .pipe(
+              Effect.map((dirs) =>
+                dirs.map((dir) => ({ ...dir, instanceId: instance.instanceId })),
+              ),
+            ),
       );
-      for (const { dir: directory, fileName } of directories.flat()) {
+      for (const { dir: directory, fileName, instanceId } of directories.flat()) {
         const sourceKey = provider + "\0" + directory;
         const previous = sourceCache.get(sourceKey);
         const dir = yield* fileSystem
@@ -363,9 +432,15 @@ export const make = Effect.gen(function* () {
           cacheDirty = true;
         }
         const key = `${provider}\0${dir}`;
-        if (seen.has(key)) continue;
+        if (seen.has(key)) {
+          dirs
+            .find((entry) => entry.provider === provider && entry.dir === dir)
+            ?.instanceIds.push(instanceId);
+          continue;
+        }
         seen.add(key);
         dirs.push({
+          instanceIds: [instanceId],
           provider,
           format,
           dir,
@@ -451,17 +526,23 @@ export const make = Effect.gen(function* () {
   ): Effect.fn.Return<{
     readonly records: readonly UsageRecord[];
     readonly malformedRecords: number;
+    readonly estimateEvents?: readonly EstimateEvent[];
+    readonly estimateInvalidRecords?: number;
     readonly failed?: true;
     readonly update?: { readonly entry: CachedFile; readonly replaces: CachedFile | undefined };
   }> {
     const cached = fileCache.get(filePath);
+    const capturedInDatabase =
+      provider !== "codex" ||
+      (cached !== undefined && hasCodexEstimateCapture(cached.position, estimateStore.databaseId));
     // Provider is part of the identity: if both providers were ever pointed
     // at one directory, a hit parsed by the other parser must not be reused.
     if (
       cached &&
       cached.size === size &&
       cached.mtimeMs === mtimeMs &&
-      cached.provider === provider
+      cached.provider === provider &&
+      capturedInDatabase
     ) {
       return {
         records:
@@ -475,7 +556,10 @@ export const make = Effect.gen(function* () {
     // Only a strictly grown file may resume. Same size with a new mtime, or
     // a shrunken file, means rewritten content; re-parse it whole.
     const resumeFrom =
-      cached !== undefined && cached.provider === provider && size > cached.size
+      cached !== undefined &&
+      cached.provider === provider &&
+      size > cached.size &&
+      capturedInDatabase
         ? cached.position
         : undefined;
 
@@ -520,10 +604,17 @@ export const make = Effect.gen(function* () {
     const seen = new Set<string>();
     const records = dedupeWithinFile([...base, ...parsed.records], seen);
     const tailRecords = dedupeWithinFile(parsed.tailRecords, seen);
+    const capture =
+      provider === "codex"
+        ? takeCodexEstimateCapture(parsed.position, estimateStore.databaseId)
+        : undefined;
 
     return {
       records: tailRecords.length === 0 ? records : [...records, ...tailRecords],
       malformedRecords: parsed.malformedRecords,
+      ...(capture === undefined
+        ? {}
+        : { estimateEvents: capture.events, estimateInvalidRecords: capture.invalidRecords }),
       update: {
         entry: {
           size,
@@ -532,7 +623,7 @@ export const make = Effect.gen(function* () {
           records,
           tailRecords,
           malformedRecords: parsed.malformedRecords,
-          position: parsed.position,
+          position: capture?.position ?? parsed.position,
         },
         replaces: cached,
       },
@@ -540,6 +631,7 @@ export const make = Effect.gen(function* () {
   });
 
   interface ScannedDir {
+    readonly instanceIds: readonly string[];
     readonly provider: UsageProviderKind;
     readonly dir: string;
     readonly volumeId: string;
@@ -565,7 +657,14 @@ export const make = Effect.gen(function* () {
     const exists = yield* fileSystem
       .exists(dir)
       .pipe(Effect.catchCause(() => Effect.succeed(false)));
-    if (!exists) return { provider, dir, volumeId, files: null } satisfies ScannedDir;
+    if (!exists)
+      return {
+        provider,
+        dir,
+        volumeId,
+        files: null,
+        instanceIds: source.instanceIds,
+      } satisfies ScannedDir;
     const { files, failedPaths } = yield* Effect.promise(() =>
       listTranscriptFiles(dir, windowStartMs, fileName === undefined ? undefined : { fileName }),
     );
@@ -577,6 +676,39 @@ export const make = Effect.gen(function* () {
         ),
       { concurrency: TRANSCRIPT_READ_CONCURRENCY },
     );
+    const estimateEvents = read.flatMap((file) => file.estimateEvents ?? []);
+    const estimateInvalidRecords = read.reduce(
+      (sum, file) => sum + (file.estimateInvalidRecords ?? 0),
+      0,
+    );
+    if (estimateInvalidRecords > 0) {
+      yield* Effect.logWarning("Some Codex records could not be used for quota estimates.", {
+        invalidRecords: estimateInvalidRecords,
+      });
+    }
+    if (estimateEvents.length > 0) {
+      // Commit before advancing any scan checkpoint; a crash or retry replays idempotently.
+      yield* estimateStore
+        .ingest({
+          source: {
+            id: encodeUsageRecordKey(["codex", hostId, dir, volumeId]),
+            deviceId: hostId,
+            accountId: null,
+            coverage: "selected_sessions",
+          },
+          events: estimateEvents,
+        })
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new UsageReadError({
+                reason: "scanFailed",
+                detail: "Could not persist local usage estimate observations.",
+                cause,
+              }),
+          ),
+        );
+    }
     const parsedFiles = read.map(({ path, records, malformedRecords, update }) => {
       if (update === undefined) return { path, records, malformedRecords };
       // A scan of another window may have cached its own read of this file
@@ -607,6 +739,7 @@ export const make = Effect.gen(function* () {
       dir,
       volumeId,
       files: parsedFiles,
+      instanceIds: source.instanceIds,
       ...(unread > 0
         ? {
             status: "partial",
@@ -631,7 +764,24 @@ export const make = Effect.gen(function* () {
       ({ driver, reader }) =>
         usageInstances(driver, settings).pipe(
           Effect.flatMap((instances) =>
-            reader.scan({ instances, settings, windowStartMs, retentionCutoffMs, awaitRefresh }),
+            Effect.forEach(
+              instances,
+              (instance) =>
+                reader
+                  .scan({
+                    instances: [instance],
+                    settings,
+                    windowStartMs,
+                    retentionCutoffMs,
+                    awaitRefresh,
+                  })
+                  .pipe(
+                    Effect.map((sources) =>
+                      sources.map((source) => ({ ...source, instanceIds: [instance.instanceId] })),
+                    ),
+                  ),
+              { concurrency: "unbounded" },
+            ).pipe(Effect.map((groups) => groups.flat())),
           ),
           Effect.flatMap((sources) =>
             Effect.forEach(sources, ({ volumeId, ...source }) =>
@@ -658,8 +808,21 @@ export const make = Effect.gen(function* () {
       [Effect.forEach(dirs, (dir) => scanTranscriptDir(dir, windowStartMs)), scans],
       { concurrency: "unbounded" },
     );
-    const scanned: readonly ScannedDir[] = [...transcripts, ...scanDirs.flat()];
-    return scanned;
+    const scanned = new Map<string, ScannedDir>();
+    for (const source of [...transcripts, ...scanDirs.flat()]) {
+      const key = encodeUsageRecordKey([source.provider, source.dir, source.volumeId]);
+      const previous = scanned.get(key);
+      scanned.set(
+        key,
+        previous
+          ? {
+              ...previous,
+              instanceIds: [...new Set([...previous.instanceIds, ...source.instanceIds])],
+            }
+          : source,
+      );
+    }
+    return [...scanned.values()];
   });
 
   const scanSummary = Effect.fn("UsageService.scanSummary")(function* (
@@ -698,6 +861,7 @@ export const make = Effect.gen(function* () {
     }
 
     const startedAtMs = yield* Clock.currentTimeMillis;
+    const providers = yield* providerRegistry.getProviders;
     yield* ensureScanCacheLoaded;
 
     const windowStart = DateTime.make(`${input.sinceDay}T00:00:00Z`);
@@ -715,10 +879,56 @@ export const make = Effect.gen(function* () {
     const [, scannedDirs] = yield* Effect.all(
       [
         ensureRates(false),
-        collectDirs(windowStartMs, settings, retentionCutoffMs, input.awaitRefresh === true),
+        collectDirs(
+          Math.min(
+            windowStartMs,
+            startedAtMs - 7 * 86400000,
+            ...providers.flatMap(
+              (provider) =>
+                provider.usageLimits?.windows.flatMap((window) =>
+                  window.startsAt ? [Date.parse(window.startsAt)] : [],
+                ) ?? [],
+            ),
+          ),
+          settings,
+          retentionCutoffMs,
+          input.awaitRefresh === true,
+        ),
       ],
       { concurrency: 2 },
     );
+    const overrides = createOverrideRateTable(settings.usagePriceOverrides);
+    const overridesJson = yield* encodePricingOverrides(
+      Object.fromEntries([...overrides].sort(([a], [b]) => a.localeCompare(b))),
+    ).pipe(Effect.orDie);
+    const estimatePricingKey = `${ratesFetchedAtMs ?? "builtin"}:${DEFAULT_PRICE_REVISION}:${overridesJson}`;
+    if (rates.size > 0 && savedEstimatePricingKey !== estimatePricingKey) {
+      const hash = yield* crypto.digest(
+        Digest.sha256,
+        new TextEncoder().encode(estimatePricingKey),
+      );
+      const estimatePricingId = `model-rates:${Hex.encode(hash)}`;
+      yield* estimateStore
+        .savePricing({
+          id: estimatePricingId,
+          description:
+            "API rates with dated official defaults, self-serve quota exemptions and explicit custom prices",
+          rates: Object.fromEntries(rates),
+          overrides: Object.fromEntries(overrides),
+        })
+        .pipe(
+          Effect.mapError(
+            (cause) =>
+              new UsageReadError({
+                reason: "scanFailed",
+                detail: "Could not persist usage estimate prices.",
+                cause,
+              }),
+          ),
+        );
+      savedEstimatePricingId = estimatePricingId;
+      savedEstimatePricingKey = estimatePricingKey;
+    }
 
     const aggregator = new UsageAggregator({
       timeZone: input.timeZone,
@@ -727,7 +937,7 @@ export const make = Effect.gen(function* () {
       resolution: input.resolution ?? "day",
       ...hourlyWindow,
       rates,
-      priceOverrides: createOverrideRateTable(settings.usagePriceOverrides),
+      priceOverrides: overrides,
       modelAliases: resolveModelAliases(settings.usageModelAliases),
       ...(input.modelFilter === undefined ? {} : { modelFilter: input.modelFilter }),
     });
@@ -799,6 +1009,7 @@ export const make = Effect.gen(function* () {
       }
     }
     const crossFileSessions = sharedSessions(filesByDir.flat());
+    const subscriptionSources: SubscriptionUsageSource[] = [];
 
     for (const [
       index,
@@ -810,6 +1021,7 @@ export const make = Effect.gen(function* () {
       // Distinct per directory. Buckets carry per-cell session counts, but a
       // session spans days and models, so clients total this figure instead.
       const sessionIds = new Set<string>();
+      const estimateRecords: UsageRecord[] = [];
 
       for (const file of filesByDir[index] ?? []) {
         malformedRecords += file.malformedRecords;
@@ -841,11 +1053,30 @@ export const make = Effect.gen(function* () {
           if (aggregator.add(usageRecord, dir) && record.sessionId.length > 0) {
             sessionIds.add(record.sessionId);
           }
+          estimateRecords.push(usageRecord);
         }
       }
 
       const sourceMessage =
         message ?? (files === null ? "No transcript directory on this environment." : null);
+      subscriptionSources.push({
+        provider,
+        dir,
+        volumeId,
+        ...(sourceHostId ? { hostId: sourceHostId } : {}),
+        instanceIds: scannedDirs[index]!.instanceIds,
+        records: estimateRecords,
+        missing:
+          files === null &&
+          estimateRecords.length === 0 &&
+          (status === undefined || status === "missing"),
+        incomplete:
+          files === null ||
+          malformedRecords > 0 ||
+          status === "partial" ||
+          status === "failed" ||
+          refreshing === true,
+      });
       sources.push({
         fingerprint: { hostId: sourceHostId ?? hostId, provider, resolvedHomePath: dir, volumeId },
         status:
@@ -875,6 +1106,47 @@ export const make = Effect.gen(function* () {
     if (pruned > 0) cacheDirty = true;
 
     const aggregated = aggregator.finish();
+    const subscriptionBatches = subscriptionEstimateSources(providers, subscriptionSources, hostId);
+    for (const batch of subscriptionBatches) {
+      yield* estimateStore.ingest({ source: batch.source, events: batch.events }).pipe(
+        Effect.mapError(
+          (cause) =>
+            new UsageReadError({
+              reason: "scanFailed",
+              detail: "Could not persist subscription usage observations.",
+              cause,
+            }),
+        ),
+      );
+    }
+    const subscriptionEstimates = yield* estimateStore
+      .readSeries({
+        sources: [
+          ...scannedDirs
+            .filter((source) => source.provider === "codex")
+            .map((source) => ({
+              id: encodeUsageRecordKey(["codex", hostId, source.dir, source.volumeId]),
+              path: source.dir,
+            })),
+          ...subscriptionBatches.map((batch) => ({
+            id: batch.source.id,
+            path: batch.path,
+            blockers: batch.blockers,
+          })),
+        ],
+        pricingId: savedEstimatePricingId,
+        nowMs: yield* Clock.currentTimeMillis,
+      })
+      .pipe(
+        Effect.mapError(
+          (cause) =>
+            new UsageReadError({
+              reason: "scanFailed",
+              detail: "Could not read local subscription estimates.",
+              cause,
+            }),
+        ),
+      );
     const readAt = yield* DateTime.now;
     const finishedAtMs = yield* Clock.currentTimeMillis;
 
@@ -886,7 +1158,8 @@ export const make = Effect.gen(function* () {
       untilDay: input.untilDay,
       buckets: aggregated.buckets,
       sources,
-      pricing: pricing(),
+      pricing: pricing(startedAtMs),
+      subscriptionEstimates,
       scanDurationMs: Math.max(0, finishedAtMs - startedAtMs),
       ...(input.modelFilter === undefined ? {} : { modelFilter: input.modelFilter }),
     } satisfies UsageSummary;
@@ -914,7 +1187,16 @@ export const make = Effect.gen(function* () {
     const modelFilter = canonicalModelFilter(requestedFilter);
     const input = modelFilter === undefined ? unfiltered : { ...unfiltered, modelFilter };
     const settings = yield* readSettings;
-    const key = scanKey(input, settings);
+    const snapshots = yield* providerRegistry.getProviders;
+    const key =
+      scanKey(input, settings) +
+      encodeUsageRecordKey(
+        snapshots.map((provider) => [
+          provider.instanceId,
+          provider.auth.email,
+          provider.usageLimits,
+        ]),
+      );
     const deferred = yield* Effect.uninterruptible(
       Effect.gen(function* () {
         const existing = inflightScans.get(key);

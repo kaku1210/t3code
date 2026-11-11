@@ -70,6 +70,23 @@ const records = (result: Effect.Success<ReturnType<typeof readAntigravityUsage>>
   result.files.flatMap((file) => file.records);
 
 describe("readAntigravityUsage", () => {
+  it.effect("accepts empty SQLite placeholders but reports unrecognized populated databases", () =>
+    Effect.gen(function* () {
+      const dir = yield* tempDir;
+      const path = yield* Path.Path;
+      const fs = yield* FileSystem.FileSystem;
+      const empty = path.join(dir, "empty.db");
+      const unknown = path.join(dir, "unknown.db");
+      yield* fs.writeFileString(empty, "");
+      yield* seedDatabase(unknown, (db) =>
+        db.exec("CREATE TABLE unfamiliar (value TEXT)").pipe(Effect.asVoid),
+      );
+      const result = yield* readAntigravityUsage([dir], 0);
+      assert.deepStrictEqual(records(result), []);
+      assert.deepStrictEqual(result.errors, [unknown]);
+      assert.isTrue(result.files.some((file) => file.path === empty));
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+  );
   it.effect(
     "deduplicates Antigravity generation and step usage while preserving retry model and token buckets",
     () =>

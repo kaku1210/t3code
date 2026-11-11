@@ -88,6 +88,9 @@ export function grokUsageResponseToLimits(
     label: kind === "weekly" ? "Weekly" : kind === "monthly" ? "Monthly" : "Subscription",
     usedPercent: clampPercent(usedPercent),
     ...(Option.isSome(reset) ? { resetsAt: DateTime.formatIso(reset.value) } : {}),
+    ...(typeof period?.start === "string" && Number.isFinite(parsePeriodBoundary(period.start))
+      ? { startsAt: period.start }
+      : {}),
   };
   return makeUsageLimits({ checkedAt, windows: [window] });
 }

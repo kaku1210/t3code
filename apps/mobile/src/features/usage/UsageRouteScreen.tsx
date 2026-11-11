@@ -245,8 +245,15 @@ function UsageScreen(props: {
         refreshControl={
           showingLimits || canReadDiagnostics ? (
             <RefreshControl
-              refreshing={showingLimits ? limits.refreshing : refreshingUsage}
-              onRefresh={showingLimits ? () => void limits.refresh() : refreshWindow}
+              refreshing={showingLimits ? limits.refreshing || isPending : refreshingUsage}
+              onRefresh={
+                showingLimits
+                  ? () => {
+                      void limits.refresh();
+                      void refresh();
+                    }
+                  : refreshWindow
+              }
             />
           ) : undefined
         }
@@ -290,6 +297,7 @@ function UsageScreen(props: {
             {showingLimits ? (
               <UsageLimitsSection
                 now={limits.now}
+                estimateEnvironments={selectedEnvironments}
                 failedLabels={limits.failedLabels}
                 selectedEnvironmentIds={selectedEnvironmentIds}
                 wide={wide}

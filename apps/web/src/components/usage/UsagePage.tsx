@@ -310,7 +310,7 @@ export function UsagePage() {
     if (showingLimits) {
       refreshingRef.current = true;
       setIsRefreshing(true);
-      void refreshLimits().finally(() => {
+      void Promise.allSettled([refreshLimits(), refresh()]).finally(() => {
         refreshingRef.current = false;
         setIsRefreshing(false);
       });
@@ -528,6 +528,7 @@ export function UsagePage() {
                 selectedEnvironmentIds={selectedEnvironmentIds}
                 hiddenProviders={hiddenProviders}
                 now={limitsNow}
+                estimateEnvironments={selectedEnvironments}
                 cursorPrompt={
                   cursorAccessEnvironments.length > 0 ? (
                     <CursorEnableLimits

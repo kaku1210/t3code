@@ -18,6 +18,15 @@ export interface TokenRates {
 export interface ModelRate extends TokenRates {
   readonly fast: TokenRates | null;
   readonly ultrafast: TokenRates | null;
+  readonly introductory?: TokenRates & {
+    readonly untilMs: number;
+    readonly fast: TokenRates | null;
+  };
+  readonly quotaFree?: {
+    readonly provider: string;
+    readonly plans: readonly string[];
+    readonly untilMs: number;
+  };
 }
 
 export type RateTable = ReadonlyMap<string, ModelRate>;
@@ -167,8 +176,12 @@ function mergeAliasRate(a: ModelRate, b: ModelRate): ModelRate | null {
   return { ...a, fast, ultrafast };
 }
 
-function ratesAt(rate: ModelRate, speed: UsageSpeed): TokenRates {
-  return (speed === "standard" ? null : rate[speed]) ?? rate;
+export function ratesAt(rate: ModelRate, speed: UsageSpeed, timestampMs?: number): TokenRates {
+  const selected =
+    rate.introductory && timestampMs !== undefined && timestampMs < rate.introductory.untilMs
+      ? { ...rate, ...rate.introductory }
+      : rate;
+  return (speed === "standard" ? null : selected[speed]) ?? selected;
 }
 
 function normalizeRateKey(model: string): string {
@@ -217,19 +230,28 @@ function resolveRate(table: RateTable, model: string): ModelRate | null {
   const key = stripVariantSuffix(normalizeRateKey(model));
   const bareName = bareModelName(key);
   if (bareName.length === 0 || UNPRICEABLE_MODELS.has(bareName)) return null;
-  return table.get(key) ?? null;
+  const exact = table.get(key);
+  if (exact) return exact;
+  // Reasoning changes token volume, not the unit price. Keep vendor prefixes intact.
+  const reasoning = key.replace(/-(?:none|minimal|low|medium|high|xhigh|max)$/, "");
+  if (reasoning !== key && /(?:^|\/)(?:gemini-\d|swe-2(?:-|$)|claude-|gpt-|deepseek-)/.test(key))
+    return table.get(reasoning) ?? null;
+  // Antigravity's Argon trial is the same model's trial quota route, not an API price tier.
+  return key === "gemini-4-argon-trial" ? (table.get("gemini-4-argon") ?? null) : null;
 }
 
 export type PricedRecord = Pick<
   UsageRecord,
   "model" | "rateModel" | "totals" | "speed" | "reportedCostUsd"
->;
+> &
+  Partial<Pick<UsageRecord, "timestampMs">> & { readonly provider?: string };
 
 export interface PricedUsage {
   readonly costUsd: number;
   readonly costSource: UsageCostSource;
   readonly categoryCostUsd: UsageCategoryCost | null;
   readonly speedPremiumUsd: number;
+  readonly quotaFree?: true;
 }
 
 function costByCategory(totals: UsageTokenTotals, rates: TokenRates): UsageCategoryCost {
@@ -250,6 +272,7 @@ export function priceUsage(
   table: RateTable,
   record: PricedRecord,
   overrides?: RateTable,
+  subscriptionPlan?: string | null,
 ): PricedUsage {
   const { model, totals, reportedCostUsd } = record;
   const override = overrides?.get(model.trim());
@@ -268,11 +291,29 @@ export function priceUsage(
     return reported === null ? unsplit(0, "unpriced") : unsplit(reported, "providerReported");
   }
 
-  const listCost = costByCategory(totals, ratesAt(rate, record.speed));
+  // Exemptions apply only to a confirmed self-serve quota account. The ordinary API-value
+  // report retains list prices, and explicit custom prices always take precedence.
+  const free = rate.quotaFree;
+  if (
+    override === undefined &&
+    free &&
+    record.provider === free.provider &&
+    record.timestampMs !== undefined &&
+    record.timestampMs < free.untilMs &&
+    subscriptionPlan &&
+    free.plans.includes(subscriptionPlan.trim().toLowerCase())
+  ) {
+    return { ...unsplit(0, "modelPriced"), quotaFree: true };
+  }
+
+  const listCost = costByCategory(totals, ratesAt(rate, record.speed, record.timestampMs));
   const listCostUsd = sumCategories(listCost);
   if (reported !== null && listCostUsd <= 0) return unsplit(reported, "providerReported");
   const premiumUsd =
-    record.speed === "standard" ? 0 : listCostUsd - sumCategories(costByCategory(totals, rate));
+    record.speed === "standard"
+      ? 0
+      : listCostUsd -
+        sumCategories(costByCategory(totals, ratesAt(rate, "standard", record.timestampMs)));
   const scale = reported === null ? 1 : reported / listCostUsd;
   return {
     costUsd: reported ?? listCostUsd,
@@ -295,6 +336,6 @@ export function cacheSavingsUsd(
   const rate =
     overrides?.get(record.model.trim()) ?? lookupRate(table, record.rateModel ?? record.model);
   if (rate === null) return 0;
-  const rates = ratesAt(rate, record.speed);
+  const rates = ratesAt(rate, record.speed, record.timestampMs);
   return record.totals.cachedInputTokens * (rates.inputCostPerToken - rates.cacheReadCostPerToken);
 }
