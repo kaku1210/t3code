@@ -2,7 +2,8 @@
 
 import type { QuitConfirmationMode, QuitShortcutHintEvent } from "@t3tools/contracts";
 
-export const QUIT_HOLD_DURATION_MS = 1200;
+export const QUIT_HOLD_HINT_MS = 1000;
+export const QUIT_HOLD_DURATION_MS = 5000;
 export const QUIT_DOUBLE_PRESS_MS = 500;
 // Auto-repeat keydowns prove the hold: macOS drops a letter keyUp while Command is down,
 // so a release-based timer would quit anyway. Once held, quitting waits for Q keyUp or a
@@ -129,10 +130,15 @@ export function makeQuitShortcutHandler(
       return;
     }
 
-    event.preventDefault();
-
     if (input.isAutoRepeat) {
-      if (mode === "hold" && armed && Date.now() - heldSince >= QUIT_HOLD_DURATION_MS) {
+      event.preventDefault();
+      if (mode !== "hold" || !armed) return;
+      const heldMs = Date.now() - heldSince;
+      if (!notified && heldMs >= QUIT_HOLD_HINT_MS) {
+        notified = true;
+        options.notify({ state: "down", mode: "hold" });
+      }
+      if (heldMs >= QUIT_HOLD_DURATION_MS) {
         armed = false;
         quitOnRelease = true;
         options.concealWindow();
@@ -147,11 +153,6 @@ export function makeQuitShortcutHandler(
     if (holding || notified) release();
 
     generation += 1;
-    if (previousPressAt !== 0 && now - previousPressAt <= QUIT_DOUBLE_PRESS_MS) {
-      quitNow();
-      return;
-    }
-
     const pressGeneration = generation;
     holding = true;
     heldSince = now;
@@ -163,6 +164,10 @@ export function makeQuitShortcutHandler(
           return;
         }
         if (resolvedMode === "double-click") {
+          if (previousPressAt !== 0 && now - previousPressAt <= QUIT_DOUBLE_PRESS_MS) {
+            quitNow();
+            return;
+          }
           const remainingMs = QUIT_DOUBLE_PRESS_MS - (Date.now() - now);
           if (remainingMs <= 0) {
             release();
@@ -178,9 +183,6 @@ export function makeQuitShortcutHandler(
         if (!holding) return;
 
         mode = resolvedMode;
-        notified = true;
-        options.notify({ state: "down", mode: resolvedMode });
-
         armed = true;
         watchdog = setTimeout(() => {
           watchdog = undefined;

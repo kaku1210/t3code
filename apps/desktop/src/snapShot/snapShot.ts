@@ -55,7 +55,6 @@ const COMMON_MOD_ACTIONS: Readonly<Partial<Record<string, ShortcutCopy>>> = {
   n: ["New", "新建"],
   o: ["Open", "打开"],
   p: ["Print", "打印"],
-  q: ["Quit", "退出"],
   s: ["Save", "保存"],
   t: ["New Tab", "新建标签页"],
   v: ["Paste", "粘贴"],

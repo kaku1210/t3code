@@ -990,7 +990,7 @@ export function GeneralSettingsPanel() {
         {isElectron ? (
           <SettingsRow
             {...searchableSetting("quit-confirmation")}
-            description="Hold mode also quits on two quick presses."
+            description="Hold mode quits after holding the shortcut for 5 seconds."
             resetAction={
               settings.confirmQuit !== DEFAULT_UNIFIED_SETTINGS.confirmQuit ? (
                 <SettingResetButton

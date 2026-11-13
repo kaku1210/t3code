@@ -4,11 +4,13 @@ import {
   makeQuitShortcutHandler,
   QUIT_DOUBLE_PRESS_MS,
   QUIT_HOLD_DURATION_MS,
+  QUIT_HOLD_HINT_MS,
 } from "./QuitHold.ts";
 import type { QuitHoldKeyInput } from "./QuitHold.ts";
 import type { QuitConfirmationMode, QuitShortcutHintEvent } from "@t3tools/contracts";
 
 const DOUBLE_CLICK_DOWN = { state: "down", mode: "double-click" } as const;
+const HOLD_DOWN = { state: "down", mode: "hold" } as const;
 const UP = { state: "up" } as const;
 
 function makeInput(overrides: Partial<QuitHoldKeyInput>): QuitHoldKeyInput {
@@ -104,31 +106,49 @@ describe("makeQuitShortcutHandler", () => {
     expect(harness.notifications).toEqual([]);
   });
 
-  it.each(["direct", "hold", "double-click"] as const)(
-    "quits on a quick second press without waiting for a pending %s mode read",
-    async (mode) => {
-      const resolvers: Array<(mode: QuitConfirmationMode) => void> = [];
-      const harness = makeHarness({
-        getMode: () => new Promise((resolve) => resolvers.push(resolve)),
-      });
-      await harness.send(makeInput({}));
-      await harness.send(makeInput({ type: "keyUp" }));
-      vi.advanceTimersByTime(QUIT_DOUBLE_PRESS_MS - 100);
-      await harness.send(makeInput({}));
+  it("quits on a quick second press in double-click mode", async () => {
+    const harness = makeHarness({ mode: "double-click" });
+    await harness.send(makeInput({}));
+    await harness.send(makeInput({ type: "keyUp" }));
+    vi.advanceTimersByTime(QUIT_DOUBLE_PRESS_MS - 100);
+    await harness.send(makeInput({}));
 
-      expect(harness.quit).toHaveBeenCalledTimes(1);
-      expect(harness.notifications).toEqual([]);
+    expect(harness.quit).toHaveBeenCalledTimes(1);
+  });
 
-      await harness.send(makeInput({ type: "keyUp" }));
+  it("does not quit on a quick second press in hold mode", async () => {
+    const harness = makeHarness({ mode: "hold" });
+    await harness.send(makeInput({}));
+    await harness.send(makeInput({ type: "keyUp" }));
+    vi.advanceTimersByTime(QUIT_DOUBLE_PRESS_MS - 100);
+    await harness.send(makeInput({}));
+    await harness.send(makeInput({ type: "keyUp" }));
 
-      resolvers[0]?.(mode);
-      await Promise.resolve();
-      await Promise.resolve();
+    expect(harness.quit).not.toHaveBeenCalled();
+    expect(harness.notifications).toEqual([]);
+  });
 
-      expect(harness.quit).toHaveBeenCalledTimes(1);
-      expect(harness.notifications).toEqual([]);
-    },
-  );
+  it("shows the hold hint after the hint delay and quits only after the full hold", async () => {
+    const harness = makeHarness({ mode: "hold", platform: "win32" });
+    const ctrlQ = { meta: false, control: true };
+    await harness.send(makeInput(ctrlQ));
+    // A single press must still reach the page, so shortcut recorders can capture Ctrl+Q.
+    expect(harness.preventDefault).not.toHaveBeenCalled();
+
+    await harness.holdFor(QUIT_HOLD_HINT_MS - 100, ctrlQ);
+    expect(harness.preventDefault).toHaveBeenCalled();
+    expect(harness.notifications).toEqual([]);
+
+    await harness.holdFor(100, ctrlQ);
+    expect(harness.notifications).toEqual([HOLD_DOWN]);
+
+    await harness.holdFor(QUIT_HOLD_DURATION_MS - QUIT_HOLD_HINT_MS - 100, ctrlQ);
+    expect(harness.quit).not.toHaveBeenCalled();
+
+    await harness.holdFor(100, ctrlQ);
+    await harness.send(makeInput({ ...ctrlQ, type: "keyUp" }));
+    expect(harness.quit).toHaveBeenCalledTimes(1);
+  });
 
   it("discards a stale mode resolution from a superseded press", async () => {
     const resolvers: Array<(mode: QuitConfirmationMode) => void> = [];

@@ -176,7 +176,10 @@ const settingCopy: Readonly<Partial<Record<string, SettingCopy>>> = {
   },
   "quit-confirmation": {
     title: ["Quit shortcut", "退出快捷键"],
-    description: ["Hold mode also quits on two quick presses.", "长按模式也允许快速按两次退出。"],
+    description: [
+      "Hold mode quits after holding the shortcut for 5 seconds.",
+      "长按模式需按住快捷键 5 秒才退出。",
+    ],
   },
   "color-scheme": {
     title: ["Color scheme", "外观模式"],
