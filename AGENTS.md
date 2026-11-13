@@ -40,6 +40,8 @@ The rest of this document is meant to help you navigate the codebase and make ch
 
 Of note: Most T3 Code contributions will come from T3 Code itself, often controlled remotely. This means you should be careful about accessing data, killing dev servers, and other things that may damage the T3 Code instance that the contributor is using.
 
+Never start the installed desktop app (T3 Code Plus or T3 Code) from a console window you or your script opened, for example with `Start-Process` or `start` in a `.cmd` or PowerShell window. The app stays tied to that console, so closing the window also closes the app. Leave starting it to the developer, from the Start menu or a desktop shortcut, and tell them when it needs a restart.
+
 ## A small glossary
 
 We need to be on the same page with terminology. When communicating, use this language:
