@@ -34,7 +34,7 @@ describe("DesktopUpdates", () => {
           yield* settings.setUpdateCenter({
             checkingEnabled: false,
             quickUpdateEnabled: false,
-            commandPath: null,
+            sourcePath: null,
           });
           yield* updates.configure;
           yield* updates.check("manual");
@@ -43,7 +43,7 @@ describe("DesktopUpdates", () => {
           yield* settings.setUpdateCenter({
             checkingEnabled: true,
             quickUpdateEnabled: false,
-            commandPath: null,
+            sourcePath: null,
           });
           yield* updates.check("manual");
           assert.equal(harness.checkCount(), 1);

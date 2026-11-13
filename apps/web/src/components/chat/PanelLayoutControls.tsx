@@ -3,8 +3,10 @@ import { Maximize2, Minimize2 } from "lucide";
 import { MorphIcon } from "~/components/MorphIcon";
 import { memo, type ReactNode } from "react";
 
+import { isElectron } from "~/env";
 import { cn } from "~/lib/utils";
 
+import { DesktopUpdateCenter } from "../desktop/DesktopUpdateCenter";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
 import type { ThreadPanelPresentation } from "../../rightPanelLayout";
 import { PopoverCreateHandle, PopoverTrigger } from "../ui/popover";
@@ -13,6 +15,8 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 export interface PanelLayoutControlsProps {
   showThreadPanelControl?: boolean;
+  /** Defaults to following the thread details toggle, so the entry moves with it. */
+  showUpdateCenter?: boolean;
   showTerminalControl?: boolean;
   showRightPanelControl?: boolean;
   terminalAvailable: boolean;
@@ -33,6 +37,7 @@ export interface PanelLayoutControlsProps {
 
 export const PanelLayoutControls = memo(function PanelLayoutControls({
   showThreadPanelControl = true,
+  showUpdateCenter = showThreadPanelControl,
   showTerminalControl = true,
   showRightPanelControl = true,
   terminalAvailable,
@@ -85,6 +90,7 @@ export const PanelLayoutControls = memo(function PanelLayoutControls({
       data-panel-layout-controls
     >
       {showThreadPanelControl ? threadPanelControl : null}
+      {isElectron && showUpdateCenter ? <DesktopUpdateCenter /> : null}
       {showTerminalControl ? (
         <Tooltip>
           <TooltipTrigger render={<span className="flex shrink-0" />}>

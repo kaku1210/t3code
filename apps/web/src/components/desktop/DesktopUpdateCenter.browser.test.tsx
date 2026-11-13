@@ -1,5 +1,10 @@
 import { RegistryContext } from "@effect/atom-react";
-import type { DesktopUpdateCenterBridge, DesktopUpdateCenterState } from "@t3tools/contracts";
+import type {
+  DesktopUpdateActionResult,
+  DesktopUpdateCenterBridge,
+  DesktopUpdateCenterState,
+  DesktopUpdateState,
+} from "@t3tools/contracts";
 import { AtomRegistry } from "effect/reactivity";
 import { expect, it, vi } from "vite-plus/test";
 import { page } from "vite-plus/test/browser";
@@ -22,7 +27,7 @@ it("shows detection separately from local installation and honors both switches 
     supported: true,
     localAllowed: true,
     installing: false,
-    preferences: { checkingEnabled: true, quickUpdateEnabled: false, commandPath: null },
+    preferences: { checkingEnabled: true, quickUpdateEnabled: false, sourcePath: null },
     build: {
       artifactVersion: "0.1.7-plus.20261109.3",
       upstreamVersion: "0.1.7",
@@ -56,6 +61,13 @@ it("shows detection separately from local installation and honors both switches 
       ],
       commitCount: 1,
     },
+    release: {
+      ...source,
+      status: "available",
+      current: "0.1.7-plus.20261109.3",
+      latest: "0.1.7-plus.20261110.1",
+      url: "https://github.com/kaku1210/t3code/releases/tag/v0.1.7-plus.20261110.1",
+    },
     local: {
       ...source,
       status: "available",
@@ -63,6 +75,29 @@ it("shows detection separately from local installation and honors both switches 
       latest: "0.1.7-plus.20261109.4",
     },
   };
+  const updateState: DesktopUpdateState = {
+    enabled: true,
+    status: "available",
+    channel: "latest",
+    currentVersion: "0.1.7-plus.20261109.3",
+    hostArch: "x64",
+    appArch: "x64",
+    runningUnderArm64Translation: false,
+    availableVersion: "0.1.7-plus.20261110.1",
+    downloadedVersion: null,
+    releaseNotes: [],
+    omittedReleaseCount: 0,
+    downloadPercent: null,
+    checkedAt: null,
+    message: null,
+    errorContext: null,
+    canRetry: false,
+  };
+  const downloadUpdate = vi.fn(async (): Promise<DesktopUpdateActionResult> => ({
+    accepted: true,
+    completed: true,
+    state: updateState,
+  }));
   const listeners = new Set<(state: DesktopUpdateCenterState) => void>();
   const emit = (change: Partial<DesktopUpdateCenterState>) => {
     state = { ...state, ...change };
@@ -90,14 +125,20 @@ it("shows detection separately from local installation and honors both switches 
       });
       return state;
     },
-    chooseCommand: async () => state,
+    chooseSource: async () => state,
     onState: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
   };
   const openExternal = vi.fn(async () => true);
-  using _bridge = stubGlobal("desktopBridge", { updateCenter: bridge, openExternal });
+  using _bridge = stubGlobal("desktopBridge", {
+    updateCenter: bridge,
+    openExternal,
+    getUpdateState: async () => updateState,
+    onUpdateState: () => () => undefined,
+    downloadUpdate,
+  });
   const registry = AtomRegistry.make();
   using _registry = { [Symbol.dispose]: () => registry.dispose() };
   await using screen = await render(
@@ -112,6 +153,9 @@ it("shows detection separately from local installation and honors both switches 
   await expect
     .element(page.getByRole("heading", { name: "Upstream T3 Code", exact: true }))
     .toBeVisible();
+  await expect
+    .element(page.getByRole("heading", { name: "T3 Code Plus release", exact: true }))
+    .not.toBeInTheDocument();
   await expect.element(page.getByText("Major version update", { exact: true })).toBeVisible();
   await expect
     .element(page.getByText("Readable update summaries", { exact: true }))
@@ -149,12 +193,12 @@ it("shows detection separately from local installation and honors both switches 
       preferences: {
         ...state.preferences,
         quickUpdateEnabled: true,
-        commandPath: "D:\\Project\\AgentLearn\\Migrate-T3-Code-Plus.cmd",
+        sourcePath: "D:\\Project\\t3codeplus",
       },
     }),
   );
   await expect
-    .element(page.getByRole("heading", { name: "Prepared local package", exact: true }))
+    .element(page.getByRole("heading", { name: "Local source", exact: true }))
     .toBeVisible();
   await page.getByRole("button", { name: "Update and restart", exact: true }).click();
   expect(install).toHaveBeenCalledOnce();
@@ -162,7 +206,7 @@ it("shows detection separately from local installation and honors both switches 
   await expect
     .element(
       page.getByText(
-        "Preparing the local update. A separate window will show installation progress.",
+        "Preparing the local update. After you confirm, the app exits, a window shows the installation's progress, and the app reopens.",
         { exact: true },
       ),
     )
@@ -178,15 +222,25 @@ it("shows detection separately from local installation and honors both switches 
   await toggle.click();
   await screen.getByRole("switch", { name: "Check for updates", exact: true }).click();
   await expect.element(toggle).not.toBeInTheDocument();
-  expect(document.documentElement.dataset.updateCenterVisible).toBeUndefined();
   await screen.getByRole("switch", { name: "Check for updates", exact: true }).click();
   await expect.element(toggle).toBeVisible();
   await act(() => emit({ localAllowed: false, build: { ...state.build, sourceBranch: "main" } }));
   await expect
     .element(screen.getByRole("switch", { name: "Quick local update", exact: true }))
     .not.toBeInTheDocument();
+  await expect
+    .element(screen.getByRole("button", { name: "Update upstream with AI", exact: true }))
+    .not.toBeInTheDocument();
   await toggle.click();
   await expect
-    .element(page.getByRole("heading", { name: "Prepared local package", exact: true }))
+    .element(page.getByRole("heading", { name: "T3 Code Plus release", exact: true }))
+    .toBeVisible();
+  await expect
+    .element(page.getByRole("heading", { name: "Upstream T3 Code", exact: true }))
     .not.toBeInTheDocument();
+  await expect
+    .element(page.getByRole("heading", { name: "Local source", exact: true }))
+    .not.toBeInTheDocument();
+  await page.getByRole("button", { name: "Download update", exact: true }).click();
+  expect(downloadUpdate).toHaveBeenCalledOnce();
 });

@@ -1,5 +1,9 @@
 import {
   DesktopBuildInfo,
+  DesktopLocalPackageInfo,
+  isReleaseBuild,
+  LOCAL_PACKAGE_INFO_FILE,
+  LOCAL_UPDATE_REFRESH_FILE,
   type DesktopUpdateCenterChange,
   type DesktopUpdateCenterState,
   type DesktopUpdateSource,
@@ -18,20 +22,25 @@ import * as Schedule from "effect/Schedule";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
+import * as Stream from "effect/Stream";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 import * as Electron from "electron";
-import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as DesktopAssets from "../app/DesktopAssets.ts";
+import * as DesktopEnvironment from "../app/DesktopEnvironment.ts";
 import * as ElectronApp from "../electron/ElectronApp.ts";
 import * as ElectronDialog from "../electron/ElectronDialog.ts";
 import * as ElectronWindow from "../electron/ElectronWindow.ts";
-import { runWindowsLocalUpdate } from "../electron/WindowsLocalUpdate.ts";
+import { LocalUpdateRequest, startLocalUpdateCoordinator } from "../electron/WindowsLocalUpdate.ts";
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as IpcChannels from "../ipc/channels.ts";
 import {
-  compareLocalPackage,
+  branchFeedCommits,
+  compareBranchCommits,
+  compareLocalSource,
+  compareRelease,
   compareUpstream,
-  PortableUpdateManifest,
-  repositoryUpdateStatus,
+  releaseFeedEntry,
+  releaseManifestVersion,
   supportsLocalUpdate,
   updateSource,
 } from "./updateCenterSources.ts";
@@ -39,7 +48,7 @@ import { normalizeDesktopUpdateReleaseNotes } from "./releaseNotes.ts";
 
 export class UpdateCenterError extends Schema.TaggedError<UpdateCenterError>()(
   "UpdateCenterError",
-  { detail: Schema.String, retryAt: Schema.optionalKey(Schema.Number) },
+  { detail: Schema.String },
 ) {
   override get message() {
     return this.detail;
@@ -47,42 +56,20 @@ export class UpdateCenterError extends Schema.TaggedError<UpdateCenterError>()(
 }
 const fail = (detail: string) => Effect.fail(new UpdateCenterError({ detail }));
 const PackageInfo = Schema.Struct({ t3codeBuildInfo: DesktopBuildInfo });
-const GithubRelease = Schema.Struct({
-  tag_name: Schema.String,
-  html_url: Schema.String,
-  body: Schema.NullOr(Schema.String),
-  published_at: Schema.NullOr(Schema.String),
-});
-const GithubCommit = Schema.Struct({
-  sha: Schema.String,
-  html_url: Schema.String,
-  commit: Schema.Struct({ message: Schema.String }),
-});
-const GithubBranch = Schema.Struct({ commit: GithubCommit });
-const GithubComparison = Schema.Struct({
-  status: Schema.String,
-  ahead_by: Schema.Number,
-  behind_by: Schema.Number,
-  commits: Schema.Array(GithubCommit),
-});
-const updateCommit = (commit: typeof GithubCommit.Type) => ({
-  sha: commit.sha,
-  message: commit.commit.message,
-  url: commit.html_url,
-});
-const MAX_UPDATE_COMMITS = 12;
-const UpdateRequest = Schema.fromJsonString(
-  Schema.Struct({
-    commandPath: Schema.String,
-    destinationRoot: Schema.String,
-    executableName: Schema.String,
-    targetVersion: Schema.String,
-    sourceBranch: Schema.NullOr(Schema.String),
-    parentPid: Schema.Number,
-  }),
+const GITHUB_REPOSITORY = /^[\w.-]+\/[\w.-]+$/;
+const REMOTE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+const LOCAL_CHECK_INTERVAL = "10 minutes";
+const LOCAL_WATCH_FILES = new Set([LOCAL_PACKAGE_INFO_FILE, LOCAL_UPDATE_REFRESH_FILE]);
+const decodeApiRelease = Schema.decodeUnknownEffect(
+  Schema.Struct({ body: Schema.NullOr(Schema.String), published_at: Schema.NullOr(Schema.String) }),
 );
+const decodeLocalPackage = Schema.decodeUnknownEffect(
+  Schema.fromJsonString(DesktopLocalPackageInfo),
+);
+const isRevision = (value: string | null): value is string =>
+  value !== null && /^[a-f0-9]{40}$/i.test(value);
+const encodeLocalUpdateRequest = Schema.encodeEffect(Schema.fromJsonString(LocalUpdateRequest));
 const isUpdateCenterError = Schema.is(UpdateCenterError);
-const encodeUpdateRequest = Schema.encodeEffect(UpdateRequest);
 const asUpdateError = (error: unknown) =>
   isUpdateCenterError(error)
     ? error
@@ -96,7 +83,7 @@ export class DesktopUpdateCenter extends Context.Service<
     readonly configure: (
       change: DesktopUpdateCenterChange,
     ) => Effect.Effect<DesktopUpdateCenterState, UpdateCenterError>;
-    readonly chooseCommand: Effect.Effect<DesktopUpdateCenterState, UpdateCenterError>;
+    readonly chooseSource: Effect.Effect<DesktopUpdateCenterState, UpdateCenterError>;
     readonly check: Effect.Effect<DesktopUpdateCenterState>;
     readonly install: Effect.Effect<boolean, UpdateCenterError>;
   }
@@ -111,6 +98,7 @@ export const make = Effect.gen(function* () {
   const windows = yield* ElectronWindow.ElectronWindow;
   const dialog = yield* ElectronDialog.ElectronDialog;
   const app = yield* ElectronApp.ElectronApp;
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const assets = yield* DesktopAssets.DesktopAssets;
   const executable = yield* HostProcess.ExecutablePath;
   const path = environment.path;
@@ -140,6 +128,7 @@ export const make = Effect.gen(function* () {
     build,
     upstream: updateSource(build.upstreamVersion),
     repository: updateSource(build.sourceRevision),
+    release: updateSource(build.artifactVersion),
     local: updateSource(build.artifactVersion),
     installing: false,
   });
@@ -157,35 +146,24 @@ export const make = Effect.gen(function* () {
   } | null>(null);
   const checkGate = yield* Semaphore.make(1);
   const actionGate = yield* Semaphore.make(1);
-  const lastRemote = yield* Ref.make(-1800000);
-  const retryAfter = yield* Ref.make(0);
+  const watcherRef = yield* Ref.make<Fiber.Fiber<void> | null>(null);
+  const lastRemote = yield* Ref.make(-REMOTE_CHECK_INTERVAL_MS);
 
-  const json = Effect.fn("desktop.updateCenter.github")(function* (endpoint: string) {
-    const now = yield* Clock.currentTimeMillis;
-    if (now < (yield* Ref.get(retryAfter))) return yield* fail("GitHub 请求已限流，请在稍后重试。");
+  // Public github.com pages, the ones the built-in updater reads, avoid the REST API's 60
+  // requests per hour per IP, which a shared office network can exhaust on its own.
+  const github = Effect.fn("desktop.updateCenter.github")(function* (page: string) {
     return yield* Effect.tryPromise({
       try: async (signal) => {
-        const response = await Electron.net.fetch(`https://api.github.com/repos/${endpoint}`, {
-          signal,
-          headers: { Accept: "application/vnd.github+json" },
-        });
-        if (!response.ok) {
-          const reset = Number(response.headers.get("x-ratelimit-reset")) * 1000;
-          const wait = Number(response.headers.get("retry-after")) * 1000;
-          if (response.status === 403 || response.status === 429) {
-            // Rate-limit state is published by the request's Effect below.
-            const retryAt = Math.max(
-              Number.isFinite(reset) ? reset : 0,
-              now + (Number.isFinite(wait) && wait > 0 ? wait : 1800000),
-            );
-            throw new UpdateCenterError({
-              detail: `GitHub 限流 (${response.status})，请在 ${DateTime.formatIso(DateTime.makeUnsafe(retryAt))} 后重试。`,
-              retryAt,
-            });
-          }
-          throw new Error(`GitHub 请求失败 (${response.status})，请检查网络、仓库或分支是否存在。`);
-        }
-        return (await response.json()) as unknown;
+        const response = await Electron.net.fetch(`https://github.com/${page}`, { signal });
+        if (response.status === 404) return null;
+        if (!response.ok)
+          throw new UpdateCenterError({
+            detail:
+              response.status === 429
+                ? "GitHub 暂时限制了访问，请稍后再检查。"
+                : `GitHub 请求失败 (${response.status})，请检查网络、仓库或分支是否存在。`,
+          });
+        return await response.text();
       },
       catch: asUpdateError,
     }).pipe(
@@ -193,40 +171,134 @@ export const make = Effect.gen(function* () {
         duration: "20 seconds",
         orElse: () => fail("GitHub 请求超时，请检查网络与代理。"),
       }),
-      Effect.tapError((error) => {
-        return error.retryAt ? Ref.set(retryAfter, error.retryAt) : Effect.void;
-      }),
     );
   });
 
+  const releaseNotesFromApi = Effect.fn("desktop.updateCenter.releaseNotesFromApi")(function* (
+    repository: string,
+    tag: string,
+  ) {
+    const release = yield* Effect.tryPromise({
+      try: async (signal) => {
+        const response = await Electron.net.fetch(
+          `https://api.github.com/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`,
+          { signal, headers: { Accept: "application/vnd.github+json" } },
+        );
+        if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+        return (await response.json()) as unknown;
+      },
+      catch: asUpdateError,
+    }).pipe(
+      Effect.flatMap(decodeApiRelease),
+      Effect.timeoutOrElse({ duration: "20 seconds", orElse: () => fail("GitHub API 超时。") }),
+    );
+    return release.body ? { notesHtml: release.body, updated: release.published_at } : null;
+  });
+
+  /** The latest non-prerelease release, from the `latest.yml` the updater also installs from. */
+  const latestRelease = Effect.fn("desktop.updateCenter.latestRelease")(function* (
+    repository: string,
+  ) {
+    const manifest = yield* github(`${repository}/releases/latest/download/latest.yml`);
+    if (manifest === null) return null;
+    const version = releaseManifestVersion(manifest);
+    if (!version) return yield* fail("发布的 latest.yml 里没有版本号。");
+    const tag = `v${version}`;
+    // Notes are optional: the feed only lists recent releases.
+    const feed = yield* github(`${repository}/releases.atom`).pipe(
+      Effect.orElseSucceed(() => null),
+    );
+    // Frequent prereleases can push a stable release out of the feed. Only then is the rate-limited
+    // REST API asked, and a refusal just leaves the notes out.
+    const entry =
+      (feed === null ? null : releaseFeedEntry(feed, tag)) ??
+      (yield* releaseNotesFromApi(repository, tag).pipe(Effect.orElseSucceed(() => null)));
+    const notes = entry
+      ? normalizeDesktopUpdateReleaseNotes(
+          entry.notesHtml,
+          version,
+          "latest",
+          entry.updated ?? undefined,
+        ).releaseNotes[0]
+      : undefined;
+    return {
+      version,
+      url: `https://github.com/${repository}/releases/tag/${tag}`,
+      ...(notes ? { releaseNotes: notes } : {}),
+    };
+  });
+
+  const git = (source: string, args: readonly string[]) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const handle = yield* spawner.spawn(
+          ChildProcess.make("git", ["-C", source, ...args], {
+            stdin: "ignore",
+            stderr: "ignore",
+            forceKillAfter: "1 second",
+          }),
+        );
+        const [stdout, exitCode] = yield* Effect.all(
+          [handle.stdout.pipe(Stream.decodeText(), Stream.mkString), handle.exitCode],
+          { concurrency: "unbounded" },
+        );
+        return exitCode === 0 ? Option.some(stdout.trim()) : Option.none<string>();
+      }),
+    ).pipe(
+      Effect.timeoutOrElse({ duration: "20 seconds", orElse: () => Effect.succeedNone }),
+      Effect.orElseSucceed(() => Option.none<string>()),
+    );
+  const commitsSince = (source: string, revision: string | null) =>
+    isRevision(revision)
+      ? git(source, ["rev-list", "--count", `${revision}..HEAD`]).pipe(
+          Effect.map((count) =>
+            Option.isSome(count) && /^\d+$/.test(count.value) ? Number(count.value) : null,
+          ),
+        )
+      : Effect.succeed(null);
+
   const readLocal = Effect.fn("desktop.updateCenter.readLocal")(function* () {
     const state = yield* Ref.get(stateRef);
-    const command = state.preferences.commandPath;
-    if (!state.localAllowed || !state.preferences.quickUpdateEnabled || !command)
-      return yield* fail("请在设置中启用快捷更新并选择配套 CMD。");
-    if (/[\r\n%]/.test(command) || path.extname(command).toLowerCase() !== ".cmd")
-      return yield* fail("请选择路径中不含 % 或换行的 CMD 迁移入口。");
-    if (!(yield* fs.exists(command))) return yield* fail("CMD 文件已不存在，请在设置中重新选择。");
-    const directory = path.dirname(command);
-    for (const relative of [
-      "release.json",
-      "release/release.json",
-      "t3code/release/release.json",
-    ]) {
-      const manifestPath = path.join(directory, relative);
-      if (!(yield* fs.exists(manifestPath))) continue;
-      const manifest = yield* fs.readFileString(manifestPath).pipe(
-        Effect.flatMap(Schema.decodeUnknownEffect(Schema.fromJsonString(PortableUpdateManifest))),
-        Effect.mapError(
-          () =>
-            new UpdateCenterError({
-              detail: "本地包清单缺少有效构建来源，请使用新版打包流程重新打包。",
-            }),
-        ),
-      );
-      return { manifest, command };
-    }
-    return yield* fail("所选 CMD 旁未找到配套 release.json。请先完成打包，或重新选择迁移入口。");
+    const source = state.preferences.sourcePath;
+    if (!state.localAllowed || !state.preferences.quickUpdateEnabled || !source)
+      return yield* fail("请在设置中启用快捷本地更新并选择源码仓库。");
+    if (Option.isNone(yield* git(source, ["rev-parse", "--is-inside-work-tree"])))
+      return yield* fail("所选目录不是 Git 源码仓库，请在设置中重新选择。");
+    const releaseDirectory = path.join(source, "release");
+    const infoPath = path.join(releaseDirectory, LOCAL_PACKAGE_INFO_FILE);
+    const local = (yield* fs.exists(infoPath))
+      ? yield* fs.readFileString(infoPath).pipe(
+          Effect.flatMap(decodeLocalPackage),
+          Effect.mapError(
+            () =>
+              new UpdateCenterError({
+                detail: `${LOCAL_PACKAGE_INFO_FILE} 无效，请运行 vp run dist:desktop:win 重新打包。`,
+              }),
+          ),
+        )
+      : null;
+    const installer = local ? path.join(releaseDirectory, local.installer) : null;
+    if (
+      local &&
+      installer &&
+      (path.basename(local.installer) !== local.installer || !(yield* fs.exists(installer)))
+    )
+      return yield* fail(`安装包 ${local.installer} 不存在，请重新打包。`);
+    const [status, commitsSinceInstalled, commitsSincePackage] = yield* Effect.all(
+      [
+        git(source, ["status", "--porcelain"]),
+        commitsSince(source, build.sourceRevision),
+        commitsSince(source, local?.buildInfo.sourceRevision ?? null),
+      ],
+      { concurrency: "unbounded" },
+    );
+    if (Option.isNone(status)) return yield* fail("无法读取源码仓库的 Git 状态。");
+    const update = compareLocalSource(build, local, {
+      dirty: status.value.length > 0,
+      commitsSinceInstalled,
+      commitsSincePackage,
+    });
+    return { update, local, installer };
   });
 
   const checkSources = Effect.fn("desktop.updateCenter.checkSources")(function* (
@@ -237,7 +309,7 @@ export const make = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
     const checkedAt = DateTime.formatIso(yield* DateTime.now);
     const runSource = Effect.fn("desktop.updateCenter.runSource")(function* <E, R>(
-      key: "upstream" | "repository" | "local",
+      key: "upstream" | "repository" | "release" | "local",
       task: Effect.Effect<DesktopUpdateSource, E, R>,
     ) {
       yield* publish({ [key]: { ...state[key], status: "checking", message: null } });
@@ -261,8 +333,33 @@ export const make = Effect.gen(function* () {
       yield* publish({ [key]: { ...result, checkedAt } });
     });
     const tasks = [];
-    if (checkRemote) {
-      yield* Ref.set(lastRemote, now);
+    if (checkRemote) yield* Ref.set(lastRemote, now);
+    // Release builds follow published releases; development builds follow source.
+    if (checkRemote && isReleaseBuild(build)) {
+      tasks.push(
+        runSource(
+          "release",
+          Effect.gen(function* () {
+            if (!GITHUB_REPOSITORY.test(build.repository))
+              return {
+                ...state.release,
+                status: "unsupported" as const,
+                message: "当前包未记录发布仓库，请安装新版 Plus 包。",
+              };
+            const release = yield* latestRelease(build.repository);
+            if (release === null)
+              return {
+                ...state.release,
+                status: "unsupported" as const,
+                message: `${build.repository} 还没有发布 Release。`,
+              };
+            const { version, ...details } = release;
+            return { ...compareRelease(build, version), ...details };
+          }),
+        ),
+      );
+    }
+    if (checkRemote && !isReleaseBuild(build)) {
       tasks.push(
         runSource(
           "upstream",
@@ -273,21 +370,10 @@ export const make = Effect.gen(function* () {
                 status: "unsupported" as const,
                 message: "当前包未记录上游版本，请安装新版 Plus 包。",
               };
-            const release = yield* json("pingdotgg/t3code/releases/latest").pipe(
-              Effect.flatMap(Schema.decodeUnknownEffect(GithubRelease)),
-            );
-            const version = release.tag_name.replace(/^v/, "");
-            const notes = normalizeDesktopUpdateReleaseNotes(
-              release.body,
-              version,
-              "latest",
-              release.published_at ?? undefined,
-            ).releaseNotes[0];
-            return {
-              ...compareUpstream(build, version),
-              url: release.html_url,
-              ...(notes ? { releaseNotes: notes } : {}),
-            };
+            const release = yield* latestRelease("pingdotgg/t3code");
+            if (release === null) return yield* fail("没有找到上游 T3 Code 的最新发布。");
+            const { version, ...details } = release;
+            return { ...compareUpstream(build, version), ...details };
           }),
         ),
       );
@@ -296,7 +382,7 @@ export const make = Effect.gen(function* () {
           "repository",
           Effect.gen(function* () {
             if (
-              !/^[\w.-]+\/[\w.-]+$/.test(build.repository) ||
+              !GITHUB_REPOSITORY.test(build.repository) ||
               !build.sourceBranch ||
               !build.sourceRevision
             )
@@ -305,47 +391,24 @@ export const make = Effect.gen(function* () {
                 status: "unsupported" as const,
                 message: "当前包缺少仓库、分支或提交信息，请安装新版 Plus 包。",
               };
-            const branch = yield* json(
-              `${build.repository}/branches/${encodeURIComponent(build.sourceBranch)}`,
-            ).pipe(Effect.flatMap(Schema.decodeUnknownEffect(GithubBranch)));
-            const latest = branch.commit.sha;
-            const url = `https://github.com/${build.repository}/compare/${build.sourceRevision}...${latest}`;
-            if (latest === build.sourceRevision)
-              return {
-                ...state.repository,
-                status: "current" as const,
-                latest,
-                url,
-                message: null,
-                commits: [updateCommit(branch.commit)],
-                commitCount: 1,
-              };
-            const comparison = yield* json(
-              `${build.repository}/compare/${build.sourceRevision}...${latest}`,
-            ).pipe(Effect.flatMap(Schema.decodeUnknownEffect(GithubComparison)));
+            const feed = yield* github(
+              `${build.repository}/commits/${encodeURIComponent(build.sourceBranch)}.atom`,
+            );
+            if (feed === null) return yield* fail(`远端没有 ${build.sourceBranch} 分支。`);
+            const result = compareBranchCommits(build, branchFeedCommits(feed));
             return {
-              ...state.repository,
-              latest,
-              url,
-              status: repositoryUpdateStatus(comparison.status),
-              commits: comparison.commits.slice(-MAX_UPDATE_COMMITS).reverse().map(updateCommit),
-              commitCount: comparison.ahead_by,
-              message:
-                comparison.status === "diverged"
-                  ? "当前构建与远端分支历史已分叉。"
-                  : `远端领先 ${comparison.ahead_by} 个提交，当前领先 ${comparison.behind_by} 个提交。`,
+              ...result,
+              url:
+                result.latest && result.latest !== build.sourceRevision
+                  ? `https://github.com/${build.repository}/compare/${build.sourceRevision}...${result.latest}`
+                  : `https://github.com/${build.repository}/commit/${build.sourceRevision}`,
             };
           }),
         ),
       );
     }
     if (state.localAllowed && state.preferences.quickUpdateEnabled)
-      tasks.push(
-        runSource(
-          "local",
-          readLocal().pipe(Effect.map(({ manifest }) => compareLocalPackage(build, manifest))),
-        ),
-      );
+      tasks.push(runSource("local", readLocal().pipe(Effect.map(({ update }) => update))));
     yield* Effect.all(tasks, { concurrency: "unbounded", discard: true });
     return yield* Ref.get(stateRef);
   });
@@ -358,7 +421,9 @@ export const make = Effect.gen(function* () {
         const running = yield* Ref.get(checkRef);
         if (running) return running;
         const includesRemote =
-          remote || (yield* Clock.currentTimeMillis) - (yield* Ref.get(lastRemote)) >= 1800000;
+          remote ||
+          (yield* Clock.currentTimeMillis) - (yield* Ref.get(lastRemote)) >=
+            REMOTE_CHECK_INTERVAL_MS;
         const fiber = yield* Effect.forkIn(
           checkSources(includesRemote).pipe(Effect.ensuring(Ref.set(checkRef, null))),
           scope,
@@ -378,12 +443,14 @@ export const make = Effect.gen(function* () {
   const stop = Effect.gen(function* () {
     const timer = yield* Ref.getAndSet(timerRef, null);
     if (timer) yield* Fiber.interrupt(timer);
+    const watcher = yield* Ref.getAndSet(watcherRef, null);
+    if (watcher) yield* Fiber.interrupt(watcher);
     const running = yield* Ref.getAndSet(checkRef, null);
     if (running) yield* Fiber.interrupt(running.fiber);
     const state = yield* Ref.get(stateRef);
     yield* publish(
       Object.fromEntries(
-        (["upstream", "repository", "local"] as const)
+        (["upstream", "repository", "release", "local"] as const)
           .filter((key) => state[key].status === "checking")
           .map((key) => [key, { ...state[key], status: "idle", message: "检查已取消。" }]),
       ),
@@ -394,25 +461,58 @@ export const make = Effect.gen(function* () {
     const state = yield* Ref.get(stateRef);
     if (!state.supported || !state.preferences.checkingEnabled) return;
     const timer = yield* Effect.forkIn(
-      check(false).pipe(Effect.asVoid, Effect.repeat(Schedule.spaced("60 seconds")), Effect.asVoid),
+      check(false).pipe(
+        Effect.asVoid,
+        Effect.repeat(Schedule.spaced(LOCAL_CHECK_INTERVAL)),
+        Effect.asVoid,
+      ),
       scope,
     );
     yield* Ref.set(timerRef, timer);
+    const source = state.preferences.sourcePath;
+    if (!state.localAllowed || !state.preferences.quickUpdateEnabled || !source) return;
+    // A finished build or a refresh request updates the entry at once instead of on the next poll.
+    // The folder is gitignored; creating it lets a fresh clone's first build be noticed too.
+    const releaseDirectory = path.join(source, "release");
+    yield* fs.makeDirectory(releaseDirectory, { recursive: true }).pipe(Effect.ignore);
+    // Git appends to logs/HEAD on every commit, checkout, merge and reset, but not on status.
+    const gitDirectory = yield* git(source, ["rev-parse", "--absolute-git-dir"]);
+    const headLog = Option.isSome(gitDirectory)
+      ? fs.watch(path.join(gitDirectory.value, "logs")).pipe(
+          Stream.filter((event) => path.basename(event.path) === "HEAD"),
+          Stream.ignore,
+        )
+      : Stream.empty;
+    const watcher = yield* Effect.forkIn(
+      fs.watch(releaseDirectory).pipe(
+        Stream.filter((event) => LOCAL_WATCH_FILES.has(path.basename(event.path))),
+        // Each watch ends on its own error, such as a missing folder, without stopping the other.
+        Stream.ignore,
+        Stream.merge(headLog),
+        Stream.debounce("2 seconds"),
+        Stream.runForEach(() => check(false)),
+        Effect.ignore,
+      ),
+      scope,
+    );
+    yield* Ref.set(watcherRef, watcher);
   });
 
-  const chooseCommand = Effect.gen(function* () {
+  const chooseSource = Effect.gen(function* () {
     const state = yield* Ref.get(stateRef);
-    if (!state.localAllowed) return yield* fail("快捷更新仅限 develop 分支的 Windows 安装包。");
-    const files = yield* dialog.pickFiles({
+    if (!state.localAllowed) return yield* fail("快捷本地更新仅限 Windows 安装包。");
+    const picked = yield* dialog.pickFolder({
       owner: yield* windows.focusedMainOrFirst,
-      defaultPath: Option.fromNullishOr(state.preferences.commandPath),
-      filters: [{ name: "T3 Code Plus 迁移入口", extensions: ["cmd"] }],
-      multiple: false,
+      defaultPath: Option.fromNullishOr(state.preferences.sourcePath),
     });
-    const commandPath = files[0];
-    if (!commandPath) return state;
-    if (/[\r\n%]/.test(commandPath)) return yield* fail("CMD 路径不能包含 % 或换行。");
-    const preferences = { ...state.preferences, commandPath, quickUpdateEnabled: true };
+    if (Option.isNone(picked)) return state;
+    const root = yield* git(picked.value, ["rev-parse", "--show-toplevel"]);
+    if (Option.isNone(root)) return yield* fail("所选目录不是 Git 源码仓库。");
+    const preferences = {
+      ...state.preferences,
+      sourcePath: path.normalize(root.value),
+      quickUpdateEnabled: true,
+    };
     yield* settings.setUpdateCenter(preferences);
     yield* publish({ preferences });
     yield* restart;
@@ -427,47 +527,24 @@ export const make = Effect.gen(function* () {
       !state.localAllowed ||
       !state.preferences.quickUpdateEnabled
     )
-      return yield* fail("当前客户端未开启 develop 快捷更新。");
-    const { manifest, command } = yield* readLocal();
-    const source = compareLocalPackage(build, manifest);
-    if (source.status !== "available")
-      return yield* fail(source.message ?? "没有可安装的更新版本。");
-    if (path.basename(path.dirname(executable)).toLowerCase() !== "win-unpacked")
-      return yield* fail("快捷更新需要完整的 win-unpacked 安装目录。");
+      return yield* fail("当前客户端未开启快捷本地更新。");
+    const { update, local, installer } = yield* readLocal();
+    if (update.status !== "available" || !local || !installer)
+      return yield* fail(update.message ?? "没有可安装的更新版本。");
+    // NSIS installs into the directory that holds the running executable.
+    const installDirectory = path.dirname(executable);
     const scriptSource = yield* assets.resolveResourcePath("local-update.ps1");
     if (Option.isNone(scriptSource))
-      return yield* fail("当前包缺少本地更新协调器，请重新安装完整包。");
-    const temporary = yield* fs.makeTempDirectory({ prefix: "t3code-local-update-" });
-    const script = path.join(temporary, "local-update.ps1");
-    const requestPath = path.join(temporary, "request.json");
-    // Windows PowerShell 5 reads UTF-8 source correctly only when it has a BOM.
-    yield* fs.writeFileString(
-      script,
-      `\uFEFF${(yield* fs.readFileString(scriptSource.value)).replace(/^\uFEFF/, "")}`,
-    );
-    const destinationRoot = path.dirname(path.dirname(executable));
-    if (/[\r\n%]/.test(destinationRoot)) return yield* fail("当前安装目录不能包含 % 或换行。");
-    yield* fs.writeFileString(
-      requestPath,
-      yield* encodeUpdateRequest({
-        commandPath: command,
-        destinationRoot,
-        executableName: path.basename(executable),
-        targetVersion: manifest.version,
-        sourceBranch: build.sourceBranch,
-        parentPid: process.pid,
-      }),
-    );
+      return yield* fail("当前包缺少本地更新程序 local-update.ps1，请手动运行一次安装包。");
     yield* publish({ installing: true });
     const handoff = Effect.gen(function* () {
-      yield* runWindowsLocalUpdate(script, requestPath, true);
       const owner = Option.getOrUndefined(yield* windows.focusedMainOrFirst);
       const answer = yield* dialog.showMessageBox(
         {
           type: "question",
           title: "更新 T3 Code Plus",
-          message: `退出并更新到 ${manifest.version}？`,
-          detail: `当前版本：${build.artifactVersion}\n安装目录：${destinationRoot}\n\n客户端和本机托管的运行任务将正常退出。安装成功后自动打开新客户端，迁移器保留旧版备份。`,
+          message: `退出并更新到 ${local.version}？`,
+          detail: `当前版本：${build.artifactVersion}\n安装目录：${installDirectory}\n安装包：${installer}\n\n客户端和本机托管的运行任务将正常退出，独立窗口显示安装进度，完成后自动打开新客户端。`,
           buttons: ["取消", "退出并更新"],
           defaultId: 0,
           cancelId: 0,
@@ -476,8 +553,28 @@ export const make = Effect.gen(function* () {
         owner,
       );
       if (answer.response !== 1) return false;
+      // The coordinator outlives this installation, so it runs from a temporary copy.
+      const temporary = yield* fs.makeTempDirectory({ prefix: "t3code-local-update-" });
+      const script = path.join(temporary, "local-update.ps1");
+      const requestPath = path.join(temporary, "request.json");
+      // Windows PowerShell 5 reads a UTF-8 script correctly only with a BOM.
+      yield* fs.writeFileString(
+        script,
+        `﻿${(yield* fs.readFileString(scriptSource.value)).replace(/^﻿/, "")}`,
+      );
+      yield* fs.writeFileString(
+        requestPath,
+        yield* encodeLocalUpdateRequest({
+          installer,
+          installDirectory,
+          executable,
+          targetVersion: local.version,
+        }),
+      );
       yield* stop;
-      yield* runWindowsLocalUpdate(script, requestPath, false).pipe(Effect.tapError(() => restart));
+      yield* startLocalUpdateCoordinator({ script, requestPath }).pipe(
+        Effect.tapError(() => restart),
+      );
       yield* app.quit;
       return true;
     });
@@ -491,19 +588,19 @@ export const make = Effect.gen(function* () {
     }),
     getState: Ref.get(stateRef),
     check: check(true),
-    chooseCommand: actionGate.withPermits(1)(chooseCommand).pipe(Effect.mapError(asUpdateError)),
+    chooseSource: actionGate.withPermits(1)(chooseSource).pipe(Effect.mapError(asUpdateError)),
     configure: Effect.fn("desktop.updateCenter.configure")(function (change) {
       return actionGate
         .withPermits(1)(
           Effect.gen(function* () {
             const state = yield* Ref.get(stateRef);
             if (change.quickUpdateEnabled && !state.localAllowed)
-              return yield* fail("快捷更新仅限 develop 分支的 Windows 安装包。");
+              return yield* fail("快捷本地更新仅限 Windows 安装包。");
             if (
               change.quickUpdateEnabled &&
-              (!state.preferences.commandPath || !(yield* fs.exists(state.preferences.commandPath)))
+              (!state.preferences.sourcePath || !(yield* fs.exists(state.preferences.sourcePath)))
             )
-              return yield* chooseCommand;
+              return yield* chooseSource;
             const preferences = {
               ...state.preferences,
               checkingEnabled: change.checkingEnabled ?? state.preferences.checkingEnabled,

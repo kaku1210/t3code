@@ -29,7 +29,6 @@ import { SnapShotCoordinator } from "../components/desktop/SnapShotCoordinator";
 import { DesktopAppActivationCoordinator } from "../components/desktop/DesktopAppActivationCoordinator";
 import { DesktopWebLinkCoordinator } from "../components/desktop/DesktopWebLinkCoordinator";
 import { RunningThreadKeepAlive } from "../components/desktop/RunningThreadKeepAlive";
-import { DesktopUpdateCenter } from "../components/desktop/DesktopUpdateCenter";
 import { ReopenClosedViewShortcut } from "../components/ReopenClosedViewShortcut";
 import { ProjectCloneToastCoordinator } from "../components/ProjectCloneToastCoordinator";
 import { ChatGptWelcomeCoordinator } from "../components/settings/ChatGptWelcomeCoordinator";
@@ -136,8 +135,6 @@ function RootRouteView() {
     <ToastProvider>
       <AnchoredToastProvider>
         <RootRouteBranch />
-        {/* Electron registers native drag regions in DOM order; keep this control after the title bars. */}
-        {isElectron ? <DesktopUpdateCenter /> : null}
       </AnchoredToastProvider>
     </ToastProvider>
   );

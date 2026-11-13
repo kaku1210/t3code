@@ -26,7 +26,7 @@ const sampleState: DesktopUpdateCenterState = {
   preferences: {
     checkingEnabled: true,
     quickUpdateEnabled: true,
-    commandPath: "D:\\Project\\AgentLearn\\Migrate-T3-Code-Plus.cmd",
+    sourcePath: "D:\\Project\\t3codeplus",
   },
   build: {
     artifactVersion: "0.1.7-plus.20261110.1",
@@ -69,6 +69,15 @@ const sampleState: DesktopUpdateCenterState = {
       },
     ],
     commitCount: 1,
+  },
+  release: {
+    status: "current",
+    current: "0.1.7-plus.20261110.1",
+    latest: "0.1.7-plus.20261110.1",
+    message: null,
+    url: null,
+    checkedAt: "2026-11-10T08:00:00Z",
+    majorUpdate: false,
   },
   local: {
     status: "current",

@@ -21,12 +21,12 @@ export const configure = DesktopIpc.makeIpcMethod({
     return yield* (yield* DesktopUpdateCenter).configure(change);
   }),
 });
-export const chooseCommand = DesktopIpc.makeIpcMethod({
+export const chooseSource = DesktopIpc.makeIpcMethod({
   channel: IpcChannels.UPDATE_CENTER_CHOOSE_CHANNEL,
   payload: Schema.Void,
   result: DesktopUpdateCenterState,
-  handler: Effect.fn("desktop.ipc.updateCenter.chooseCommand")(function* () {
-    return yield* (yield* DesktopUpdateCenter).chooseCommand;
+  handler: Effect.fn("desktop.ipc.updateCenter.chooseSource")(function* () {
+    return yield* (yield* DesktopUpdateCenter).chooseSource;
   }),
 });
 export const check = DesktopIpc.makeIpcMethod({

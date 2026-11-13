@@ -29,20 +29,27 @@ Expand a commit to read its full message. Long lists show a summary and a link t
 GitHub page, opened with the system browser. If the branch is current, its current commit is
 shown instead. Git commit notes do not include uncommitted changes bundled into a local build.
 
-Packaged `develop` builds additionally offer **Quick local update** in **Settings → About**.
-Enable it and select your local migration CMD. Keep the CMD with its complete prepared release,
-or use your checkout's reusable migration entry after building a new package. A matching, newer
-package enables **Update and restart**. Confirming exits the app and its locally hosted tasks,
-installs with an old-version backup, then reopens the client. A separate progress window stays
-visible during validation, shutdown, installation and startup; failures show a reason and log path.
-Successful portable updates keep only the immediate previous installation for rollback. Older
-installer-created backups are removed; a backup in use or containing links is retained with a
-cleanup warning. Failed installs clean up their own temporary copy without rotating backups.
-If the CMD moves, select it again. Other branches show the release and repository checks only.
+To install T3 Code Plus on a new machine, run its installer, `T3-Code-Plus-<version>-x64.exe`.
+Installed clients then find newer releases from the T3 Code Plus GitHub repository and offer to
+download and install them, like the official app. A client installed before this update feed
+existed needs the new installer run once by hand.
+
+Released builds, from the `main` branch, show only the latest T3 Code Plus release under
+**Updates**. Development builds, from any other branch, show upstream T3 Code and their own branch
+instead, and never update themselves to a release.
+
+On a machine with the source checkout, a development build's
+**Settings → About → Quick local update** takes that
+checkout folder. The title-bar **Updates** entry then shows how the checkout compares with your
+installation: **Needs a new package** when it has commits or uncommitted changes not in your
+installed build, or **Update available** once `vp run dist:desktop:win:x64` has built a newer
+installer. It checks right away when a build finishes or you commit, and otherwise every
+10 minutes. **Update and
+restart** exits the app and its locally hosted tasks, shows the installation's progress in a
+small window, installs into the current installation folder, and reopens the client. If you move the checkout, select it again.
 
 Plus versions use `upstreamVersion-plus.YYYYMMDD.N`. The package version, upstream version and
-source branch are separate information. Old prepared packages without branch metadata must be
-rebuilt before quick update can use them.
+source branch are separate information.
 
 ## Update everything at once
 

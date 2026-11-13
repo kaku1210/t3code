@@ -156,6 +156,8 @@ For mobile verification, a missing or outdated native client is an install step,
 - UI changes need before/after images. Motion or timing needs a short video.
 - Upload PR evidence to GitHub. Never commit PR-only screenshots or assets such as `.github/pr-assets/`.
 - One request is one PR. Split it only when the maintainer asks. Outside contributions follow the stricter [one problem per PR](CONTRIBUTING.md#one-problem) rule.
+- On `develop`, the installed T3 Code Plus's Quick local update notices builds (`vp run dist:desktop:win:x64`) and commits by itself. When a session ends with uncommitted source changes it should see, run `vp run notify:local-update`. Do not run it on `main`.
+- Every time you merge into `main`, also publish a T3 Code Plus GitHub release from the merged `main`, following [Publish on every merge to main](docs/operations/release.md#publish-on-every-merge-to-main), so other machines update to the latest version. This merge is the developer's standing approval for that release. Publish at other times only when the developer asks or a release is clearly needed, and confirm first.
 - When babysitting: call `watch_pull_request` and end your turn. T3 Code wakes you on checks, comments, or conflicts. Do not poll or sleep. Verify each bot finding against the source, fix real ones, dismiss false positives with a written reason. Stay quiet when nothing is new. Stop when the bots are green on the latest commit.
 
 ## Documentation

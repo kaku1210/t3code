@@ -1,3 +1,4 @@
+import { isReleaseBuild } from "@t3tools/contracts";
 import { SparklesIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -51,59 +52,61 @@ export function UpdateCenterSettings() {
           />
         }
       />
-      <SettingsRow
-        id="ai-quick-update"
-        title={t("updates.aiQuickUpdateSettingsTitle")}
-        description={t("updates.aiQuickUpdateSettingsDescription")}
-        control={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              size="xs"
-              variant={
-                state.upstream.status === "available" || state.upstream.status === "diverged"
-                  ? "default"
-                  : "outline"
-              }
-              disabled={
-                pending ||
-                startingKind !== null ||
-                state.installing ||
-                state.upstream.status === "checking"
-              }
-              onClick={() => startQuickUpdate("upstream")}
-            >
-              <SparklesIcon className="size-3" />
-              {t(
-                startingKind === "upstream"
-                  ? "updates.aiQuickUpdating"
-                  : "updates.aiQuickUpdateUpstream",
-              )}
-            </Button>
-            <Button
-              size="xs"
-              variant={
-                state.repository.status === "available" || state.repository.status === "diverged"
-                  ? "default"
-                  : "outline"
-              }
-              disabled={
-                pending ||
-                startingKind !== null ||
-                state.installing ||
-                state.repository.status === "checking"
-              }
-              onClick={() => startQuickUpdate("repository")}
-            >
-              <SparklesIcon className="size-3" />
-              {t(
-                startingKind === "repository"
-                  ? "updates.aiQuickUpdating"
-                  : "updates.aiQuickUpdateRepository",
-              )}
-            </Button>
-          </div>
-        }
-      />
+      {isReleaseBuild(state.build) ? null : (
+        <SettingsRow
+          id="ai-quick-update"
+          title={t("updates.aiQuickUpdateSettingsTitle")}
+          description={t("updates.aiQuickUpdateSettingsDescription")}
+          control={
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="xs"
+                variant={
+                  state.upstream.status === "available" || state.upstream.status === "diverged"
+                    ? "default"
+                    : "outline"
+                }
+                disabled={
+                  pending ||
+                  startingKind !== null ||
+                  state.installing ||
+                  state.upstream.status === "checking"
+                }
+                onClick={() => startQuickUpdate("upstream")}
+              >
+                <SparklesIcon className="size-3" />
+                {t(
+                  startingKind === "upstream"
+                    ? "updates.aiQuickUpdating"
+                    : "updates.aiQuickUpdateUpstream",
+                )}
+              </Button>
+              <Button
+                size="xs"
+                variant={
+                  state.repository.status === "available" || state.repository.status === "diverged"
+                    ? "default"
+                    : "outline"
+                }
+                disabled={
+                  pending ||
+                  startingKind !== null ||
+                  state.installing ||
+                  state.repository.status === "checking"
+                }
+                onClick={() => startQuickUpdate("repository")}
+              >
+                <SparklesIcon className="size-3" />
+                {t(
+                  startingKind === "repository"
+                    ? "updates.aiQuickUpdating"
+                    : "updates.aiQuickUpdateRepository",
+                )}
+              </Button>
+            </div>
+          }
+        />
+      )}
       {state.localAllowed ? (
         <SettingsRow
           id="quick-local-update"
@@ -123,15 +126,15 @@ export function UpdateCenterSettings() {
           {state.preferences.quickUpdateEnabled ? (
             <div className="mt-2 flex items-start justify-between gap-3">
               <p className="min-w-0 break-all text-xs text-muted-foreground">
-                {state.preferences.commandPath ?? t("updates.pathMissing")}
+                {state.preferences.sourcePath ?? t("updates.pathMissing")}
               </p>
               <Button
                 size="xs"
                 variant="outline"
                 disabled={pending || state.installing}
-                onClick={() => act(() => getUpdateCenterBridge()!.chooseCommand())}
+                onClick={() => act(() => getUpdateCenterBridge()!.chooseSource())}
               >
-                {t(state.preferences.commandPath ? "updates.change" : "updates.choose")}
+                {t(state.preferences.sourcePath ? "updates.change" : "updates.choose")}
               </Button>
             </div>
           ) : null}

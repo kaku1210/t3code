@@ -1,145 +1,136 @@
-# This coordinator lives outside the installation so the portable directory can be replaced.
+﻿# Installs a T3 Code Plus build after the client exits, showing progress, then reopens the client.
+# Started through WMI so it outlives the client's job object; see WindowsLocalUpdate.ts.
 [CmdletBinding()]
-param([Parameter(Mandatory=$true)][string]$RequestPath, [switch]$ValidateOnly)
+param(
+    [Parameter(Mandatory = $true)][string]$RequestPath,
+    # No window or dialogs, for tests.
+    [switch]$Quiet
+)
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-Set-Location -LiteralPath $PSScriptRoot
-[Environment]::CurrentDirectory = $PSScriptRoot
 $request = Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$logPath = Join-Path $PSScriptRoot 'update.log'
-$resultPath = Join-Path $PSScriptRoot 'result.json'
-$cancelPath = $RequestPath + '.cancelled'
-$ready = $false
-$progressWindow = $null
-$progressLabel = $null
-$mayCloseProgress = $false
-function Show-UpdateProgress([int]$Step, [string]$Message) {
-    Add-Content -LiteralPath $logPath -Value ("[{0}] {1}/4 {2}" -f (Get-Date -Format 'HH:mm:ss'), $Step, $Message) -Encoding UTF8
-    if ($ValidateOnly) { return }
-    if ($null -eq $script:progressWindow) {
-        Add-Type -AssemblyName System.Windows.Forms
-        Add-Type -AssemblyName System.Drawing
-        [Windows.Forms.Application]::EnableVisualStyles()
-        $script:progressWindow = New-Object Windows.Forms.Form
-        $script:progressWindow.Text = 'T3 Code Plus 更新'
-        $script:progressWindow.ClientSize = New-Object Drawing.Size(460, 160)
-        $script:progressWindow.Font = New-Object Drawing.Font('Segoe UI', 10)
-        $script:progressWindow.StartPosition = 'CenterScreen'
-        $script:progressWindow.FormBorderStyle = 'FixedDialog'
-        $script:progressWindow.ControlBox = $false
-        $script:progressWindow.Add_FormClosing({ param($sender, $eventArgs)
-            if (-not $script:mayCloseProgress) { $eventArgs.Cancel = $true }
-        })
-        $versionLabel = New-Object Windows.Forms.Label
-        $versionLabel.Location = New-Object Drawing.Point(20, 18)
-        $versionLabel.Size = New-Object Drawing.Size(420, 24)
-        $versionLabel.Text = "正在更新到 $($request.targetVersion)"
-        $script:progressLabel = New-Object Windows.Forms.Label
-        $script:progressLabel.Location = New-Object Drawing.Point(20, 54)
-        $script:progressLabel.Size = New-Object Drawing.Size(420, 42)
-        $bar = New-Object Windows.Forms.ProgressBar
-        $bar.Location = New-Object Drawing.Point(20, 112)
-        $bar.Size = New-Object Drawing.Size(420, 18)
-        $bar.Style = 'Marquee'
-        $script:progressWindow.Controls.AddRange(@($versionLabel, $script:progressLabel, $bar))
-        $script:progressWindow.Show()
-    }
-    $script:progressLabel.Text = "$Step/4  $Message"
+$logPath = Join-Path (Split-Path -Parent $RequestPath) 'update.log'
+$installRoot = $request.installDirectory.TrimEnd('\') + '\'
+$form = $null
+$status = $null
+
+function Write-UpdateLog([string]$Message) {
+    Add-Content -LiteralPath $logPath -Value ('[{0}] {1}' -f (Get-Date -Format 'HH:mm:ss'), $Message) -Encoding UTF8
+}
+
+function Show-Step([int]$Step, [string]$Message) {
+    Write-UpdateLog "$Step/3 $Message"
+    if ($null -eq $script:status) { return }
+    $script:status.Text = "$Step/3  $Message"
     [Windows.Forms.Application]::DoEvents()
 }
-function Wait-UpdateProcess([Diagnostics.Process]$Process, [int]$TimeoutMilliseconds = -1) {
-    if ($null -eq $script:progressWindow) { return $Process.WaitForExit($TimeoutMilliseconds) }
-    $elapsed = [Diagnostics.Stopwatch]::StartNew()
-    while (-not $Process.WaitForExit(100)) {
-        [Windows.Forms.Application]::DoEvents()
-        if ($TimeoutMilliseconds -ge 0 -and $elapsed.ElapsedMilliseconds -ge $TimeoutMilliseconds) { return $false }
+
+# Keeps the window responsive while waiting; returns $false on timeout.
+function Wait-Until([scriptblock]$Condition, [int]$TimeoutSeconds, [int]$IntervalMilliseconds = 200) {
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (& $Condition)) {
+        if ($watch.Elapsed.TotalSeconds -ge $TimeoutSeconds) { return $false }
+        if ($null -ne $script:form) { [Windows.Forms.Application]::DoEvents() }
+        Start-Sleep -Milliseconds $IntervalMilliseconds
     }
-    [Windows.Forms.Application]::DoEvents()
     return $true
 }
-function Invoke-Installer([bool]$CheckOnly) {
-    $info = New-Object Diagnostics.ProcessStartInfo
-    $info.FileName = $env:ComSpec
-    $info.WorkingDirectory = $PSScriptRoot
-    $info.UseShellExecute = $false
-    $info.CreateNoWindow = $true
-    $info.RedirectStandardOutput = $true
-    $info.RedirectStandardError = $true
-    $info.EnvironmentVariables['T3CODE_LOCAL_UPDATE'] = '1'
-    $info.EnvironmentVariables['T3CODE_UPDATE_CMD'] = [string]$request.commandPath
-    $info.EnvironmentVariables['T3CODE_UPDATE_DEST'] = [string]$request.destinationRoot
-    $info.EnvironmentVariables['T3CODE_UPDATE_EXE'] = [string]$request.executableName
-    $info.EnvironmentVariables['T3CODE_UPDATE_VERSION'] = [string]$request.targetVersion
-    $info.EnvironmentVariables['T3CODE_UPDATE_BRANCH'] = [string]$request.sourceBranch
-    $info.Arguments = '/d /s /c ""%T3CODE_UPDATE_CMD%" -DestinationRoot "%T3CODE_UPDATE_DEST%" -ExpectedExecutableName "%T3CODE_UPDATE_EXE%" -ExpectedVersion "%T3CODE_UPDATE_VERSION%" -ExpectedBranch "%T3CODE_UPDATE_BRANCH%"'
-    if ($CheckOnly) { $info.Arguments += ' -ValidateOnly' }
-    $info.Arguments += '"'
-    $child = [Diagnostics.Process]::Start($info)
-    try {
-        $stdout = $child.StandardOutput.ReadToEndAsync()
-        $stderr = $child.StandardError.ReadToEndAsync()
-        $null = Wait-UpdateProcess $child
-        Add-Content -LiteralPath $logPath -Value ($stdout.Result + $stderr.Result) -Encoding UTF8
-        if ($child.ExitCode -ne 0) {
-            $detail = $stderr.Result.Trim()
-            if (-not $detail) { $detail = $stdout.Result.Trim() }
-            throw "本地安装失败（退出代码 $($child.ExitCode)）。`n$detail"
-        }
-    } finally { $child.Dispose() }
+
+function Get-InstalledProcesses {
+    @(Get-CimInstance Win32_Process | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath.StartsWith($installRoot, [StringComparison]::OrdinalIgnoreCase)
+    })
 }
+
+function Show-Message([string]$Text, [string]$Title, [string]$Icon) {
+    Write-UpdateLog $Text
+    if ($Quiet) { return }
+    [Windows.Forms.MessageBox]::Show($script:form, $Text, $Title, 'OK', $Icon) | Out-Null
+}
+
+if (-not $Quiet) {
+    Add-Type -AssemblyName System.Windows.Forms
+    Add-Type -AssemblyName System.Drawing
+    [Windows.Forms.Application]::EnableVisualStyles()
+    $form = New-Object Windows.Forms.Form
+    $form.Text = 'T3 Code Plus 更新'
+    $form.ClientSize = New-Object Drawing.Size(460, 140)
+    $form.Font = New-Object Drawing.Font('Microsoft YaHei UI', 9.5)
+    $form.StartPosition = 'CenterScreen'
+    $form.FormBorderStyle = 'FixedDialog'
+    $form.MaximizeBox = $false
+    $form.MinimizeBox = $false
+    $form.ControlBox = $false
+    $form.TopMost = $true
+    try { $form.Icon = [Drawing.Icon]::ExtractAssociatedIcon($request.executable) } catch {}
+    $heading = New-Object Windows.Forms.Label
+    $heading.Location = New-Object Drawing.Point(20, 16)
+    $heading.Size = New-Object Drawing.Size(420, 24)
+    $heading.Text = "正在更新到 $($request.targetVersion)"
+    $status = New-Object Windows.Forms.Label
+    $status.Location = New-Object Drawing.Point(20, 48)
+    $status.Size = New-Object Drawing.Size(420, 40)
+    $bar = New-Object Windows.Forms.ProgressBar
+    $bar.Location = New-Object Drawing.Point(20, 98)
+    $bar.Size = New-Object Drawing.Size(420, 18)
+    $bar.Style = 'Marquee'
+    $bar.MarqueeAnimationSpeed = 30
+    $form.Controls.AddRange(@($heading, $status, $bar))
+    $form.Show()
+    [Windows.Forms.Application]::DoEvents()
+}
+
+$stage = 0
 try {
-    # Capture the original handle before readiness; a recycled PID cannot become our parent.
-    $parent = if ($ValidateOnly) { $null } else { [Diagnostics.Process]::GetProcessById([int]$request.parentPid) }
-    if ($null -ne $parent) { $null = $parent.Handle }
-    Show-UpdateProgress 1 '正在校验本地安装包'
-    Invoke-Installer $true
-    if ($ValidateOnly) { exit 0 }
-    if (Test-Path -LiteralPath $cancelPath) { throw '本地更新已取消。' }
-    Show-UpdateProgress 2 '正在等待当前客户端和本机任务退出'
-    $ready = $true
-    [IO.File]::WriteAllText($RequestPath + '.ready.tmp', [string]$PID)
-    [IO.File]::Move($RequestPath + '.ready.tmp', $RequestPath + '.ready')
-    if (-not (Wait-UpdateProcess $parent 45000)) { throw 'The original client did not exit. No installation was changed.' }
-    $parent.Dispose()
-    if (Test-Path -LiteralPath $cancelPath) { throw '本地更新已取消。' }
-    Show-UpdateProgress 3 '正在备份旧版并安装新版本'
-    Invoke-Installer $false
-    $executable = Join-Path (Join-Path $request.destinationRoot 'win-unpacked') $request.executableName
-    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Installed application is missing: $executable" }
-    $launch = New-Object Diagnostics.ProcessStartInfo
-    $launch.FileName = $executable
-    $launch.WorkingDirectory = Split-Path -Parent $executable
-    $launch.UseShellExecute = $false
-    $launch.CreateNoWindow = $true
-    foreach ($name in @('ELECTRON_RUN_AS_NODE','T3CODE_LOCAL_UPDATE','T3CODE_UPDATE_CMD','T3CODE_UPDATE_DEST','T3CODE_UPDATE_EXE','T3CODE_UPDATE_VERSION','T3CODE_UPDATE_BRANCH')) { $launch.EnvironmentVariables.Remove($name) }
-    Show-UpdateProgress 4 '正在启动新客户端'
-    $newApp = [Diagnostics.Process]::Start($launch)
-    try {
-        $startup = [Diagnostics.Stopwatch]::StartNew()
-        while ($true) {
-            $newApp.Refresh()
-            if ($newApp.HasExited) { throw 'The installed client exited before showing its window. Check its startup log before retrying.' }
-            if ($newApp.MainWindowHandle -ne [IntPtr]::Zero) { break }
-            if ($startup.ElapsedMilliseconds -ge 45000) { throw 'Installation completed, but the new client window did not appear within 45 seconds. Check its startup log.' }
-            $null = Wait-UpdateProcess $newApp 100
-        }
-        @{ success=$true; processId=$newApp.Id; executable=$executable } | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
-    } finally { $newApp.Dispose() }
+    $stage = 1
+    Show-Step 1 '等待 T3 Code Plus 退出'
+    if (-not (Wait-Until { @(Get-InstalledProcesses).Count -eq 0 } 90 500)) {
+        $names = (Get-InstalledProcesses | ForEach-Object { "$($_.Name) ($($_.ProcessId))" }) -join ', '
+        throw "T3 Code Plus 在 90 秒内没有完全退出，安装没有改动。仍在运行：$names"
+    }
+
+    $stage = 2
+    Show-Step 2 '正在安装新版本'
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $request.installer
+    # NSIS takes /D= only as the last argument, unquoted even with spaces.
+    $info.Arguments = '--updated /S /D=' + $request.installDirectory
+    $info.UseShellExecute = $false
+    $info.WorkingDirectory = Split-Path -Parent $request.installer
+    $installer = [Diagnostics.Process]::Start($info)
+    if (-not (Wait-Until { $installer.HasExited } 600)) { throw '安装程序 10 分钟内没有完成。' }
+    if ($installer.ExitCode -ne 0) { throw "安装程序失败（退出代码 $($installer.ExitCode)）。" }
+    $version = (Get-Item -LiteralPath $request.executable).VersionInfo.FileVersion
+    if ($version -ne $request.targetVersion) {
+        throw "安装后的版本是 $version，不是 $($request.targetVersion)。"
+    }
+    $stage = 3
+    Show-Step 3 '正在打开 T3 Code Plus'
+    if ($Quiet) { exit 0 }
+    # Explorer starts it like the Start menu does, so nothing ties it to this hidden console.
+    Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') -ArgumentList ('"' + $request.executable + '"')
+    $opened = Wait-Until {
+        @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+            $_.MainWindowHandle -ne [IntPtr]::Zero -and $_.Path -eq $request.executable
+        }).Count -gt 0
+    } 60 500
+    if (-not $opened) {
+        Show-Message "已更新到 $($request.targetVersion)，但新版本 60 秒内没有打开。请从开始菜单打开 T3 Code Plus。" 'T3 Code Plus 更新' 'Information'
+    }
+    Write-UpdateLog 'done'
     exit 0
 } catch {
-    $message = $_.Exception.Message
-    Add-Content -LiteralPath $logPath -Value $message -Encoding UTF8
-    @{ success=$false; error=$message; logPath=$logPath } | ConvertTo-Json | Set-Content -LiteralPath $resultPath -Encoding UTF8
-    [IO.File]::WriteAllText($RequestPath + '.error.tmp', $message)
-    [IO.File]::Move($RequestPath + '.error.tmp', $RequestPath + '.error')
-    if ($ready) {
-        [Windows.Forms.MessageBox]::Show($progressWindow, "本地更新未完成。`n$message`n日志：$logPath", 'T3 Code Plus 更新失败', 'OK', 'Error') | Out-Null
-    } else { [Console]::Error.WriteLine($message) }
+    $detail = $_.Exception.Message
+    $hint = if ($stage -eq 2) { "`n`n如果 T3 Code Plus 无法正常使用，请手动运行安装包：`n$($request.installer)" } else { '' }
+    Show-Message "更新没有完成：`n$detail$hint`n`n日志：$logPath" 'T3 Code Plus 更新失败' 'Error'
+    # Reopen what is installed now, unless the client never exited.
+    if (-not $Quiet -and $stage -ge 2 -and (Test-Path -LiteralPath $request.executable)) {
+        Start-Process -FilePath (Join-Path $env:SystemRoot 'explorer.exe') -ArgumentList ('"' + $request.executable + '"')
+    }
     exit 1
 } finally {
-    if ($null -ne $progressWindow) {
-        $script:mayCloseProgress = $true
-        $progressWindow.Close()
-        $progressWindow.Dispose()
+    if ($null -ne $form) {
+        $form.Close()
+        $form.Dispose()
     }
 }

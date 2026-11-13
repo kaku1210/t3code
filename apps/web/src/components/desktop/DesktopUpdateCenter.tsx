@@ -1,22 +1,33 @@
-import type { DesktopUpdateCenterState, DesktopUpdateSource } from "@t3tools/contracts";
+import { isReleaseBuild, type DesktopUpdateSource } from "@t3tools/contracts";
 import { DownloadIcon, RefreshCwIcon, SparklesIcon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   useStartUpdateSession,
   useUpdateSessionStartingKind,
   type UpdateSessionKind,
 } from "../../hooks/useStartUpdateSession";
 import { useUiLanguage } from "../../i18n/useUiLanguage";
+import { ensureLocalApi } from "../../localApi";
+import { useDesktopUpdateState } from "../../state/desktopUpdate";
 import { getUpdateCenterBridge, useDesktopUpdateCenter } from "../../state/desktopUpdateCenter";
 import { Button } from "../ui/button";
-import { keyReleaseNoteItems } from "../desktopUpdate.logic";
+import {
+  getDesktopUpdateActionError,
+  getDesktopUpdateDisabledReason,
+  getDesktopUpdateInstallConfirmationMessage,
+  keyReleaseNoteItems,
+  resolveDesktopUpdateButtonAction,
+} from "../desktopUpdate.logic";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
+import { Toggle } from "../ui/toggle";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 
 const statusKeys = {
   idle: "updates.status.idle",
   checking: "updates.status.checking",
   current: "updates.status.current",
   available: "updates.status.available",
+  "needs-build": "updates.status.needsBuild",
   ahead: "updates.status.ahead",
   diverged: "updates.status.diverged",
   error: "updates.status.error",
@@ -28,22 +39,14 @@ const revision = (value: string | null) =>
 function SourceRow({
   title,
   source,
-  local,
-  state,
-  quickUpdating,
-  quickUpdateDisabled,
-  onQuickUpdate,
-  onInstall,
+  showEmptyNotes = true,
+  actions,
   onOpenUrl,
 }: {
   title: string;
   source: DesktopUpdateSource;
-  local?: boolean;
-  state: DesktopUpdateCenterState;
-  quickUpdating?: boolean;
-  quickUpdateDisabled?: boolean;
-  onQuickUpdate?: () => void;
-  onInstall: () => void;
+  showEmptyNotes?: boolean;
+  actions?: ReactNode;
   onOpenUrl: (url: string) => void;
 }) {
   const { t } = useUiLanguage();
@@ -158,51 +161,97 @@ function SourceRow({
           ) : null}
         </details>
       ) : null}
-      {!local && showNotes && !releaseNotes && !commits?.length ? (
+      {showEmptyNotes && showNotes && !releaseNotes && !commits?.length ? (
         <p className="text-xs text-muted-foreground">{t("updates.noNotes")}</p>
       ) : null}
-      {!local ? (
-        <div className="space-y-1.5">
-          <p className="text-2xs text-muted-foreground">{t("updates.aiQuickUpdateHint")}</p>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {onQuickUpdate ? (
-              <Button
-                size="xs"
-                variant={
-                  source.status === "available" || source.status === "diverged"
-                    ? "default"
-                    : "outline"
-                }
-                disabled={
-                  quickUpdating ||
-                  quickUpdateDisabled ||
-                  source.status === "checking" ||
-                  state.installing
-                }
-                onClick={onQuickUpdate}
-              >
-                <SparklesIcon className="size-3" />
-                {t(quickUpdating ? "updates.aiQuickUpdating" : "updates.aiQuickUpdate")}
-              </Button>
-            ) : (
-              <span className="text-2xs text-muted-foreground">{t("updates.detectOnly")}</span>
-            )}
-            {source.url ? (
-              <Button size="xs" variant="ghost" onClick={() => onOpenUrl(source.url!)}>
-                {t("updates.notes")}
-              </Button>
-            ) : null}
-          </div>
+      {actions || source.url ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          {source.url ? (
+            <Button size="xs" variant="ghost" onClick={() => onOpenUrl(source.url!)}>
+              {t("updates.notes")}
+            </Button>
+          ) : null}
         </div>
-      ) : source.status === "available" ? (
-        <Button size="sm" disabled={state.installing} onClick={onInstall}>
-          {t(state.installing ? "updates.installing" : "updates.install")}
-        </Button>
       ) : null}
     </section>
   );
 }
 
+/** Download and install go through the built-in updater, which reads the same published release. */
+function ReleaseActions({
+  source,
+  disabled,
+  onError,
+}: {
+  source: DesktopUpdateSource;
+  disabled: boolean;
+  onError: (message: string) => void;
+}) {
+  const { t } = useUiLanguage();
+  const updateState = useDesktopUpdateState();
+  const [pending, setPending] = useState(false);
+  if (source.status !== "available" || !updateState) return null;
+  const blocked = getDesktopUpdateDisabledReason(updateState);
+  if (blocked) return <p className="text-xs text-muted-foreground">{blocked}</p>;
+  const action = resolveDesktopUpdateButtonAction(updateState);
+  const run = (
+    operation: () => Promise<Parameters<typeof getDesktopUpdateActionError>[0] | null>,
+  ) => {
+    setPending(true);
+    void operation()
+      .then((result) => {
+        const message = result ? getDesktopUpdateActionError(result) : null;
+        if (message) onError(message);
+      })
+      .catch((cause: unknown) => onError(cause instanceof Error ? cause.message : String(cause)))
+      .finally(() => setPending(false));
+  };
+  if (updateState.status === "downloading")
+    return (
+      <Button size="sm" disabled>
+        {t("updates.downloading")}
+        {updateState.downloadPercent !== null ? ` ${Math.floor(updateState.downloadPercent)}%` : ""}
+      </Button>
+    );
+  if (action === "install")
+    return (
+      <Button
+        size="sm"
+        disabled={disabled || pending}
+        onClick={() =>
+          run(async () => {
+            const confirmed = await ensureLocalApi().dialogs.confirm(
+              getDesktopUpdateInstallConfirmationMessage(updateState),
+            );
+            return confirmed
+              ? window.desktopBridge!.installUpdate(updateState.downloadedVersion ?? undefined)
+              : null;
+          })
+        }
+      >
+        {t("updates.install")}
+      </Button>
+    );
+  return (
+    <Button
+      size="sm"
+      disabled={disabled || pending || updateState.status === "checking"}
+      onClick={() =>
+        run(async () => {
+          // A release published since the updater's last poll is not downloadable until it checks.
+          if (action !== "download") await window.desktopBridge!.checkForUpdate();
+          return window.desktopBridge!.downloadUpdate();
+        })
+      }
+    >
+      <DownloadIcon className="size-3" />
+      {t("updates.download")}
+    </Button>
+  );
+}
+
+/** The title-bar update entry: an icon toggle that opens every update source. */
 export function DesktopUpdateCenter() {
   const state = useDesktopUpdateCenter();
   const { t } = useUiLanguage();
@@ -210,31 +259,24 @@ export function DesktopUpdateCenter() {
   const startingKind = useUpdateSessionStartingKind();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const visible = Boolean(state?.supported && state.preferences.checkingEnabled);
-  // Reserve the same title-bar width in chat, split panels and Settings.
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- keeps the root DOM title-bar reservation aligned with the native update entry while mounted
-  useEffect(() => {
-    if (visible) document.documentElement.dataset.updateCenterVisible = "true";
-    else delete document.documentElement.dataset.updateCenterVisible;
-    return () => {
-      delete document.documentElement.dataset.updateCenterVisible;
-    };
-  }, [visible]);
-  if (!visible || !state) return null;
-  const available = [
-    state.upstream,
-    state.repository,
-    ...(state.localAllowed && state.preferences.quickUpdateEnabled ? [state.local] : []),
-  ].some((source) => source.status === "available");
-  const checking = [state.upstream, state.repository, state.local].some(
-    (source) => source.status === "checking",
-  );
+  if (!state?.supported || !state.preferences.checkingEnabled) return null;
+  // main builds update from published releases; development builds follow source.
+  const releaseBuild = isReleaseBuild(state.build);
+  const localEnabled = state.localAllowed && state.preferences.quickUpdateEnabled;
+  const sources = releaseBuild
+    ? [state.release]
+    : [state.upstream, state.repository, ...(localEnabled ? [state.local] : [])];
+  const available = sources.some((source) => source.status === "available");
+  const checking = sources.some((source) => source.status === "checking");
+  const reportError = (message: string) => {
+    setError(message);
+    setOpen(true);
+  };
   const act = (operation: () => Promise<unknown>) => {
     setError(null);
-    void operation().catch((cause: unknown) => {
-      setError(cause instanceof Error ? cause.message : String(cause));
-      setOpen(true);
-    });
+    void operation().catch((cause: unknown) =>
+      reportError(cause instanceof Error ? cause.message : String(cause)),
+    );
   };
   const openUrl = (url: string) =>
     act(async () => {
@@ -250,90 +292,141 @@ export function DesktopUpdateCenter() {
       })
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)));
   };
+  const aiSync = (kind: UpdateSessionKind, source: DesktopUpdateSource) => (
+    <Button
+      size="xs"
+      variant={
+        source.status === "available" || source.status === "diverged" ? "default" : "outline"
+      }
+      disabled={startingKind !== null || source.status === "checking" || state.installing}
+      onClick={() => startQuickUpdate(kind)}
+    >
+      <SparklesIcon className="size-3" />
+      {t(startingKind === kind ? "updates.aiQuickUpdating" : "updates.aiQuickUpdate")}
+    </Button>
+  );
+  const label = t(state.installing ? "updates.installing" : "updates.title");
   return (
-    <div className="[-webkit-app-region:no-drag] fixed top-(--workspace-controls-top) right-(--workspace-update-center-right) z-50 flex h-(--workspace-topbar-height) w-28 items-center justify-end">
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          render={
-            <Button
-              size="sm"
-              variant={available ? "secondary" : "ghost-muted"}
-              aria-label={t("updates.title")}
-            />
-          }
-        >
-          {state.installing ? (
-            <RefreshCwIcon className="size-3.5 animate-spin motion-reduce:animate-none" />
-          ) : (
-            <DownloadIcon className="size-3.5" />
-          )}
-          {t(state.installing ? "updates.installing" : "updates.title")}
-          {available ? <span className="size-1.5 rounded-full bg-primary" /> : null}
-        </PopoverTrigger>
-        <PopoverPopup width="lg" align="end" className="max-h-[min(80vh,44rem)] overflow-y-auto">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-medium">{t("updates.title")}</h2>
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled={checking || state.installing}
-              onClick={() => act(() => getUpdateCenterBridge()!.check())}
-            >
-              <RefreshCwIcon className={checking ? "size-3 animate-spin" : "size-3"} />
-              {t("updates.check")}
-            </Button>
-          </div>
-          <p className="mt-1 text-xs break-all text-muted-foreground">
-            {state.build.artifactVersion} · {state.build.sourceBranch ?? t("updates.unknown")} ·{" "}
-            {revision(state.build.sourceRevision) ?? t("updates.unknown")}
+    <Popover open={open} onOpenChange={setOpen}>
+      <Tooltip>
+        <TooltipTrigger render={<span className="flex shrink-0" />}>
+          <PopoverTrigger
+            render={
+              <Toggle
+                className="relative shrink-0 [-webkit-app-region:no-drag]"
+                pressed={open}
+                aria-label={t("updates.title")}
+                variant="ghost"
+                size="sm"
+              />
+            }
+          >
+            {state.installing ? (
+              <RefreshCwIcon className="size-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <DownloadIcon className="size-4" />
+            )}
+            {available ? (
+              <span
+                aria-hidden
+                className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
+              />
+            ) : null}
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipPopup side="bottom">
+          {available ? `${label} · ${t("updates.status.available")}` : label}
+        </TooltipPopup>
+      </Tooltip>
+      <PopoverPopup width="lg" align="end" className="max-h-[min(80vh,44rem)] overflow-y-auto">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-medium">{t("updates.title")}</h2>
+          <Button
+            size="xs"
+            variant="ghost"
+            disabled={checking || state.installing}
+            onClick={() => act(() => getUpdateCenterBridge()!.check())}
+          >
+            <RefreshCwIcon className={checking ? "size-3 animate-spin" : "size-3"} />
+            {t("updates.check")}
+          </Button>
+        </div>
+        <p className="mt-1 text-xs break-all text-muted-foreground">
+          {state.build.artifactVersion} · {state.build.sourceBranch ?? t("updates.unknown")} ·{" "}
+          {revision(state.build.sourceRevision) ?? t("updates.unknown")}
+        </p>
+        {state.build.sourceDirty ? (
+          <p className="mt-1 text-2xs text-muted-foreground">{t("updates.dirty")}</p>
+        ) : null}
+        {state.installing ? (
+          <p role="status" className="mt-2 text-xs text-muted-foreground">
+            {t("updates.installProgress")}
           </p>
-          {state.build.sourceDirty ? (
-            <p className="mt-1 text-2xs text-muted-foreground">{t("updates.dirty")}</p>
-          ) : null}
-          {state.installing ? (
-            <p role="status" className="mt-2 text-xs text-muted-foreground">
-              {t("updates.installProgress")}
-            </p>
-          ) : null}
-          {error ? (
-            <p role="alert" className="mt-2 text-xs break-words text-destructive">
-              {error}
-            </p>
-          ) : null}
-          <div className="divide-y divide-border">
-            <SourceRow
-              title={t("updates.upstream")}
-              source={state.upstream}
-              state={state}
-              quickUpdating={startingKind === "upstream"}
-              quickUpdateDisabled={startingKind !== null}
-              onQuickUpdate={() => startQuickUpdate("upstream")}
-              onInstall={() => {}}
-              onOpenUrl={openUrl}
-            />
-            <SourceRow
-              title={`${t("updates.repository")} · ${state.build.sourceBranch ?? "?"}`}
-              source={state.repository}
-              state={state}
-              quickUpdating={startingKind === "repository"}
-              quickUpdateDisabled={startingKind !== null}
-              onQuickUpdate={() => startQuickUpdate("repository")}
-              onInstall={() => {}}
-              onOpenUrl={openUrl}
-            />
-            {state.localAllowed && state.preferences.quickUpdateEnabled ? (
+        ) : null}
+        {error ? (
+          <p role="alert" className="mt-2 text-xs break-words text-destructive">
+            {error}
+          </p>
+        ) : null}
+        {releaseBuild ? (
+          <SourceRow
+            title={t("updates.release")}
+            source={state.release}
+            actions={
+              <ReleaseActions
+                source={state.release}
+                disabled={state.installing}
+                onError={reportError}
+              />
+            }
+            onOpenUrl={openUrl}
+          />
+        ) : (
+          <>
+            {localEnabled ? (
               <SourceRow
                 title={t("updates.local")}
                 source={state.local}
-                local
-                state={state}
-                onInstall={() => act(() => getUpdateCenterBridge()!.install())}
+                showEmptyNotes={false}
+                actions={
+                  state.local.status === "available" ? (
+                    <Button
+                      size="sm"
+                      disabled={state.installing}
+                      onClick={() => act(() => getUpdateCenterBridge()!.install())}
+                    >
+                      {t(state.installing ? "updates.installing" : "updates.install")}
+                    </Button>
+                  ) : null
+                }
                 onOpenUrl={openUrl}
               />
             ) : null}
-          </div>
-        </PopoverPopup>
-      </Popover>
-    </div>
+            <div className="mt-2 border-t border-border pt-3">
+              <h3 className="text-xs font-medium text-muted-foreground">
+                {t("updates.sourceSync")}
+              </h3>
+              <p className="mt-1 text-2xs text-muted-foreground">
+                {t("updates.aiQuickUpdateHint")}
+              </p>
+              <div className="divide-y divide-border">
+                <SourceRow
+                  title={t("updates.upstream")}
+                  source={state.upstream}
+                  actions={aiSync("upstream", state.upstream)}
+                  onOpenUrl={openUrl}
+                />
+                <SourceRow
+                  title={`${t("updates.repository")} · ${state.build.sourceBranch ?? "?"}`}
+                  source={state.repository}
+                  actions={aiSync("repository", state.repository)}
+                  onOpenUrl={openUrl}
+                />
+              </div>
+            </div>
+          </>
+        )}
+      </PopoverPopup>
+    </Popover>
   );
 }

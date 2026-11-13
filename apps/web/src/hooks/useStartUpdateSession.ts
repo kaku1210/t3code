@@ -239,8 +239,8 @@ export function buildUpdateSessionPayload(input: {
       candidateRoots.length > 0
         ? `Candidate local repository paths (verify first):\n${candidateRoots.map((root) => `- \`${root}\``).join("\n")}`
         : "Candidate local repository paths: Locate the local T3 Code Plus checkout on this machine first.";
-    const commandPathNote = preferences.commandPath
-      ? `- Configured local migration CMD: \`${preferences.commandPath}\``
+    const sourcePathNote = preferences.sourcePath
+      ? `- Configured local source checkout: \`${preferences.sourcePath}\``
       : null;
 
     if (kind === "upstream") {
@@ -268,7 +268,7 @@ export function buildUpdateSessionPayload(input: {
         ...(upstream.url ? [`- Upstream release URL: ${upstream.url}`] : []),
         `- Current T3 Code Plus build: \`${build.artifactVersion}\` (branch: \`${branch}\`, commit: \`${currentRev}\`${build.sourceDirty ? ", built with uncommitted changes" : ""})`,
         `- Personal remote repository: \`${build.repository ?? "kaku1210/t3code"}\``,
-        ...(commandPathNote ? [commandPathNote] : []),
+        ...(sourcePathNote ? [sourcePathNote] : []),
         `- ${candidatePathsSection}`,
         ...(releaseNotesBlock ? [releaseNotesBlock] : []),
         `### Follow This Strict Two-Stage Confirmation Workflow`,
@@ -320,7 +320,7 @@ export function buildUpdateSessionPayload(input: {
       `- Current build commit: \`${currentCommit}\` (build: \`${build.artifactVersion}\`${build.sourceDirty ? ", built with uncommitted changes" : ""})`,
       `- Detected remote commit: \`${latestCommit}\``,
       ...(repository.url ? [`- Compare URL: ${repository.url}`] : []),
-      ...(commandPathNote ? [commandPathNote] : []),
+      ...(sourcePathNote ? [sourcePathNote] : []),
       `- ${candidatePathsSection}`,
       ...(commitsBlock ? [commitsBlock] : []),
       `### Follow This Strict Two-Stage Confirmation Workflow`,
@@ -348,8 +348,8 @@ export function buildUpdateSessionPayload(input: {
       ? `候选本地仓库路径（请先核实）：\n${candidateRoots.map((root) => `- \`${root}\``).join("\n")}`
       : "候选本地仓库路径：请先在本机工作区或常见项目目录中定位 T3 Code Plus 源码仓库。";
 
-  const commandPathNote = preferences.commandPath
-    ? `- 已配置的本地迁移脚本路径：\`${preferences.commandPath}\``
+  const sourcePathNote = preferences.sourcePath
+    ? `- 已配置的本地源码仓库：\`${preferences.sourcePath}\``
     : null;
 
   if (kind === "upstream") {
@@ -378,7 +378,7 @@ export function buildUpdateSessionPayload(input: {
       ...(upstream.url ? [`- 上游发布链接：${upstream.url}`] : []),
       `- 当前 T3 Code Plus 构建版本：\`${build.artifactVersion}\`（分支：\`${branch}\`，提交：\`${currentRev}\`${build.sourceDirty ? "，构建时含未提交改动" : ""}）`,
       `- 个人远端仓库：\`${build.repository ?? "kaku1210/t3code"}\``,
-      ...(commandPathNote ? [commandPathNote] : []),
+      ...(sourcePathNote ? [sourcePathNote] : []),
       `- ${candidatePathsSection}`,
       ...(releaseNotesBlock ? [releaseNotesBlock] : []),
       `### 请严格按以下两阶段确认流程执行`,
@@ -437,7 +437,7 @@ export function buildUpdateSessionPayload(input: {
     `- 当前构建提交：\`${currentCommit}\`（构建版本：\`${build.artifactVersion}\`${build.sourceDirty ? "，构建时含未提交改动" : ""}）`,
     `- 远端仓库状态：${repoStatusDescription}`,
     ...(repository.url ? [`- 对比链接：${repository.url}`] : []),
-    ...(commandPathNote ? [commandPathNote] : []),
+    ...(sourcePathNote ? [sourcePathNote] : []),
     `- ${candidatePathsSection}`,
     ...(commitsBlock ? [commitsBlock] : []),
     `### 请严格按以下两阶段确认流程执行`,

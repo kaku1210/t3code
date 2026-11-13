@@ -152,7 +152,7 @@ it.effect.each([false, true])(
             getState: Effect.die("unexpected update-center read"),
             check: Effect.die("unexpected update-center check"),
             configure: () => Effect.die("unexpected update-center setting"),
-            chooseCommand: Effect.die("unexpected command picker"),
+            chooseSource: Effect.die("unexpected source picker"),
             install: Effect.die("unexpected local install"),
           }),
           Effect.provideService(DesktopLinuxUrlHandler.DesktopLinuxUrlHandler, {

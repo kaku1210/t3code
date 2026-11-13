@@ -44,7 +44,7 @@ import {
   resolveMergedStageDependencies,
   resolveBuildOptions,
   stageWslRuntimeArchive,
-  stageWindowsPortableInstaller,
+  nextPlusBuildVersion,
   ancestorNodeModulesPaths,
   copyDirectoryPreservingSymlinks,
   LinuxBrowserSecretHostError,
@@ -77,7 +77,6 @@ const encodeModuleUrl = Schema.encodeEffect(Schema.fromJsonString(Schema.String)
 const decodePackageVersion = Schema.decodeUnknownEffect(
   Schema.fromJsonString(Schema.Struct({ version: Schema.String })),
 );
-const decodeJson = Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Unknown));
 
 // Keeps pnpm from auto-installing TypeScript, a types-only peer, into the app.
 
@@ -532,7 +531,25 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         undefined,
       );
 
+      const plus = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.1.7-plus.20261113.1",
+        false,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+        "kaku1210/t3code",
+      );
+
       assert.isNull(preview.publish);
+      assert.deepStrictEqual(
+        plus.publish,
+        release.publish,
+        "a configured repository outranks the checkout's origin",
+      );
       assert.isString(preview.afterPack);
       assert.notProperty(preview, "afterSign");
       assert.isNull(previewChannel.publish);
@@ -551,6 +568,26 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
         ),
       ),
     ),
+  );
+
+  it.effect("publishes Plus builds to the checkout's GitHub repository by default", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "mac",
+        "dmg",
+        "0.1.7-plus.20261113.1",
+        false,
+        false,
+        undefined,
+        undefined,
+        false,
+        "arm64",
+        "kaku1210/t3code",
+      );
+      assert.deepStrictEqual(config.publish, [
+        { provider: "github", owner: "kaku1210", repo: "t3code", releaseType: "release" },
+      ]);
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
   );
 
   // pnpm writes "set this to true or false" placeholders into allowBuilds when a
@@ -1786,82 +1823,26 @@ it.effect.skipIf(!symlinksSupported)("rebases packaged links into the isolated t
   }).pipe(Effect.provide(NodeServices.layer)),
 );
 
-it.effect.each(["win-unpacked", "win-arm64-unpacked"])(
-  "exports a complete portable installer for %s with this build's metadata",
-  (payloadDirectory) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const root = yield* fs.makeTempDirectoryScoped({ prefix: "t3-portable-release-" });
-      const stageDistDir = path.join(root, "stage");
-      const packagedAppDir = path.join(stageDistDir, payloadDirectory);
-      const output = path.join(root, "release");
-      const appName = "T3 Code Plus (Nightly)";
-      const repoRoot = path.join(import.meta.dirname, "..");
-      const buildInfo = {
-        artifactVersion: "1.2.3-nightly.1",
-        upstreamVersion: "1.2.3",
-        repository: "kaku1210/t3code",
-        sourceBranch: "develop",
-        sourceRevision: "012345abcdef012345abcdef012345abcdef0123",
-        sourceDirty: false,
-        builtAt: "2026-11-09T00:00:00Z",
-        platform: "win32",
-        arch: payloadDirectory === "win-unpacked" ? "x64" : "arm64",
-      };
-      yield* fs.makeDirectory(path.join(packagedAppDir, "resources"), { recursive: true });
-      yield* fs.writeFileString(path.join(packagedAppDir, `${appName}.exe`), "electron");
-      yield* fs.writeFileString(path.join(packagedAppDir, "resources/app.asar"), "bundle");
-      yield* fs.writeFileString(path.join(stageDistDir, "portable.zip"), "zip");
-      yield* stageWindowsPortableInstaller({
-        repoRoot,
-        stageDistDir,
-        packagedAppDir,
-        appName,
-        version: "1.2.3-nightly.1",
-        sourceRevision: "012345abcdef",
-        buildInfo,
-      });
-      yield* copyDesktopBuildArtifacts(stageDistDir, output, true);
-
-      assert.deepStrictEqual(
-        yield* decodeJson(yield* fs.readFileString(path.join(output, "release.json"))),
-        {
-          appName,
-          version: "1.2.3-nightly.1",
-          sourceRevision: "012345abcdef",
-          payloadDirectory,
-          buildInfo,
-          files: [
-            { path: `${appName}.exe`, length: 8 },
-            { path: "resources/app.asar", length: 6 },
-          ],
-        },
-      );
-      assert.equal(
-        yield* fs.readFileString(path.join(output, payloadDirectory, "resources/app.asar")),
-        "bundle",
-      );
-      assert.equal(
-        yield* fs.readFileString(path.join(output, "install-desktop-portable.ps1")),
-        yield* fs.readFileString(path.join(repoRoot, "scripts/install-desktop-portable.ps1")),
-      );
-      assert.equal(
-        yield* fs.readFileString(path.join(output, "Install-T3-Code-Plus.cmd")),
-        yield* fs.readFileString(path.join(repoRoot, "scripts/install-desktop-portable.cmd")),
-      );
-      assert.deepStrictEqual(
-        (yield* fs.readDirectory(output)).sort(),
-        [
-          "Install-T3-Code-Plus.cmd",
-          "install-desktop-portable.ps1",
-          "portable.zip",
-          "release.json",
-          payloadDirectory,
-        ].sort(),
-      );
-    }).pipe(Effect.provide(NodeServices.layer), Effect.scoped),
-);
+it.each([
+  ["first package of the day", [], "0.1.7-plus.20261113.1"],
+  [
+    "after local installers and published tags",
+    [
+      "T3-Code-Plus-0.1.7-plus.20261113.2-x64.exe",
+      "T3-Code-Plus-0.1.7-plus.20261113.2-x64.exe.blockmap",
+      "v0.1.7-plus.20261113.4",
+      "T3-Code-Plus-0.1.7-plus.20261112.9-x64.exe",
+    ],
+    "0.1.7-plus.20261113.5",
+  ],
+  [
+    "ignoring other upstream versions",
+    ["v10.1.7-plus.20261113.8", "v0.1.17-plus.20261113.6", "v0.1.7-plus.202611130.3"],
+    "0.1.7-plus.20261113.1",
+  ],
+] as const)("numbers Plus build versions: %s", (_name, existing, expected) => {
+  assert.equal(nextPlusBuildVersion("0.1.7", "20261113", existing), expected);
+});
 
 it.effect("preserves packaged app directories from the dir target", () =>
   Effect.gen(function* () {

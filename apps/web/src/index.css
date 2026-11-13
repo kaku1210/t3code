@@ -125,9 +125,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
   --workspace-controls-left: calc(env(safe-area-inset-left) + 0.75rem);
   --workspace-update-center-right: calc(env(safe-area-inset-right) + 0.75rem);
   /* Floating panel controls need their own offset; header padding cannot move them. */
-  --workspace-controls-right: calc(
-    var(--workspace-update-center-right) + var(--workspace-update-center-width, 0px)
-  );
+  --workspace-controls-right: var(--workspace-update-center-right);
   --workspace-native-controls-inset: 0px;
   --workspace-titlebar-control-size: 1.75rem;
   --workspace-titlebar-control-gap: 0.75rem;
@@ -164,10 +162,6 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px) + 0.75rem
   );
   --workspace-native-controls-inset: var(--workspace-controls-right);
-}
-
-:root[data-update-center-visible="true"] {
-  --workspace-update-center-width: 7.5rem;
 }
 
 /* The font tokens are declared outside the inline theme so utilities reference

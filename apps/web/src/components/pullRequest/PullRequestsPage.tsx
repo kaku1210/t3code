@@ -1115,6 +1115,7 @@ export function PullRequestsPage() {
     <PanelLayoutControls
       showTerminalControl={false}
       showThreadPanelControl={false}
+      showUpdateCenter
       terminalAvailable={false}
       terminalOpen={false}
       terminalShortcutLabel={null}

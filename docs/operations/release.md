@@ -9,53 +9,77 @@ remain stable and nightly. To ship 0.1.0 Beta, use `channel=stable` and
 `version=0.1.0`. Removing the Beta label later is a branding change independent of
 the version.
 
-## Local Windows portable builds
+## T3 Code Plus Windows releases
 
-From the checkout, build a portable release with:
+T3 Code Plus ships one Windows artifact, the NSIS installer. The same file installs a new machine,
+updates other machines through the in-app updater, and powers **Quick local update** on a
+development machine. Build it from the checkout with:
 
 ```sh
-vp run dist:desktop:win:portable --arch x64 --build-version 0.1.7-plus.20261109.1
+git fetch --tags
+vp run dist:desktop:win:x64
 ```
 
-The default `release/` output is gitignored. Alongside the ordinary application ZIP, the build
-exports the complete unpacked application directory, `Install-T3-Code-Plus.cmd`,
-`install-desktop-portable.ps1`, and a fresh `release.json` describing that build's version,
-executable name, payload directory, and file sizes. Custom `--output-dir` paths work the same way.
-The NSIS installer build is unchanged.
+Without `--build-version`, the version is the upstream server version followed by
+`-plus.YYYYMMDD.N` in local time. `N` is one above the highest number already used that day by a
+`v<version>` tag or an installer in the output directory, so fetch tags first. Every new package
+needs a higher version, even when only uncommitted changes differ; clients skip a version they
+already run. The application records the upstream version, full package version, repository,
+branch, commit, dirty state, build time, platform and architecture.
 
-Plus packages retain the upstream version followed by `-plus.YYYYMMDD.N`; increase `N` for each
-new package on the same day, even when only uncommitted source changes differ. The application
-and portable manifest both record the upstream version, full package version, repository,
-branch, commit, dirty state, build time, platform and architecture. The update center compares
-upstream releases, same-branch commits and prepared package versions separately. A missing
-source identity is unknown, not evidence that a build is current.
+The gitignored `release/` output holds `T3-Code-Plus-<version>-x64.exe`, its `.blockmap` and
+`local-package.json`. The branch decides what a build is for:
 
-For a reusable double-click entry, run `Migrate-T3-Code-Plus.cmd` at the checkout root.
-It always uses that checkout's default `release/` output, so the same entry works after each
-new portable build. It does not build from source. For a custom `--output-dir`, use the
-installer exported into that directory instead. Keep the checkout entry in Git so each
-development machine can use its own local release without hard-coded source paths.
+- A `main` build is what other machines install. Its update feed points at the GitHub repository
+  of the checkout's `origin` (`T3CODE_DESKTOP_UPDATE_REPOSITORY` or `GITHUB_REPOSITORY` override
+  it), the build also writes `latest.yml`, and the title-bar **Updates** entry shows only the
+  latest T3 Code Plus release.
+- Any other branch, normally `develop`, is a development build. It has no update feed, so it never
+  replaces itself with a release. Its **Updates** entry compares upstream T3 Code, this branch on
+  the remote, and **Quick local update**.
 
-To migrate on either Windows development machine, keep the **entire output directory** together,
-exit the installed client including its tray icon, then run the exported CMD. Its default target
-is `D:\AI Program Files\T3 Code Plus`; pass `-DestinationRoot "E:\Apps\T3 Code Plus"` for a
-different location. The tool checks and stages the complete payload, retains the old installation
-as a timestamped backup, and restores it if activation fails. It does not start the app or copy
-profile data. The scripts under `scripts/` are templates; run the copies shipped with a release.
-Existing manifests without `payloadDirectory` continue to use `win-unpacked`.
+`local-package.json` is only for quick local update and is written last, after the installer is
+complete.
 
-Packaged Windows builds from the exact `develop` branch also offer **Quick local update** in
-**Settings → About**. Select this checkout's migration CMD or an exported release CMD. Its
-prepared package must include the new source metadata and match the running branch, repository
-and architecture. The title-bar update center preflights the package, asks to exit, then hands
-off outside the installation. It explicitly targets the current installation root, preserves
-the installer's backup and rollback, and opens the new client once. Automated invocation skips
-the CMD pause and exits all coordinator processes. Logs and `result.json` remain in the temporary
-`t3code-local-update-*` directory named in a failure message. Manual CMD use still pauses and
-leaves launch timing to the user. The first update-center build must be installed manually.
+### Publish on every merge to main
 
-Keep source, installer templates and these instructions in Git. Distribute application binaries
-separately; never commit release directories, profile databases, credentials or local `.t3` state.
+Each merge into `main` publishes a GitHub release so other machines update. From a clean `main`:
+
+```sh
+git switch main && git pull && git fetch --tags
+vp run dist:desktop:win:x64
+version=<version printed by the build>
+git tag "v$version" && git push origin "v$version"
+gh release create "v$version" --repo <origin owner/repo> --title "T3 Code Plus $version" \
+  --notes "<merged changes>" \
+  "release/T3-Code-Plus-$version-x64.exe" \
+  "release/T3-Code-Plus-$version-x64.exe.blockmap" \
+  release/latest.yml
+```
+
+Publish it as a normal release, not a draft or prerelease: the updater reads the repository's
+latest release and its `latest.yml`. Never publish a `develop` build: it has no `latest.yml`, and
+installing it would leave that machine without updates. Do not upload `local-package.json`. Clients installed before
+the update feed existed must install one new installer by hand.
+
+### Quick local update
+
+Development builds offer **Settings → About → Quick local update**, which takes the checkout
+folder. It compares the checkout's Git state with the running build and reads
+`release/local-package.json` as soon as a build writes that file, a commit, checkout, merge or reset
+appends to `.git/logs/HEAD`, or `release/.refresh-local-update` changes, and otherwise every
+10 minutes. Builds and commits therefore refresh the entry by themselves;
+`vp run notify:local-update` asks for a comparison of uncommitted changes. A newer
+package for the same repository, platform and architecture enables **Update and restart**. The
+client exits normally and hands off to `apps/desktop/resources/local-update.ps1`, which shows a
+progress window, waits until no process runs from the installation folder, runs the installer
+silently with `--updated /S /D=<install directory>`, checks the installed version, and reopens the
+app through Explorer. Electron keeps its children in a job object that kills them on exit, even
+`detached` ones, so the client starts this coordinator through `Win32_Process.Create` instead.
+Failures show a message with the log in the temporary `t3code-local-update-*` folder.
+
+Keep source and these instructions in Git. Distribute application binaries through releases;
+never commit release directories, profile databases, credentials or local `.t3` state.
 Use an isolated development home when running from source, as described in
 [Development](development.md), so development and everyday use do not share a live database.
 

@@ -17,7 +17,7 @@ import {
 
 import { fromYaml } from "@t3tools/shared/schemaYaml";
 import * as HostProcess from "@t3tools/shared/HostProcess";
-import type { DesktopBuildInfo } from "@t3tools/contracts";
+import { type DesktopBuildInfo, LOCAL_PACKAGE_INFO_FILE } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
@@ -863,6 +863,49 @@ const spawnAndCollectOutput = Effect.fn("spawnAndCollectOutput")(function* (
   );
 
   return { stdout, stderr, exitCode } as const;
+});
+
+/**
+ * Plus packages are `upstream-plus.YYYYMMDD.N`. N follows the highest one already used that day,
+ * from release tags (published packages) and installer names in the output directory (local ones).
+ */
+export function nextPlusBuildVersion(
+  upstreamVersion: string,
+  date: string,
+  existingNames: readonly string[],
+): string {
+  const prefix = `${upstreamVersion}-plus.${date}.`;
+  const pattern = new RegExp(`(?<![\\d.])${prefix.replaceAll(".", "\\.")}(\\d+)(?!\\d)`);
+  let highest = 0;
+  for (const name of existingNames) {
+    const match = pattern.exec(name);
+    if (match) highest = Math.max(highest, Number(match[1]));
+  }
+  return `${prefix}${highest + 1}`;
+}
+
+const resolveDefaultPlusVersion = Effect.fn("resolveDefaultPlusVersion")(function* (
+  repoRoot: string,
+  outputDir: string,
+  upstreamVersion: string,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const now = DateTime.toDate(yield* DateTime.now);
+  const date = [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+    .map((part) => String(part).padStart(2, "0"))
+    .join("");
+  const files = yield* fs.readDirectory(outputDir).pipe(Effect.orElseSucceed(() => []));
+  const tags = yield* spawnAndCollectOutput(
+    ChildProcess.make("git", ["tag", "--list", `v${upstreamVersion}-plus.${date}.*`], {
+      cwd: repoRoot,
+    }),
+  ).pipe(
+    Effect.map((result) => (result.exitCode === 0 ? result.stdout.split(/\r?\n/) : [])),
+    Effect.orElseSucceed(() => []),
+  );
+  const version = nextPlusBuildVersion(upstreamVersion, date, [...files, ...tags]);
+  yield* Effect.log(`[desktop-artifact] Using build version ${version}.`);
+  return version;
 });
 
 const resolveGitCommitHash = Effect.fn("resolveGitCommitHash")(function* (repoRoot: string) {
@@ -2694,6 +2737,7 @@ export function resolveDesktopRuntimeDependencies(
 
 export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig")(function* (
   updateChannel: "latest" | "nightly",
+  defaultRepository?: string,
 ) {
   const env = yield* Config.all({
     updateRepository: Config.String("T3CODE_DESKTOP_UPDATE_REPOSITORY").pipe(Config.option),
@@ -2702,6 +2746,7 @@ export const resolveGitHubPublishConfig = Effect.fn("resolveGitHubPublishConfig"
   const rawRepo = (
     Option.getOrUndefined(env.updateRepository)?.trim() ||
     Option.getOrUndefined(env.githubRepository)?.trim() ||
+    defaultRepository?.trim() ||
     ""
   ).trim();
   if (!rawRepo) return undefined;
@@ -2768,6 +2813,8 @@ export function resolveDesktopProductName(version: string): string {
     : productName;
 }
 
+const DESKTOP_ARTIFACT_NAME = "T3-Code-Plus-${version}-${arch}.${ext}";
+
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
@@ -2783,6 +2830,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     | undefined,
   wslRuntimeBundled = false,
   arch?: typeof BuildArch.Type,
+  updateRepository?: string,
 ) {
   const buildConfig: Record<string, unknown> = {
     // Windows must finish editing the EXE before running it to prepare bytecode: executing it
@@ -2793,7 +2841,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     ),
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-Plus-${version}-${arch}.${ext}",
+    artifactName: DESKTOP_ARTIFACT_NAME,
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
@@ -2822,7 +2870,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   // Missing publish config infers a GitHub feed from tokens; staging has no repository, so manifest generation would crash.
   buildConfig.publish = null;
   if (!isDesktopPreviewVersion(version)) {
-    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
+    const publishConfig = yield* resolveGitHubPublishConfig(updateChannel, updateRepository);
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
     } else if (mockUpdates) {
@@ -3654,7 +3702,9 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       }),
   });
 
-  const appVersion = options.version ?? serverPackageJson.version;
+  const appVersion =
+    options.version ??
+    (yield* resolveDefaultPlusVersion(repoRoot, options.outputDir, serverPackageJson.version));
   const iconAssets = resolveDesktopBuildIconAssets(appVersion);
   const commitHash = yield* resolveGitCommitHash(repoRoot);
   const gitSource = yield* Effect.forEach(
@@ -3928,6 +3978,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
         : undefined,
       bundlesWslRuntime({ platform: options.platform, runtimeArchivePath: options.wslRuntime }),
       options.arch,
+      // Only main builds are released; development builds must not update themselves to one.
+      buildInfo.sourceBranch === "main" ? buildInfo.repository || undefined : undefined,
     ),
     dependencies: stageDependencies,
     devDependencies: {
@@ -4086,9 +4138,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
     });
   }
 
-  const windowsPortable = options.platform === "win" && options.target === "zip";
   if (options.platform === "win") {
-    const payload = yield* validateWindowsPackagedPayload({
+    yield* validateWindowsPackagedPayload({
       stageDistDir,
       appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
       targetArch: options.arch,
@@ -4099,17 +4150,6 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       }),
       verbose: options.verbose,
     });
-    if (windowsPortable) {
-      yield* stageWindowsPortableInstaller({
-        repoRoot,
-        stageDistDir,
-        packagedAppDir: payload.packagedAppDir,
-        appName: resolveDesktopProductName(appVersion),
-        version: appVersion,
-        sourceRevision: commitHash,
-        buildInfo,
-      });
-    }
   }
   // x64 builds on arm64 runners; the arm64 check covers the shared JS bundle.
   if (options.platform === "mac" && options.arch === "arm64" && hostPlatform === "darwin") {
@@ -4119,7 +4159,7 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
   const copiedArtifacts = yield* copyDesktopBuildArtifacts(
     stageDistDir,
     options.outputDir,
-    options.target === "dir" || windowsPortable,
+    options.target === "dir",
   );
 
   if (copiedArtifacts.length === 0) {
@@ -4128,6 +4168,10 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       platform: options.platform,
       arch: options.arch,
     });
+  }
+
+  if (options.platform === "win" && options.target === "nsis") {
+    yield* writeLocalPackageInfo(options.outputDir, buildInfo);
   }
 
   yield* Effect.log("[desktop-artifact] Done. Artifacts:").pipe(
@@ -4143,50 +4187,31 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
 });
 
 /**
- * Adds the manual installer beside a validated Windows payload. The manifest describes only
- * this build's application files; no machine paths, profile data or credentials are copied.
- * The final artifact export includes the payload directory for ZIP builds as well as dir builds.
+ * Points a checkout's quick local update at the installer this build produced. It is written after
+ * every artifact is copied so a running client never offers a partially copied installer.
  */
-export const stageWindowsPortableInstaller = Effect.fn("stageWindowsPortableInstaller")(
-  function* (input: {
-    readonly repoRoot: string;
-    readonly stageDistDir: string;
-    readonly packagedAppDir: string;
-    readonly appName: string;
-    readonly version: string;
-    readonly sourceRevision: string;
-    readonly buildInfo?: DesktopBuildInfo;
-  }) {
-    const fs = yield* FileSystem.FileSystem;
-    const path = yield* Path.Path;
-    const files: Array<{ path: string; length: number }> = [];
-    for (const relative of (yield* fs.readDirectory(input.packagedAppDir, {
-      recursive: true,
-    })).sort()) {
-      const stat = yield* fs.stat(path.join(input.packagedAppDir, relative));
-      if (stat.type === "File") {
-        files.push({ path: relative.split(path.sep).join("/"), length: Number(stat.size) });
-      }
-    }
-    yield* fs.copyFile(
-      path.join(input.repoRoot, "scripts/install-desktop-portable.ps1"),
-      path.join(input.stageDistDir, "install-desktop-portable.ps1"),
+export const writeLocalPackageInfo = Effect.fn("writeLocalPackageInfo")(function* (
+  outputDir: string,
+  buildInfo: DesktopBuildInfo,
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const installer = DESKTOP_ARTIFACT_NAME.replace("${version}", buildInfo.artifactVersion)
+    .replace("${arch}", buildInfo.arch)
+    .replace("${ext}", "exe");
+  if (!(yield* fs.exists(path.join(outputDir, installer)))) {
+    yield* Effect.logWarning(
+      `[desktop-artifact] ${installer} was not produced; quick local update is not updated.`,
     );
-    yield* fs.copyFile(
-      path.join(input.repoRoot, "scripts/install-desktop-portable.cmd"),
-      path.join(input.stageDistDir, "Install-T3-Code-Plus.cmd"),
-    );
-    const manifest = yield* encodeJsonString({
-      appName: input.appName,
-      version: input.version,
-      sourceRevision: input.sourceRevision,
-      ...(input.buildInfo ? { buildInfo: input.buildInfo } : {}),
-      payloadDirectory: path.basename(input.packagedAppDir),
-      files,
-    });
-    yield* fs.writeFileString(path.join(input.stageDistDir, "release.json"), `${manifest}\n`);
-  },
-);
+    return;
+  }
+  const info = yield* encodeJsonString({
+    version: buildInfo.artifactVersion,
+    installer,
+    buildInfo,
+  });
+  yield* fs.writeFileString(path.join(outputDir, LOCAL_PACKAGE_INFO_FILE), `${info}\n`);
+});
 
 export const copyDesktopBuildArtifacts = Effect.fn("copyDesktopBuildArtifacts")(function* (
   stageDistDir: string,

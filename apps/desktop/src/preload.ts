@@ -277,7 +277,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   updateCenter: {
     getState: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_GET_CHANNEL),
     configure: (change) => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CONFIGURE_CHANNEL, change),
-    chooseCommand: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CHOOSE_CHANNEL),
+    chooseSource: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CHOOSE_CHANNEL),
     check: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_CHECK_CHANNEL),
     install: () => ipcRenderer.invoke(IpcChannels.UPDATE_CENTER_INSTALL_CHANNEL),
     onState: (listener) => {

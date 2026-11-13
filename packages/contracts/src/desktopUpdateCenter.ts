@@ -1,3 +1,4 @@
+import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { DesktopUpdateReleaseNoteSchema } from "./ipc.ts";
 
@@ -15,17 +16,37 @@ export const DesktopBuildInfo = Schema.Struct({
 });
 export type DesktopBuildInfo = typeof DesktopBuildInfo.Type;
 
+/** `main` builds are what other machines install; every other branch is a development build. */
+export function isReleaseBuild(build: Pick<DesktopBuildInfo, "sourceBranch">): boolean {
+  return build.sourceBranch === "main";
+}
+
+/** Name of the file a Windows installer build writes beside its NSIS installer in `release/`. */
+export const LOCAL_PACKAGE_INFO_FILE = "local-package.json";
+/** Touching this file in `release/` asks a client watching the checkout to compare it again. */
+export const LOCAL_UPDATE_REFRESH_FILE = ".refresh-local-update";
+
+/** Describes the newest installer in a checkout's `release/` directory for quick local updates. */
+export const DesktopLocalPackageInfo = Schema.Struct({
+  version: Schema.String,
+  /** Installer file name inside the same `release/` directory. */
+  installer: Schema.String,
+  buildInfo: DesktopBuildInfo,
+});
+export type DesktopLocalPackageInfo = typeof DesktopLocalPackageInfo.Type;
+
 export const DesktopUpdateCenterPreferences = Schema.Struct({
   checkingEnabled: Schema.Boolean,
   quickUpdateEnabled: Schema.Boolean,
-  commandPath: Schema.NullOr(Schema.String),
+  /** Local T3 Code Plus checkout whose `release/` directory holds the installer to apply. */
+  sourcePath: Schema.NullOr(Schema.String).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
 });
 export type DesktopUpdateCenterPreferences = typeof DesktopUpdateCenterPreferences.Type;
 
 export const DEFAULT_UPDATE_CENTER_PREFERENCES: DesktopUpdateCenterPreferences = {
   checkingEnabled: true,
   quickUpdateEnabled: false,
-  commandPath: null,
+  sourcePath: null,
 };
 
 /** A GitHub commit returned for the checked branch or update range. */
@@ -42,6 +63,7 @@ export const DesktopUpdateSource = Schema.Struct({
     "checking",
     "current",
     "available",
+    "needs-build",
     "ahead",
     "diverged",
     "error",
@@ -66,6 +88,8 @@ export const DesktopUpdateCenterState = Schema.Struct({
   build: DesktopBuildInfo,
   upstream: DesktopUpdateSource,
   repository: DesktopUpdateSource,
+  /** Latest published T3 Code Plus release, which the built-in updater installs. */
+  release: DesktopUpdateSource,
   local: DesktopUpdateSource,
   installing: Schema.Boolean,
 });
@@ -81,7 +105,7 @@ export type DesktopUpdateCenterChange = typeof DesktopUpdateCenterChange.Type;
 export interface DesktopUpdateCenterBridge {
   getState(): Promise<DesktopUpdateCenterState>;
   configure(change: DesktopUpdateCenterChange): Promise<DesktopUpdateCenterState>;
-  chooseCommand(): Promise<DesktopUpdateCenterState>;
+  chooseSource(): Promise<DesktopUpdateCenterState>;
   check(): Promise<DesktopUpdateCenterState>;
   install(): Promise<boolean>;
   onState(listener: (state: DesktopUpdateCenterState) => void): () => void;

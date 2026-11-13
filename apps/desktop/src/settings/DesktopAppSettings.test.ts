@@ -97,19 +97,19 @@ function writeSettingsPatch(patch: typeof DesktopSettingsPatch.Type) {
 }
 
 describe("DesktopSettings", () => {
-  it.effect("persists update-center switches and this machine's CMD path across reloads", () =>
+  it.effect("persists update-center switches and this machine's source path across reloads", () =>
     withSettings(
       Effect.gen(function* () {
         const settings = yield* DesktopAppSettings.DesktopAppSettings;
         assert.deepEqual((yield* settings.load).updateCenter, {
           checkingEnabled: true,
           quickUpdateEnabled: false,
-          commandPath: null,
+          sourcePath: null,
         });
         const preferences = {
           checkingEnabled: false,
           quickUpdateEnabled: true,
-          commandPath: "D:\\开发\\Migrate-T3-Code-Plus.cmd",
+          sourcePath: "D:\\开发\\t3codeplus",
         };
         yield* settings.setUpdateCenter(preferences);
         assert.deepEqual((yield* settings.load).updateCenter, preferences);
@@ -118,6 +118,31 @@ describe("DesktopSettings", () => {
           (yield* settings.load).updateCenter,
           DesktopAppSettings.DEFAULT_DESKTOP_SETTINGS.updateCenter,
         );
+      }),
+    ),
+  );
+  it.effect("keeps update-center switches saved with the retired CMD path", () =>
+    withSettings(
+      Effect.gen(function* () {
+        const environment = yield* DesktopEnvironment.DesktopEnvironment;
+        const fileSystem = yield* FileSystem.FileSystem;
+        yield* fileSystem.makeDirectory(environment.stateDir, { recursive: true });
+        yield* fileSystem.writeFileString(
+          environment.desktopSettingsPath,
+          JSON.stringify({
+            updateCenter: {
+              checkingEnabled: false,
+              quickUpdateEnabled: true,
+              commandPath: "D:\\开发\\Migrate-T3-Code-Plus.cmd",
+            },
+          }),
+        );
+        const settings = yield* DesktopAppSettings.DesktopAppSettings;
+        assert.deepEqual((yield* settings.load).updateCenter, {
+          checkingEnabled: false,
+          quickUpdateEnabled: true,
+          sourcePath: null,
+        });
       }),
     ),
   );
