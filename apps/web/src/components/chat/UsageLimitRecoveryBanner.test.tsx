@@ -22,12 +22,13 @@ function bannerDescription(resetAt: Date, timestampFormat: TimestampFormat) {
 }
 
 describe("usageLimitRecoveryBannerItem", () => {
+  // The day-period marker follows the host locale ("5:30 PM", "下午5:30"); the hour cycle is ours.
   it.each([
-    ["12-hour", "Resets 5:30 PM"],
-    ["24-hour", "Resets 17:30"],
+    ["12-hour", /^Resets \D*5:30\D*$/],
+    ["24-hour", /^Resets 17:30$/],
   ] as const)("formats a same-day reset with the %s setting", (timestampFormat, expected) => {
     using _now = vi.spyOn(Date, "now").mockReturnValue(stoppedAt.getTime());
-    expect(bannerDescription(new Date(2026, 9, 20, 17, 30), timestampFormat)).toBe(expected);
+    expect(bannerDescription(new Date(2026, 9, 20, 17, 30), timestampFormat)).toMatch(expected);
   });
 
   it("names the day when the reset is tomorrow", () => {
