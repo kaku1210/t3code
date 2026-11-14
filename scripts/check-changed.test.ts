@@ -451,8 +451,10 @@ it.each(["install", "lint"])("reports a failing %s step with its output", (step)
     "install",
     "--lockfile-only",
     "--ignore-scripts",
+    "--prefer-offline",
   ]);
-  expect(install?.cwd).not.toBe(project.root);
+  expect(NodePath.dirname(install!.cwd)).toBe(NodePath.join(project.root, "node_modules/.cache"));
+  expect(NodeFS.existsSync(install!.cwd)).toBe(false);
   expect(result.stdout + result.stderr).toContain(`fixture stdout: ${step}`);
   expect(result.stdout + result.stderr).toContain(`fixture stderr: ${step}`);
   expect(result.stdout).toContain(step === "install" ? "FAIL  unused patches" : "FAIL  lint");
