@@ -430,10 +430,17 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
 
   // Resolve without the lockfile in a temp copy to preserve the working tree and lockfile.
   // Copy mobile modules too: they are file: dependencies, not workspace packages.
-  // Cached registry metadata limits this to patches stranded by local changes, not registry drift.
+  // Prefer cached registry metadata; missing entries still use the configured registry.
   const checkPatches = Effect.scoped(
     Effect.gen(function* () {
-      const temp = yield* fs.makeTempDirectoryScoped({ prefix: "t3-patch-check-" });
+      // pnpm chooses its default store by disk. A system temp directory on another
+      // drive would use a different store from the checkout, even with a warm install.
+      const tempParent = inRoot("node_modules/.cache");
+      yield* fs.makeDirectory(tempParent, { recursive: true });
+      const temp = yield* fs.makeTempDirectoryScoped({
+        directory: tempParent,
+        prefix: "t3-patch-check-",
+      });
       const copy = Effect.fnUntraced(function* (relative: string) {
         const dest = path.join(temp, relative);
         yield* fs.makeDirectory(path.dirname(dest), { recursive: true });
@@ -452,7 +459,11 @@ const checkChanged = Effect.fn("checkChanged")(function* (input: {
       for (const extra of ["apps/mobile/deps", "patches", ".pnpmfile.cjs"]) {
         if (yield* fs.exists(inRoot(extra))) yield* copy(extra);
       }
-      const result = yield* vp(["install", "--lockfile-only", "--ignore-scripts"], temp);
+      yield* Console.log("\n> vp unused patches  resolving dependency metadata (cache preferred)");
+      const result = yield* vp(
+        ["install", "--lockfile-only", "--ignore-scripts", "--prefer-offline"],
+        temp,
+      );
       if (result.ok || !result.output.includes("ERR_PNPM_UNUSED_PATCH")) return result;
       return {
         ok: false,

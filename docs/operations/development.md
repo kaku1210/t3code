@@ -213,6 +213,16 @@ change the limit (`1` runs the steps one by one). A step that runs past `--timeo
 run's summary instead of running again. Any change to a file, the install, or a generated file runs
 the checks again.
 
+Manifest and dependency-patch changes also resolve an isolated workspace under
+`node_modules/.cache`, on the checkout's disk so pnpm can reuse its default package store.
+This check prefers cached registry metadata and fetches missing entries. It reports when
+resolution starts; a cold cache can still require a lengthy registry check. Lifecycle scripts
+stay disabled, supply-chain policies still apply, and the temporary workspace is removed
+after success or failure without changing the checkout's lockfile.
+
+After syncing changes that add workspace packages, run `vp i --frozen-lockfile` again.
+Packages present in the shared store still need links in each workspace's `node_modules`.
+
 While you iterate, run single checks:
 
 ```sh
